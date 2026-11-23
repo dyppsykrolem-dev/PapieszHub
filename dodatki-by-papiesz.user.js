@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.49.4
+// @version      2.51.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2132,6 +2132,132 @@
     return root;
   }
 
+  const AURA_ON_KEY = 'gi_aura_on_v1', AURA_CFG_KEY = 'gi_aura_cfg_v1';
+  let auraEnabled = (() => { try { return localStorage.getItem(AURA_ON_KEY) === '1'; } catch (e) { return false; } })();
+  const AURA_COLORS = {
+    fire: ['Ogień', '#ff6d00', '#ffb300', '#fff3b0'],
+    blue: ['Niebieski ogień', '#1e6bff', '#4fc3f7', '#e8fbff'],
+    green: ['Zielony', '#2e9d3a', '#7be06f', '#eaffd9'],
+    violet: ['Fioletowy', '#7a35ff', '#c9a0ff', '#f5eaff'],
+    gold: ['Złoty', '#c79100', '#ffd54f', '#fffbe0']
+  };
+  function buildAuraView() {
+    const cfg = Object.assign({ style: 'fire', color: 'fire', custom: '#ff3d71', int: 1, spd: 1, pad: 10 }, readLS(AURA_CFG_KEY, {}));
+    const save = () => { writeLS(AURA_CFG_KEY, cfg); built = ''; scan(); };
+    document.head.append(el('style', { textContent: `
+      @property --gi-a{syntax:'<angle>';inherits:false;initial-value:0deg}
+      #gi-eqaura{position:fixed;z-index:99985;pointer-events:none;display:none}
+      #gi-eqaura .gi-ea-edge{position:absolute;left:0;top:0;transform-origin:0 0}
+      #gi-eqaura .gi-ea-edge span{position:absolute;bottom:-4px;border-radius:50% 50% 30% 30% / 80% 80% 20% 20%;transform-origin:50% 100%;filter:blur(1px);
+        background:radial-gradient(ellipse at 50% 100%,var(--c3) 0%,var(--c2) 28%,var(--c1) 58%,transparent 76%);animation:gi-eaflick var(--t) ease-in-out infinite alternate}
+      @keyframes gi-eaflick{0%{transform:scale(.8,.55) skewX(-7deg);opacity:.65}45%{transform:scale(1.05,1) skewX(6deg);opacity:.95}100%{transform:scale(1.08,1.15) skewX(-4deg);opacity:1}}
+      #gi-eqaura .gi-ea-ring{position:absolute;inset:0;border-radius:10px;padding:3px;
+        background:conic-gradient(from var(--gi-a),transparent,var(--c2) 22%,var(--c3) 30%,transparent 50%,var(--c1) 72%,var(--c2) 80%,transparent);
+        -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+        animation:gi-earot calc(var(--t)*5) linear infinite;filter:drop-shadow(0 0 5px var(--c2))}
+      @keyframes gi-earot{to{--gi-a:360deg}}
+      #gi-eqaura .gi-ea-glow{position:absolute;inset:0;border-radius:10px;animation:gi-eapulse calc(var(--t)*3) ease-in-out infinite alternate}
+      @keyframes gi-eapulse{from{box-shadow:0 0 6px 1px var(--c1),inset 0 0 8px 0 var(--c1);opacity:.65}to{box-shadow:0 0 22px 5px var(--c2),inset 0 0 16px 2px var(--c1);opacity:1}}
+    ` }));
+    const ov = el('div', { id: 'gi-eqaura' });
+    const rgbHex = h => /^#[0-9a-f]{6}$/i.test(h) ? h : '#ff6d00';
+    const mix = (h, k) => { const n = parseInt(rgbHex(h).slice(1), 16); const f = c => Math.round(c + (255 - c) * k); return '#' + [f(n >> 16 & 255), f(n >> 8 & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); };
+    const palette = () => cfg.color === 'custom' ? [rgbHex(cfg.custom), mix(cfg.custom, .35), mix(cfg.custom, .85)] : AURA_COLORS[cfg.color].slice(1);
+    let built = '', flameLen = 0;
+    function build(w, h) {
+      const [c1, c2, c3] = palette();
+      const H = Math.round(18 * cfg.int + 8);
+      const t = (0.8 / cfg.spd).toFixed(2);
+      ov.style.cssText = `--c1:${c1};--c2:${c2};--c3:${c3};--t:${t}s;display:block`;
+      ov.replaceChildren();
+      if (cfg.style === 'ring') { ov.append(el('div', { className: 'gi-ea-glow' }), el('div', { className: 'gi-ea-ring' })); }
+      else if (cfg.style === 'glow') { ov.append(el('div', { className: 'gi-ea-glow' })); }
+      else {
+        ov.append(el('div', { className: 'gi-ea-glow', style: 'opacity:.5' }));
+        const edge = (len, tf) => {
+          const e = el('div', { className: 'gi-ea-edge' });
+          e.style.cssText = `width:${len}px;height:${H}px;transform:${tf}`;
+          const n = Math.max(4, Math.round(len / 13));
+          for (let i = 0; i < n; i++) {
+            const sp = el('span'); const wd = 14 + Math.random() * 20;
+            sp.style.cssText = `left:${(i / n) * 100 - 1 + Math.random() * 2}%;width:${wd}px;height:${H * (0.55 + Math.random() * 0.6)}px;animation-delay:${(-Math.random() * 0.9).toFixed(2)}s;animation-duration:${(0.5 + Math.random() * 0.5).toFixed(2)}s`;
+            e.append(sp);
+          }
+          return e;
+        };
+        ov.append(edge(w, `translate(0,${-H}px)`), edge(w, `translate(0,${h + H}px) scaleY(-1)`), edge(h, `translate(${-H}px,${h}px) rotate(-90deg)`), edge(h, `translate(${w + H}px,0) rotate(90deg)`));
+      }
+      flameLen = w + h;
+    }
+    const isEquipped = (node, d) => {
+      const loc = d && d.loc != null ? String(d.loc) : '';
+      if (loc) return loc === 's';
+      return !!node.closest('[class*="equip" i],[class*="eq-" i]');
+    };
+    let testUntil = 0;
+    function equippedRects() {
+      const out = [];
+      document.querySelectorAll('[class*="item-id-"]').forEach(node => {
+        if (node.closest('#gi-panel,.gi-float,[class*="tip" i],[class*="loot" i]')) return;
+        const id = idOf(node); if (!id) return;
+        if (!isEquipped(node, itemData(id))) return;
+        const r = node.getBoundingClientRect();
+        if (r.width < 4 || r.height < 4) return;
+        out.push(r);
+      });
+      return out;
+    }
+    function scan() {
+      if (!auraEnabled) { ov.style.display = 'none'; return; }
+      const rs = equippedRects();
+      if (!rs.length) { ov.style.display = 'none'; return; }
+      const pad = Math.max(0, Number(cfg.pad) || 0);
+      const L = Math.min(...rs.map(r => r.left)) - pad, T = Math.min(...rs.map(r => r.top)) - pad;
+      const R = Math.max(...rs.map(r => r.right)) + pad, B = Math.max(...rs.map(r => r.bottom)) + pad;
+      const w = Math.round(R - L), h = Math.round(B - T);
+      if (!ov.isConnected) document.body.append(ov);
+      const key = [cfg.style, cfg.color, cfg.custom, cfg.int, cfg.spd, Math.round(w / 8), Math.round(h / 8)].join('|');
+      if (key !== built) { built = key; build(w, h); }
+      ov.style.display = 'block';
+      ov.style.left = Math.round(L) + 'px'; ov.style.top = Math.round(T) + 'px'; ov.style.width = w + 'px'; ov.style.height = h + 'px';
+    }
+    setInterval(() => { try { scan(); } catch (err) { log('aura – błąd', err); } }, 250);
+
+    const mkSel = (key, opts, num) => { const sl = el('select'); opts.forEach(([v, l]) => sl.append(el('option', { value: v, textContent: l, selected: String(cfg[key]) === String(v) }))); sl.addEventListener('change', () => { cfg[key] = num ? Number(sl.value) : sl.value; if (key === 'color') customRow.style.display = cfg.color === 'custom' ? '' : 'none'; save(); }); return sl; };
+    const customIn = el('input', { type: 'color', value: rgbHex(cfg.custom) });
+    customIn.style.cssText = 'width:34px;height:20px;padding:0;vertical-align:middle';
+    customIn.addEventListener('input', () => { cfg.custom = customIn.value; save(); });
+    const customRow = el('div', { style: 'margin:2px 0;display:' + (cfg.color === 'custom' ? '' : 'none') }, 'Własny kolor: ', customIn);
+    const padIn = isolate(el('input', { type: 'number', min: 0, max: 60, value: cfg.pad }));
+    padIn.style.cssText = 'width:52px';
+    padIn.addEventListener('change', () => { cfg.pad = Math.min(60, Math.max(0, Number(padIn.value) || 0)); save(); });
+    const dbg = isolate(el('textarea', { rows: 6, readOnly: true, placeholder: 'Diagnostyka aury' })); dbg.style.fontSize = '10px';
+    const dbgBtn = el('button', { textContent: 'Pokaż znalezione przedmioty' });
+    dbgBtn.addEventListener('click', () => {
+      const all = [...document.querySelectorAll('[class*="item-id-"]')].filter(n => !n.closest('#gi-panel,.gi-float')).slice(0, 80).map(n => { const id = idOf(n), d = itemData(id) || {}, r = n.getBoundingClientRect(); return { id, loc: d.loc, st: d.st, eq: isEquipped(n, d), w: Math.round(r.width), h: Math.round(r.height), cls: clsOf(n).slice(0, 50), parent: clsOf(n.parentElement || document.body).slice(0, 40) }; });
+      dbg.value = JSON.stringify({ znalezionoZalozonych: all.filter(x => x.eq).length, przedmioty: all }, null, 1); dbg.select();
+      if (navigator.clipboard) navigator.clipboard.writeText(dbg.value).catch(() => {});
+    });
+    const root = el('div');
+    root.settingsBox = setTabs([
+      ['Wizualne', [
+        el('div', { textContent: 'Aura otacza cały obszar, w którym leżą Twoje założone przedmioty (widoczna, gdy okno ekwipunku jest otwarte).', style: 'color:#888;margin-bottom:4px' }),
+        el('div', {}, 'Styl: ', mkSel('style', [['fire', 'Płomienie dookoła'], ['ring', 'Obracająca się ramka energii'], ['glow', 'Pulsująca poświata']])),
+        el('div', {}, 'Kolor: ', mkSel('color', Object.keys(AURA_COLORS).map(k => [k, AURA_COLORS[k][0]]).concat([['custom', 'Własny…']]))),
+        customRow,
+        el('div', {}, 'Siła: ', mkSel('int', [[0.6, 'Delikatna'], [1, 'Normalna'], [1.6, 'Mocna'], [2.2, 'Bardzo mocna']], true)),
+        el('div', {}, 'Tempo: ', mkSel('spd', [[0.6, 'Wolne'], [1, 'Normalne'], [1.7, 'Szybkie']], true))
+      ]],
+      ['Funkcje', [
+        el('div', {}, 'Odstęp od przedmiotów (px): ', padIn),
+        el('details', { style: 'margin-top:4px' }, el('summary', { textContent: 'Diagnostyka' }), dbgBtn, dbg)
+      ]]
+    ]);
+    root.test = () => { built = ''; scan(); };
+    root.stop = () => { ov.style.display = 'none'; };
+    return root;
+  }
+
   let panel, status, selBox, pickBtn, rulesBox, urlIn, prev, scopeSel, dumpBox;
   function setStatus(t) { if (status) status.textContent = t; }
 
@@ -2450,6 +2576,7 @@
       } catch (err) { log('błąd okna dropów', err); return { el: el('div'), toggle() {}, restore() {}, setOpen() {} }; }
     })();
     const flameView = safeView('Ogień przy dropie', buildFlameView);
+    const auraView = safeView('Aura ekwipunku', buildAuraView);
     const relogView = safeView('Przelogowanie', buildRelogView);
     const relogWin = (() => {
       try {
@@ -2476,6 +2603,7 @@
     const respSetWin = mkSetWin('gi-resp-set', 'Ustawienia – Minutnik', 'gi_win_respset_v1', respView.settingsBox || el('div'), 330);
     const dropsSetWin = mkSetWin('gi-drops-set', 'Ustawienia – Ostatnie dropy', 'gi_win_dropset_v1', dropsView.settingsBox || el('div'), 330);
     const relogSetWin = mkSetWin('gi-relog-set', 'Ustawienia – Przelogowanie', 'gi_win_relogset_v1', relogView.settingsBox || el('div'), 330);
+    const auraSetWin = mkSetWin('gi-aura-set', 'Ustawienia – Aura ekwipunku', 'gi_win_auraset_v1', auraView.settingsBox || el('div'), 340);
     const flameSetWin = mkSetWin('gi-flame-set', 'Ustawienia – Ogień przy dropie', 'gi_win_flameset_v1', flameView.settingsBox || el('div'), 330);
     relogView.openSettings = () => relogSetWin.toggle();
     respView.openSettings = () => respSetWin.toggle();
@@ -2499,6 +2627,10 @@
         settings: () => flameSetWin.toggle(),
         isOn: () => flameEnabled,
         setOn: v => { flameEnabled = v; try { localStorage.setItem(FLAME_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (flameView.stop) flameView.stop(); flameSetWin.setOpen(false); } } },
+      { id: 'aura', icon: '✨', title: 'Aura ekwipunku', desc: 'Animowana aura (płomienie, obracająca się ramka lub poświata) dookoła całego miejsca, w którym leżą Twoje założone przedmioty. Styl, kolor i siłę ustawisz w ustawieniach.', view: el('div'), action: () => { if (auraEnabled && auraSetWin) auraSetWin.toggle(); },
+        settings: () => auraSetWin.toggle(),
+        isOn: () => auraEnabled,
+        setOn: v => { auraEnabled = v; try { localStorage.setItem(AURA_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (auraView.stop) auraView.stop(); auraSetWin.setOpen(false); } } },
       { id: 'relog', icon: '👥', title: 'Przelogowanie', desc: 'Własny pasek postaci z outfitami, nickiem i poziomem. Klik (lub dwuklik) przełącza postać. Można filtrować po świecie, ustawić liczbę rzędów i tryb „ultra clear” (same outfity).', view: el('div'), action: () => { if (relogEnabled) relogWin.toggle(); },
         settings: () => relogSetWin.toggle(),
         isOn: () => relogEnabled,
@@ -2684,7 +2816,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.49.4');
+    log('Załadowano v2.51.0');
   }
 
   let tries = 0;
