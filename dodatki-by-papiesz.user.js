@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.77.1
+// @version      2.78.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2354,7 +2354,7 @@
       const out = [], skip = (n, r) => { if (why) why.push({ sel: (n.tagName + '#' + n.id + '.' + String(n.className && n.className.baseVal === undefined ? n.className : '').slice(0, 50)), r, rect: Math.round(n.getBoundingClientRect().width) + 'x' + Math.round(n.getBoundingClientRect().height) }); return false; };
       const test = n => {
         if (n.nodeType !== 1 || n.closest(OURS) || n.matches('script,style,canvas,iframe,link,svg,#gi-gtp,.gi-gtf,.border-window')) return false;
-        if (/tip|toast|cursor|loader|context/i.test(n.id + ' ' + String(n.className && n.className.baseVal === undefined ? n.className : ''))) return skip(n, 'nazwa');
+        if (/tip|toast|cursor|loader|context|party|team|group|riddle|quiz|captcha|battle|fight|zagad|dru[zż]yn|walk/i.test(n.id + ' ' + String(n.className && n.className.baseVal === undefined ? n.className : ''))) return skip(n, 'nazwa');
         if (n.querySelector('.interface-layer.layer') || n.matches('.interface-layer,.game-layer') || n.closest('.interface-layer')) return false;
         const cs = getComputedStyle(n), rr = n.getBoundingClientRect();
         if (!/fixed|absolute/.test(cs.position)) return false;
@@ -2382,13 +2382,14 @@
       document.querySelectorAll('.gi-float').forEach((n, i) => { const rr = n.getBoundingClientRect(); if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') return; if (getComputedStyle(n).display === 'none' || rr.width < 60 || n.querySelector('.gi-ultra')) return; tmap['a_' + (n.id || i)] = () => n; });
       document.querySelectorAll('.border-window').forEach((n, i) => {
         if (n.closest(OURS) || (n.parentElement && n.parentElement.closest('.border-window'))) return;
+        if (!/[łl]upy/i.test((n.textContent || '').slice(0, 60))) return;
         const cs = getComputedStyle(n), rr = n.getBoundingClientRect();
         if (cs.display === 'none' || cs.visibility === 'hidden' || rr.width < 90 || rr.height < 60 || rr.width * rr.height > innerWidth * innerHeight * 0.7 || !/absolute|fixed/.test(cs.position)) return;
         tmap['g_' + (n.id || i)] = () => n;
       });
       if (cfg.fT.other) { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherCache.l = otherWins(); } }
       if (cfg.fT.other) otherCache.l.filter(n => n.isConnected).forEach((n, i) => { tmap['x_' + (n.id || i)] = () => n; });
-      Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } });
+      Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].miss = (frs[k].miss || 0) + 1; if (frs[k].miss > 6) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } } });
       for (const key of Object.keys(tmap)) {
         const want = (anim || parts) && cfg.fT[key.startsWith('a_') ? 'addons' : key.startsWith('g_') ? 'gwins' : key.startsWith('x_') ? 'other' : key];
         if (!want) { if (frs[key]) { frs[key].node.remove(); delete frs[key]; } delete frRects[key]; continue; }
@@ -2421,6 +2422,7 @@
         if (!anim) { if (o) o.node.style.display = 'none'; continue; }
         if (!o) { o = frs[key] = { node: el('div', { className: 'gi-gtf' }) }; document.body.append(o.node); }
         if (o.built !== cfg.fst || force) { frEnsureSvg(); frBuild(o, key); const [c1, c2, c3] = frColors(); const st = o.node.style; st.setProperty('--c1', c1); st.setProperty('--c2', c2); st.setProperty('--c3', c3); st.setProperty('--w', Wd + 'px'); st.setProperty('--spd', String(cfg.fspd)); st.setProperty('--glow', String(cfg.fglow)); o.node.className = 'gi-gtf s-' + cfg.fst + (cfg.fclip !== false ? ' clip' : '') + (cfg.fstatic ? ' freeze' : ''); }
+        o.miss = 0;
         const st = o.node.style; st.display = ''; st.left = Math.round(r.left) + 'px'; st.top = Math.round(r.top) + 'px'; st.width = Math.round(r.width) + 'px'; st.height = Math.round(r.height) + 'px';
         let mk = 'none';
         if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 4)}px)`; }
@@ -2790,7 +2792,7 @@
     const fSl = slide('Własna ramka: obszar rogów (slice)', 5, 120, 1, 'fSlice', x => x + ' px');
     const grid2 = 'display:grid;grid-template-columns:1fr 1fr;gap:0 8px;margin:4px 0';
     const note = t => el('div', { style: 'font-size:11px;color:#90a4ae;margin:4px 0' }, t);
-    const tgtBox = el('div', { style: grid2 }, tgt('Cały ekran gry', 'game'), tgt('Mapa', 'map'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats'), tgt('Okna dodatków (minutnik, dropy…)', 'addons'), tgt('Okna gry (łupy, ekwipunek…)', 'gwins'), tgt('Okna innych dodatków (Lootlog…)', 'other'));
+    const tgtBox = el('div', { style: grid2 }, tgt('Cały ekran gry', 'game'), tgt('Mapa', 'map'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats'), tgt('Okna dodatków (minutnik, dropy…)', 'addons'), tgt('Okno łupów', 'gwins'), tgt('Okna innych dodatków (Lootlog…)', 'other'));
     const setAllT = v => { Object.keys(cfg.fT).forEach(k => { cfg.fT[k] = v; }); tgtBox.querySelectorAll('input').forEach(i => { i.checked = v; }); chg(); updWarn(); };
     const mkBtn = (t, f) => { const b = el('button', { textContent: t }); b.style.cssText = 'margin:2px 4px 2px 0;padding:1px 8px;font-size:11px'; b.addEventListener('click', f); return b; };
     ptBox.style.cssText = grid2;
@@ -3763,7 +3765,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.77.1');
+    log('Załadowano v2.78.0');
   }
 
   let tries = 0;
