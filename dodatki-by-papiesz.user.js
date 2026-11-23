@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.95.4
+// @version      2.95.6
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3728,7 +3728,7 @@
     let discN = 0;
     const capPos = name => { const c = fcap.get(name); if (!c || performance.now() - c.t > 1500 || !c.cw) return null; const g = document.querySelector('#GAME_CANVAS') || document.querySelector('.game-layer'); if (!g) return null; const r = g.getBoundingClientRect(), sc = r.width / c.cw; return { x: r.left + c.x * sc, y: r.top + (c.top + (c.bot - c.top) * .1) * sc, found: true }; };
     let maxSeen = 1, pendHit = null;
-    const seen = new Map();
+    const seen = new Map(), sigSeen = new Map(), lanes = new Map();
     const me = () => { try { const h = PW.Engine && PW.Engine.hero && PW.Engine.hero.d; return h && h.nick || ''; } catch (e) { return ''; } };
     const num = s => Number(String(s).replace(/[^\d]/g, '')) || 0;
     const fmtN = n => cfg.fmt === 'short' && n >= 1000 ? (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'k') : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -3802,11 +3802,14 @@
       if (cfg.who === 'me' && !tm) return; if (cfg.who === 'others' && tm) return;
       if (box.childElementCount > cfg.max) box.firstChild.remove();
       const a = e._a || anchor(e.target, e.row || document.body);
-      const k = (e.target || '') + '|' + Math.round(a.x / 20), n = (stack.get(k) || { n: 0, t: 0 }); const now = performance.now(); if (now - n.t > 900) n.n = 0; n.n++; n.t = now; stack.set(k, n);
-      const x = a.x + (Math.random() - .5) * 20, y = a.y - (n.n - 1) * 17 * cfg.size;
+      const nowL = performance.now(), key = Math.round(a.x / 40) + '|' + Math.round(a.y / 40); let arr = lanes.get(key); if (!arr) lanes.set(key, arr = []);
+      let slot = arr.findIndex(t => t < nowL); if (slot < 0) slot = arr.length < 4 ? arr.length : (arr._r = ((arr._r || 0) + 1) % 4); arr[slot] = nowL + cfg.dur * 480;
+      if (lanes.size > 40) for (const [kk, v] of lanes) if (v.every(t => t < nowL)) lanes.delete(kk);
+      const x = a.x + (Math.random() - .5) * 14;
       const ei = e.elem ? DM_ELEM[e.elem] : null, base = e.kind === 'crit' ? 21 : e.kind === 'dot' ? 13 : e.kind === 'heal' ? 16 : 17;
       if (e.amount) maxSeen = Math.max(maxSeen * .995, e.amount);
       const rel = cfg.scale && e.amount ? .85 + .45 * Math.min(1, e.amount / maxSeen) : 1, sz = Math.round(base * cfg.size * rel);
+      const y = a.y - slot * Math.round(sz * 1.3 + 4);
       const col = cfg.elemColor && ei && (e.kind === 'dmg' || e.kind === 'crit') ? ei[1] : kcol(e.kind);
       const style = e.kind === 'crit' ? (cfg.anim === 'float' ? 'pop' : cfg.anim) : (e.kind === 'heal' || e.kind === 'dot') ? 'float' : cfg.anim;
       let txt;
@@ -3825,7 +3828,7 @@
       if (e.skill && (e.kind === 'dmg' || e.kind === 'crit')) add(e.skill, '#cfd8dc', 'normal');
       if (!a.found && e.target) { const q = document.createElement('span'); q.textContent = e.target.slice(0, 14); q.style.cssText = `font-size:${small}px;color:#cfd8dc;font-weight:normal`; d.insertBefore(q, main); }
       box.append(d);
-      const dx = (Math.random() < .5 ? -1 : 1) * (10 + Math.random() * 20), dy = e.kind === 'dot' ? 36 : e.kind === 'heal' ? -50 : -44;
+      const dx = (Math.random() < .5 ? -1 : 1) * (6 + Math.random() * 12), dy = e.kind === 'dot' ? 24 : e.kind === 'heal' ? -34 : -28;
       anim(d, x, y, dx, dy, cfg.dur, 0, style, e.kind === 'crit' ? 1.08 : 1);
       if (e.kind === 'crit' && cfg.burst) burst(x, y, col, 40 * cfg.size);
       lastEv.push({ ...e, row: undefined, _a: undefined, znalazlem_cel: a.found }); if (lastEv.length > 8) lastEv.shift();
@@ -3848,6 +3851,9 @@
       rows.forEach(r => {
         if (!r.isConnected) return;
         const raw = rowText(r).replace(/\n/g, ' | ').slice(0, 300); let ev = [];
+        const sig = raw.replace(/\s+/g, ' ').trim();
+        if (sigSeen.has(sig) && nowT - sigSeen.get(sig) < 120000) return;
+        sigSeen.set(sig, nowT);
         try { ev = parse(r); } catch (e) {  }
         if (!ev.length) { if (/obra[żz]e[ńn]/i.test(raw)) lastRaw.push('NIEROZPOZNANE: ' + raw); return; }
         lastRaw.push(raw);
@@ -3860,8 +3866,9 @@
         });
       });
       if (seen.size > 200) for (const [k, t] of seen) if (nowT - t > 2000) seen.delete(k);
+      if (sigSeen.size > 400) for (const [k, t] of sigSeen) if (nowT - t > 120000) sigSeen.delete(k);
       while (lastRaw.length > 10) lastRaw.shift();
-      evs.forEach(e => { setTimeout(() => { try { show(e); } catch (er) { log('obrażenia – błąd', er); } }, i * 90); i++; });
+      evs.forEach(e => { setTimeout(() => { try { show(e); } catch (er) { log('obrażenia – błąd', er); } }, i * 140); i++; });
     }
     mo.observe(document.body, { childList: true, subtree: true });
     const mkR = (key, label, min, max, step, fmt) => {
@@ -4560,7 +4567,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.95.4');
+    log('Załadowano v2.95.6');
   }
 
   let tries = 0;
