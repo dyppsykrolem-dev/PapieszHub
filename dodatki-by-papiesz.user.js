@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.49.1
+// @version      2.49.3
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -1539,12 +1539,19 @@
 
     const statusEl = el('div', { style: 'color:#78909c;font-size:10px;padding:0 4px 3px' });
     const view = el('div', { className: 'gi-drops' });
-    const STAT_PL = { lvl: 'Wymagany poziom', dmg: 'Atak fizyczny', ac: 'Pancerz', hp: 'Życie', mana: 'Mana', resfire: 'Odp. na ogień', reslight: 'Odp. na błyskawice', resfrost: 'Odp. na zimno', resmanaburn: 'Odp. na spalenie many', absorb: 'Absorpcja fizyczna', absorbm: 'Absorpcja magiczna', crit: 'Cios krytyczny', critmval: 'Siła kryt. magicznego', critval: 'Siła ciosu kryt.', evade: 'Unik', blok: 'Blok', pierce: 'Przebicie', slow: 'Spowolnienie', sa: 'Szybkość ataku', heal: 'Leczenie', manabon: 'Mana', energybon: 'Energia', str: 'Siła', agi: 'Zwinność', int: 'Intelekt', acdmg: 'Pancerz/atak', rarity: 'Rzadkość', legbon: 'Bonus legendy', ds: 'Smocze', opis: 'Opis', reqp: 'Profesja' };
+    const STAT_PL = { lvl: 'Wymagany poziom', dmg: 'Atak fizyczny', ac: 'Pancerz', hp: 'Życie', mana: 'Mana', resfire: 'Odp. na ogień', reslight: 'Odp. na błyskawice', resfrost: 'Odp. na zimno', resmanaburn: 'Odp. na spalenie many', absorb: 'Absorpcja fizyczna', absorbm: 'Absorpcja magiczna', crit: 'Cios krytyczny', critmval: 'Siła kryt. magicznego', critval: 'Siła ciosu kryt.', evade: 'Unik', blok: 'Blok', pierce: 'Przebicie', slow: 'Spowolnienie', sa: 'Szybkość ataku', heal: 'Leczenie', manabon: 'Mana', energybon: 'Energia', str: 'Siła', agi: 'Zwinność', int: 'Intelekt', acdmg: 'Pancerz/atak', rarity: 'Rzadkość', legbon: 'Bonus legendy', opis: 'Opis', reqp: 'Profesja' };
     let tipEl = null;
     function hideTip() { if (tipEl) { tipEl.remove(); tipEl = null; } }
     function moveTip(ev) { if (!tipEl) return; const bb = tipEl.getBoundingClientRect(); const w = Math.max(tipEl.offsetWidth, bb.width), h = Math.max(tipEl.offsetHeight, bb.height, tipEl.scrollHeight); let x = ev.clientX + 14, y = ev.clientY + 14; if (x + w > innerWidth - 4) x = ev.clientX - w - 14; if (y + h > innerHeight - 4) y = ev.clientY - h - 10 >= 4 ? ev.clientY - h - 10 : Math.max(4, innerHeight - h - 4); tipEl.style.left = Math.max(4, x) + 'px'; tipEl.style.top = y + 'px'; }
+    const lazySeen = new Set();
     function showTip(rec, kind, ev) {
       hideTip();
+      if (!rec.tip && !lazySeen.has(rec.id)) {
+        // stary przedmiot bez zapisanego opisu z gry: jeśli nadal leży w torbie/ekwipunku, pobierz jego dymek z gry
+        lazySeen.add(rec.id);
+        const node = [...document.querySelectorAll('.item-id-' + String(rec.id).replace(/[^\w-]/g, ''))].find(n => !n.closest('.gi-float,#gi-panel,.gi-dtip'));
+        if (node) captureTip(node, rec.name, false).then(h => { if (h) { rec.tip = h; saveD(); renderD(); if (tipEl) showTip(rec, kind, ev); } });
+      }
       const c = DR_COL[kind] || '#ddd';
       tipEl = el('div', { className: 'gi-dtip' });
       if (rec.tip) {
@@ -1559,9 +1566,9 @@
       tipEl.append(el('div', { textContent: RN[rec.r] || '', style: 'color:' + c + ';font-size:11px' }));
       const d = rec.d || {};
       const stat = String(d.stat || '');
-      stat.split(';').filter(Boolean).forEach(kv => { const i = kv.indexOf('='); const k = i < 0 ? kv : kv.slice(0, i), v = i < 0 ? '' : kv.slice(i + 1); tipEl.append(el('div', { textContent: (STAT_PL[k] || k) + (v !== '' ? ': ' + v : '') })); });
-      if (d.cl != null && d.cl !== '') tipEl.append(el('div', { textContent: 'Typ: ' + d.cl, style: 'color:#888;font-size:11px' }));
+      stat.split(';').filter(Boolean).forEach(kv => { const i = kv.indexOf('='); const k = i < 0 ? kv : kv.slice(0, i), v = i < 0 ? '' : kv.slice(i + 1); if (!STAT_PL[k] || k === 'rarity' || v === '') return; const PROF = { w: 'Wojownik', m: 'Mag', p: 'Paladyn', t: 'Tropiciel', h: 'Łowca', b: 'Tancerz ostrzy' }; tipEl.append(el('div', { textContent: STAT_PL[k] + ': ' + (k === 'reqp' ? v.split('').map(ch => PROF[ch] || ch).join(', ') : v) })); });
       if (d.pr) tipEl.append(el('div', { textContent: 'Wartość: ' + d.pr, style: 'color:#888;font-size:11px' }));
+      tipEl.append(el('div', { textContent: 'Uproszczony opis – brak zapisu opisu z gry dla tego przedmiotu.', style: 'color:#a58a3a;font-size:10px;margin-top:3px' }));
       tipEl.append(el('div', { textContent: 'Wypadło: ' + new Date(rec.t).toLocaleString() + ' · prawy klik: usuń', style: 'color:#78909c;font-size:10px;margin-top:3px' }));
       document.body.append(tipEl); moveTip(ev);
     }
@@ -2799,7 +2806,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.49.1');
+    log('Załadowano v2.49.3');
   }
 
   let tries = 0;
