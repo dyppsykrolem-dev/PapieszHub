@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.95.0
+// @version      2.95.2
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3416,6 +3416,11 @@
       const wr = function () { capOn = true; capBox = null; try { return orig.apply(this, arguments); } finally { capOn = false; if (capBox) { cap = capBox; capT = performance.now(); } } };
       wr.__giHA = true; try { h.draw = wr; hookedHero = h; } catch (e) {  }
     }
+    (window.__giShared = window.__giShared || {}).heroScreen = () => {
+      if (!cap) return null; const g = document.querySelector('#GAME_CANVAS') || document.querySelector('.game-layer'); if (!g) return null;
+      const r = g.getBoundingClientRect(), sc = r.width / (cap.cw || r.width); return { x: r.left + cap.x * sc, y: r.top + (cap.y - 34) * sc };
+    };
+    setInterval(() => { try { if (haEnabled || dmEnabled) hookHero(PW.Engine && PW.Engine.hero); } catch (e) {  } }, 700);
     function heroPos(dt) {
       const lay = document.querySelector('.game-layer'), gc = document.querySelector('#GAME_CANVAS') || (lay && lay.querySelector('canvas'));
       const box = (gc || lay); if (!box) return null;
@@ -3695,7 +3700,8 @@
     const box = document.createElement('div'); box.id = 'gi-dmg'; box.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;z-index:99500';
     document.body.append(box);
     const done = new WeakSet(), tcache = new Map(), stack = new Map(), lastEv = [], lastRaw = [];
-    let maxSeen = 1;
+    let maxSeen = 1, pendHit = null;
+    const seen = new Map();
     const me = () => { try { const h = PW.Engine && PW.Engine.hero && PW.Engine.hero.d; return h && h.nick || ''; } catch (e) { return ''; } };
     const num = s => Number(String(s).replace(/[^\d]/g, '')) || 0;
     const fmtN = n => cfg.fmt === 'short' && n >= 1000 ? (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'k') : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -3735,11 +3741,13 @@
       return ev;
     }
     function anchor(name, row) {
-      const now = performance.now(), c = tcache.get(name);
+      const now = performance.now();
+      if (cfg.pos === 'target' && name && me() && name.toLowerCase() === me().toLowerCase()) { try { const hs = window.__giShared && window.__giShared.heroScreen && window.__giShared.heroScreen(); if (hs) return { x: hs.x, y: hs.y, found: true, hero: true }; } catch (e) {  } }
+      const c = tcache.get(name);
       if (c && c.el.isConnected && now - c.t < 1500) { const r = c.el.getBoundingClientRect(); if (r.width > 0) return { x: r.left + r.width / 2, y: r.top + r.height * .3, found: true }; }
       let logRoot = row; for (let n = row; n && n !== document.body; n = n.parentElement) if (n.scrollHeight > n.clientHeight + 4 && n.clientHeight > 40) { logRoot = n; break; }
       if (cfg.pos === 'target') {
-        const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: t => { const v = t.nodeValue.trim(); return v === name ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+        const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: t => { const v = t.nodeValue.trim(); return (v === name || (v.length < name.length + 14 && v.startsWith(name) && !/\p{L}/u.test(v.charAt(name.length) || ' '))) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
         let t; while ((t = tw.nextNode())) { const p = t.parentElement; if (!p || logRoot.contains(p) || p.closest(GI_OWN + ',.new-chat-window,script,style')) continue; const r = p.getBoundingClientRect(); if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight) { tcache.set(name, { el: p, t: now }); return { x: r.left + r.width / 2, y: r.top + r.height * .3, found: true }; } }
       }
       const g = document.querySelector('.game-layer'), r = g ? g.getBoundingClientRect() : { left: 0, top: 0, width: innerWidth, height: innerHeight };
@@ -3762,34 +3770,35 @@
       for (let i = 0; i < 9; i++) { const p = document.createElement('div'), ang = i / 9 * 6.283 + Math.random() * .4; p.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:5px;height:5px;border-radius:50%;background:${color};box-shadow:0 0 6px ${color}`; box.append(p); const r = 40 + Math.random() * 30; const b = p.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${Math.cos(ang) * r}px,${Math.sin(ang) * r}px) scale(.2)`, opacity: 0 }], { duration: 520 + Math.random() * 200, easing: 'ease-out' }); b.onfinish = () => p.remove(); }
     }
     function show(e) {
-      if (!cfg.on[e.kind]) return;
+      if (!cfg.on[e.kind] || e.kind === 'bonus') return;
       const mine = me(), tm = e.target && mine && e.target.toLowerCase() === mine.toLowerCase();
       if (cfg.who === 'me' && !tm) return; if (cfg.who === 'others' && tm) return;
       if (box.childElementCount > cfg.max) box.firstChild.remove();
       const a = e._a || anchor(e.target, e.row || document.body);
       const k = (e.target || '') + '|' + Math.round(a.x / 20), n = (stack.get(k) || { n: 0, t: 0 }); const now = performance.now(); if (now - n.t > 900) n.n = 0; n.n++; n.t = now; stack.set(k, n);
-      let x = a.x + (Math.random() - .5) * 26, y = a.y - (n.n - 1) * 20 * cfg.size;
-      const ei = e.elem ? DM_ELEM[e.elem] : null, base = e.kind === 'crit' ? 30 : e.kind === 'dot' ? 17 : e.kind === 'heal' ? 22 : 24;
+      const x = a.x + (Math.random() - .5) * 20, y = a.y - (n.n - 1) * 17 * cfg.size;
+      const ei = e.elem ? DM_ELEM[e.elem] : null, base = e.kind === 'crit' ? 21 : e.kind === 'dot' ? 13 : e.kind === 'heal' ? 16 : 17;
       if (e.amount) maxSeen = Math.max(maxSeen * .995, e.amount);
-      const rel = cfg.scale && e.amount ? .8 + .7 * Math.min(1, e.amount / maxSeen) : 1, sz = Math.round(base * cfg.size * rel);
-      const col = cfg.elemColor && ei && (e.kind === 'dmg' || e.kind === 'crit') ? ei[1] : kcol(e.kind === 'dmg' && e.crit ? 'crit' : e.kind);
-      const dur = cfg.dur, style = e.kind === 'crit' ? (cfg.anim === 'float' ? 'pop' : cfg.anim) : e.kind === 'heal' ? 'float' : e.kind === 'dot' ? 'float' : cfg.anim;
+      const rel = cfg.scale && e.amount ? .85 + .45 * Math.min(1, e.amount / maxSeen) : 1, sz = Math.round(base * cfg.size * rel);
+      const col = cfg.elemColor && ei && (e.kind === 'dmg' || e.kind === 'crit') ? ei[1] : kcol(e.kind);
+      const style = e.kind === 'crit' ? (cfg.anim === 'float' ? 'pop' : cfg.anim) : (e.kind === 'heal' || e.kind === 'dot') ? 'float' : cfg.anim;
       let txt;
-      if (e.kind === 'heal') txt = '+' + fmtN(e.amount); else if (e.kind === 'dot') txt = '-' + fmtN(e.amount); else if (e.kind === 'bonus') txt = '+' + fmtN(e.amount) + (e.amount2 ? ' +' + fmtN(e.amount2) : ''); else if (e.kind === 'block') txt = e.label || 'BLOK'; else txt = '-' + fmtN(e.amount);
-      if (ei && e.kind !== 'bonus' && e.kind !== 'heal') txt = ei[0] + ' ' + txt;
+      if (e.kind === 'heal') txt = '+' + fmtN(e.amount); else if (e.kind === 'dot') txt = '-' + fmtN(e.amount); else if (e.kind === 'block') txt = e.label || 'BLOK'; else txt = '-' + fmtN(e.amount);
+      if (ei && e.kind !== 'heal') txt = ei[0] + ' ' + txt;
       if (e.kind === 'crit') txt += '!';
-      const d = chip(txt, col, sz); if (e.kind === 'bonus') { d.style.color = '#4dd0e1'; if (e.amount2) { d.textContent = ''; const a1 = document.createElement('span'); a1.textContent = '+' + fmtN(e.amount); a1.style.color = '#4dd0e1'; const a2 = document.createElement('span'); a2.textContent = ' +' + fmtN(e.amount2); a2.style.color = kcol('bonus'); d.append(a1, a2); } }
+      const d = chip('', col, sz); d.style.display = 'flex'; d.style.alignItems = 'baseline'; d.style.gap = Math.round(5 * cfg.size) + 'px';
+      const main = document.createElement('span'); main.textContent = txt; d.append(main);
+      const small = Math.max(10, Math.round(sz * .55));
+      const add = (t, c, w) => { const q = document.createElement('span'); q.textContent = t; q.style.cssText = `font-size:${small}px;color:${c};font-weight:${w || 'bold'}`; d.append(q); };
+      if (e.bonusA && cfg.on.bonus) { add('+' + fmtN(e.bonusA), '#4dd0e1'); if (e.bonusB) add('+' + fmtN(e.bonusB), kcol('bonus')); }
+      if (e.combo && cfg.on.combo) add('x' + e.combo, kcol('combo'));
+      if (e.shield && cfg.on.block) add('🛡', kcol('block'));
+      if (e.label && e.kind !== 'block') add(e.label, e.kind === 'heal' ? kcol('heal') : '#ffab91', 'normal');
+      if (e.skill && (e.kind === 'dmg' || e.kind === 'crit')) add(e.skill, '#cfd8dc', 'normal');
       box.append(d);
-      const dx = (Math.random() < .5 ? -1 : 1) * (14 + Math.random() * 26), dy = e.kind === 'dot' ? 46 : e.kind === 'heal' ? -64 : -58;
-      anim(d, x, y, dx, dy, dur, 0, style, e.kind === 'crit' ? 1.12 : 1);
-      if (e.kind === 'crit' && cfg.burst) burst(x, y, col, 54 * cfg.size);
-      if (e.kind === 'heal' && cfg.burst) burst(x, y, kcol('heal'), 34 * cfg.size);
-      let off = 0;
-      const sub = (t, c, s2, extra) => { if (!cfg.on.combo && c === 'combo') return; const q = chip(t, c, Math.round(s2 * cfg.size), extra); box.append(q); off += 1; anim(q, x + 4, y - 24 * cfg.size * off - 6, 0, -34, dur * .95, .08 * off, 'float', 1); };
-      if (e.combo && cfg.on.combo) sub('Kombinacja x' + e.combo, kcol('combo'), 15, 'bold');
-      if (e.shield && cfg.on.block) sub('🛡 osłona', kcol('block'), 13, 'bold');
-      if (e.label && e.kind !== 'block') sub(e.label, e.kind === 'heal' ? kcol('heal') : '#ffab91', 12, 'normal');
-      if (e.skill && cfg.on.bonus && (e.kind === 'dmg' || e.kind === 'crit')) sub(e.skill, '#e0e0e0', 12, 'italic');
+      const dx = (Math.random() < .5 ? -1 : 1) * (10 + Math.random() * 20), dy = e.kind === 'dot' ? 36 : e.kind === 'heal' ? -50 : -44;
+      anim(d, x, y, dx, dy, cfg.dur, 0, style, e.kind === 'crit' ? 1.08 : 1);
+      if (e.kind === 'crit' && cfg.burst) burst(x, y, col, 40 * cfg.size);
       lastEv.push({ ...e, row: undefined, _a: undefined, znalazlem_cel: a.found }); if (lastEv.length > 8) lastEv.shift();
     }
     let queue = [], qt = 0;
@@ -3806,10 +3815,24 @@
     function drain() {
       qt = 0; let rows = queue; queue = [];
       if (rows.length > 14) rows = rows.slice(-5);
-      let i = 0; const evs = [];
-      rows.forEach(r => { if (!r.isConnected) return; const raw = (r.innerText || r.textContent || '').trim().slice(0, 300); let ev = []; try { ev = parse(r); } catch (e) {  } if (!ev.length) { if (/obra[żz]e[ńn]/i.test(raw)) { lastRaw.push('NIEROZPOZNANE: ' + raw); } return; } lastRaw.push(raw); ev.forEach(e => { e.row = r; evs.push(e); }); });
+      let i = 0; const evs = [], nowT = performance.now();
+      rows.forEach(r => {
+        if (!r.isConnected) return;
+        const raw = (r.innerText || r.textContent || '').trim().slice(0, 300); let ev = [];
+        try { ev = parse(r); } catch (e) {  }
+        if (!ev.length) { if (/obra[żz]e[ńn]/i.test(raw)) lastRaw.push('NIEROZPOZNANE: ' + raw); return; }
+        lastRaw.push(raw);
+        ev.forEach(e => {
+          const key = e.kind + '|' + e.target + '|' + e.amount + '|' + (e.amount2 || 0);
+          if (seen.has(key) && nowT - seen.get(key) < 700) return; seen.set(key, nowT);
+          if (e.kind === 'bonus') { pendHit = { t: nowT, a: e.amount, b: e.amount2 }; return; }
+          if ((e.kind === 'dmg' || e.kind === 'crit') && pendHit && nowT - pendHit.t < 2500) { e.bonusA = pendHit.a; e.bonusB = pendHit.b; pendHit = null; }
+          e.row = r; evs.push(e);
+        });
+      });
+      if (seen.size > 200) for (const [k, t] of seen) if (nowT - t > 2000) seen.delete(k);
       while (lastRaw.length > 10) lastRaw.shift();
-      evs.forEach(e => { setTimeout(() => { try { show(e); } catch (er) { log('obrażenia – błąd', er); } }, i * 110); i++; });
+      evs.forEach(e => { setTimeout(() => { try { show(e); } catch (er) { log('obrażenia – błąd', er); } }, i * 90); i++; });
     }
     mo.observe(document.body, { childList: true, subtree: true });
     const mkR = (key, label, min, max, step, fmt) => {
@@ -3828,7 +3851,7 @@
     });
     const test = () => {
       const g = document.querySelector('.game-layer'), r = g ? g.getBoundingClientRect() : { left: 0, top: 0, width: innerWidth, height: innerHeight }, cx = r.left + r.width / 2;
-      const S = [[{ kind: 'dmg', amount: 2380, elem: 'fire' }, -140], [{ kind: 'crit', amount: 8905, elem: 'lightning', combo: '3', skill: 'Fuzja żywiołów' }, -60], [{ kind: 'dot', amount: 1850, label: 'głęboka rana' }, 20], [{ kind: 'heal', amount: 604 }, 90], [{ kind: 'bonus', amount: 1126, amount2: 2129 }, 150], [{ kind: 'dmg', amount: 1468, elem: 'frost', shield: true }, 210]];
+      const S = [[{ kind: 'dmg', amount: 2380, elem: 'fire' }, -140], [{ kind: 'crit', amount: 8905, elem: 'lightning', combo: '3', skill: 'Fuzja żywiołów' }, -60], [{ kind: 'dot', amount: 1850, label: 'głęboka rana' }, 20], [{ kind: 'heal', amount: 604 }, 90], [{ kind: 'dmg', amount: 3255, bonusA: 1126, bonusB: 2129, elem: 'poison' }, 150], [{ kind: 'dmg', amount: 1468, elem: 'frost', shield: true }, 210]];
       S.forEach(([e, dx], i) => setTimeout(() => { const a = { x: cx + dx, y: r.top + r.height * .5 }; show(Object.assign({ target: '__test' + i, row: document.body, _a: a }, e)); }, i * 230));
     };
     const dbg = isolate(el('textarea', { rows: 8, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
@@ -3839,7 +3862,7 @@
     root.settingsBox = setTabs([
       ['Wygląd', [testBtn, el('div', { style: 'margin:5px 0' }, 'Animacja: ', mkSel('anim', [['float', 'Unoszenie'], ['arc', 'Łuk'], ['bounce', 'Odbicie'], ['pop', 'Wybuch'], ['shake', 'Drżenie']])), mkR('size', 'Rozmiar', .5, 2.5, .05, v => '×' + v.toFixed(2)), mkR('dur', 'Czas trwania', .6, 3, .1, v => v.toFixed(1) + ' s'), mkR('rise', 'Wysokość lotu', .3, 2.5, .1, v => '×' + v.toFixed(1)), mkC('scale', 'Większe liczby przy mocniejszych uderzeniach'), mkC('burst', 'Rozbłysk przy krytyku i leczeniu'), el('div', {}, 'Format liczb: ', mkSel('fmt', [['full', '2 380'], ['short', '2.4k']]))]],
       ['Zdarzenia', [el('div', { style: 'font-weight:bold' }, 'Co pokazywać i jakim kolorem'), ...kindRows, mkC('elem', 'Ikona żywiołu (🔥 ❄ ⚡ ☠ ✦ ☾) przy obrażeniach'), mkC('elemColor', 'Kolor liczby zależny od żywiołu'), el('div', { style: 'margin-top:5px' }, 'Czyje liczby: ', mkSel('who', [['all', 'Wszystkie'], ['me', 'Tylko otrzymane przeze mnie'], ['others', 'Tylko otrzymane przez innych']]))]],
-      ['Pozycja', [el('div', {}, 'Gdzie pokazywać: ', mkSel('pos', [['target', 'Nad celem (jeśli go znajdę)'], ['center', 'Środek mapy']])), mkR('max', 'Limit naraz', 10, 80, 5, v => String(v)), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0' }, 'Liczby powstają z linii dziennika walki. Cel szukam po nicku w oknie walki; gdy go nie ma, liczby lecą ze środka mapy.')]],
+      ['Pozycja', [el('div', {}, 'Gdzie pokazywać: ', mkSel('pos', [['target', 'Nad celem (jeśli go znajdę)'], ['center', 'Środek mapy']])), mkR('max', 'Limit naraz', 10, 80, 5, v => String(v)), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0' }, 'Liczby powstają z linii dziennika walki. Obrażenia otrzymane przez Ciebie pojawiają się przy Twojej postaci. Przy przeciwnikach szukam ich nicku w oknie walki; gdy go nie ma, liczby lecą ze środka mapy.')]],
       ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli liczby się nie pojawiają, zrób walkę, kliknij i wklej mi wynik.'), dbgBtn, dbg]]
     ]);
     root.test = test; root.stop = () => { box.replaceChildren(); };
@@ -4508,7 +4531,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.95.0');
+    log('Załadowano v2.95.2');
   }
 
   let tries = 0;
