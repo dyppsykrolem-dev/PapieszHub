@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.60.0
+// @version      2.61.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2141,9 +2141,11 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fout: 0, gAvoid: true, gcut: 16, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, fout: 0, gAvoid: true, gcut: 6, fgap: 3, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
     cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, cfg.fT);
     if (cfg.fst === 'ripple') cfg.fst = 'ring';
+    if (cfg.fpal === 'win') { cfg.fsync = true; cfg.fpal = 'theme'; }
+    if (cfg.gcut === 16) cfg.gcut = 6;
     const save = () => writeLS(GT_CFG_KEY, cfg);
     let styleEl = null;
     const SYNC = { game: [0, 0], fantasy: [130, 45], classic: [205, 55], crimson: [2, 60], violet: [272, 45], gold: [42, 70], mono: [0, 0] };
@@ -2210,11 +2212,17 @@
       } else fixPos();
       frSync(true);
     }
-    themeHooks.push(() => { if (cfg.sync || cfg.fpal === 'win') apply(); });
+    themeHooks.push(() => { if (cfg.sync || cfg.fsync) { apply(); if (typeof render === 'function') render(); } });
 
     const PAL = {
       fire: ['#fff3b0', '#ff9800', '#c62828'], ice: ['#e1f5fe', '#4fc3f7', '#1565c0'], storm: ['#ffffff', '#b39ddb', '#448aff'],
       magic: ['#f8bbd0', '#b388ff', '#7c4dff'], gold: ['#fff3b0', '#ffd54f', '#b8860b'], blood: ['#ff8a80', '#e53935', '#7f0000'], green: ['#ccff90', '#76ff03', '#1b5e20']
+    };
+    const barTopY = () => {
+      const ex = document.querySelector('.exp-progress'), gp = document.querySelector('.bottom-panel-graphic');
+      if (ex) { const r = ex.getBoundingClientRect(); if (r.height > 2) return r.top - 4; }
+      if (gp) { const r = gp.getBoundingClientRect(); return r.top + r.height * 0.18; }
+      return null;
     };
     const frTargets = {
       game: () => document.querySelector('.interface-layer.layer'),
@@ -2224,13 +2232,13 @@
       map: () => document.querySelector('.game-layer'),
       grid: () => document.querySelector('.inventory-grid-bg.interface-element-grid-border'),
       stats: () => document.querySelector('.stats-wrapper'),
-      bottom: () => { const g = document.querySelector('.interface-layer.layer'), b = document.querySelector('.bottom-panel-graphic'); if (!g || !b) return null; const gr = g.getBoundingClientRect(), br = b.getBoundingClientRect(); return { getBoundingClientRect: () => ({ left: gr.left, right: gr.right, top: br.top, bottom: gr.bottom, width: gr.width, height: Math.max(0, gr.bottom - br.top) }) }; }
+      bottom: () => { const g = document.querySelector('.interface-layer.layer'), b = document.querySelector('.bottom-panel-graphic'); if (!g || !b) return null; const gr = g.getBoundingClientRect(), bt = barTopY() ?? b.getBoundingClientRect().top; return { getBoundingClientRect: () => ({ left: gr.left, right: gr.right, top: bt, bottom: gr.bottom, width: gr.width, height: Math.max(0, gr.bottom - bt) }) }; }
     };
     const frs = {};
     let frTimer = 0, frSvg = null;
     const frColors = () => {
       if (cfg.fpal === 'custom') return [cfg.fc1, cfg.fc2, cfg.fc3];
-      if (cfg.fpal === 'win') return WINPAL[getTheme()] || WINPAL.classic;
+      if (cfg.fsync) return WINPAL[getTheme()] || WINPAL.classic;
       if (PAL[cfg.fpal]) return PAL[cfg.fpal];
       const E = eff(), H = E.h, S = Math.max(25, E.s); return [`hsl(${H} ${S}% 82%)`, `hsl(${H} ${S}% 58%)`, `hsl(${H} ${S}% 32%)`];
     };
@@ -2280,21 +2288,23 @@
     function frSync(force) {
       const anim = gtEnabled && ANIM_FR.includes(cfg.fst);
       const parts = gtEnabled && Object.keys(cfg.fpt || {}).some(k => cfg.fpt[k]);
-      const gc = globeCircle(), out = Number(cfg.fout) || 0;
+      const gc = globeCircle(), out = Number(cfg.fout) || 0, barTop = barTopY();
       for (const key of Object.keys(frTargets)) {
         const want = (anim || parts) && cfg.fT[key];
         let o = frs[key];
         if (!want) { if (o) { o.node.remove(); delete frs[key]; } delete frRects[key]; continue; }
-        const t = frTargets[key](); const r0 = t && t.getBoundingClientRect();
+        const t = frTargets[key](); let r0 = t && t.getBoundingClientRect();
+        if (r0 && barTop != null && ['map', 'chat', 'right', 'grid', 'stats'].includes(key) && r0.bottom > barTop) r0 = { left: r0.left, right: r0.right, top: r0.top, bottom: barTop, width: r0.width, height: Math.max(0, barTop - r0.top) };
         if (!r0 || r0.width < 30 || r0.height < 14) { delete frRects[key]; if (o) o.node.style.display = 'none'; continue; }
-        const r = { left: r0.left - out, top: r0.top - out, width: r0.width + 2 * out, height: r0.height + 2 * out };
+        const Wd = Math.min(14, Math.max(2, cfg.fw)), ex = key === 'game' ? Wd + out : -Math.max(0, Number(cfg.fgap) || 0);
+        const r = { left: r0.left - ex, top: r0.top - ex, width: r0.width + 2 * ex, height: r0.height + 2 * ex };
         frRects[key] = { l: r.left, t: r.top, w: r.width, h: r.height };
         if (!anim) { if (o) o.node.style.display = 'none'; continue; }
         if (!o) { o = frs[key] = { node: el('div', { className: 'gi-gtf' }) }; document.body.append(o.node); }
         if (o.built !== cfg.fst || force) { frEnsureSvg(); frBuild(o, key); const [c1, c2, c3] = frColors(); const st = o.node.style; st.setProperty('--c1', c1); st.setProperty('--c2', c2); st.setProperty('--c3', c3); st.setProperty('--w', Math.min(14, Math.max(2, cfg.fw)) + 'px'); st.setProperty('--spd', String(cfg.fspd)); st.setProperty('--glow', String(cfg.fglow)); o.node.className = 'gi-gtf s-' + cfg.fst; }
         const st = o.node.style; st.display = ''; st.left = Math.round(r.left) + 'px'; st.top = Math.round(r.top) + 'px'; st.width = Math.round(r.width) + 'px'; st.height = Math.round(r.height) + 'px';
         let mk = 'none';
-        if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 10)}px)`; }
+        if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 4)}px)`; }
         if (o.mk !== mk) { o.mk = mk; st.webkitMaskImage = mk; st.maskImage = mk; }
         frGeo(o, Math.round(r.width), Math.round(r.height));
       }
@@ -2458,13 +2468,13 @@
       { n: 'Toksyczny', d: 'Bicie serca, bąbelki i dym', theme: 'las', h: 105, s: 65, fst: 'heartbeat', fpal: 'green', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('bubbles', 'smoke'), fw: 5, fspd: 1, fglow: 1, fout: 4, fpd: 1 },
       { n: 'Tęczowa impreza', d: 'Pryzmat i konfetti', theme: 'roz', h: 330, s: 50, fst: 'prism', fpal: 'theme', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('confetti', 'stars'), fw: 5, fspd: 1.3, fglow: 0.9, fout: 5, fpd: 1 },
       { n: 'Cyber (obwody)', d: 'Obwody, glitch i iskry', theme: 'lod', h: 175, s: 70, fst: 'circuit', fpal: 'custom', fc1: '#b9fff0', fc2: '#00e5c0', fc3: '#006b5a', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('sparks', 'orbit'), fw: 4, fspd: 1.2, fglow: 0.8, fout: 3, fpd: 1 },
-      { n: 'Elegancki minimalizm', d: 'Jedna cienka ramka, bez cząsteczek', theme: 'mrok', h: 0, s: 0, fst: 'royal', fpal: 'win', t: TG('game'), pt: {}, fw: 3, fspd: 0.8, fglow: 0.5, fout: 0, fpd: 1 },
-      { n: 'Zgodny z motywem okien', d: 'Kolory jak w oknach dodatków', theme: 'custom', h: 205, s: 55, sync: true, fst: 'ring', fpal: 'win', t: TG('game', 'top', 'bottom'), pt: {}, fw: 4, fspd: 1, fglow: 0.8, fout: 2, fpd: 1 },
+      { n: 'Elegancki minimalizm', d: 'Jedna cienka ramka, bez cząsteczek', theme: 'mrok', h: 0, s: 0, fst: 'royal', fpal: 'theme', fsync: true, t: TG('game'), pt: {}, fw: 3, fspd: 0.8, fglow: 0.5, fout: 0, fpd: 1 },
+      { n: 'Zgodny z motywem głównym', d: 'Ramka w kolorach motywu okien, bez zmian w grze', theme: 'none', fsync: true, fst: 'ring', fpal: 'theme', t: TG('game', 'top', 'bottom'), pt: {}, fw: 4, fspd: 1, fglow: 0.8, fout: 2, fpd: 1 },
       { n: 'Wyłącz wszystko', d: 'Oryginalny wygląd gry', theme: 'none', fst: 'none', t: TG(), pt: {} }
     ];
     function applyPreset(pr) {
       cfg.theme = pr.theme; if (pr.h !== undefined) { cfg.h = pr.h; cfg.s = pr.s; }
-      cfg.sync = !!pr.sync; cfg.l = 1; cfg.frame = true; cfg.panels = true; cfg.btns = true;
+      cfg.fsync = !!pr.fsync; cfg.l = 1; cfg.frame = true; cfg.panels = true; cfg.btns = true;
       cfg.fst = pr.fst; cfg.fpal = pr.fpal || 'theme'; if (pr.fc1) { cfg.fc1 = pr.fc1; cfg.fc2 = pr.fc2; cfg.fc3 = pr.fc3; }
       cfg.fT = Object.assign({}, pr.t); cfg.fpt = Object.assign({}, pr.pt);
       if (pr.fw) { cfg.fw = pr.fw; cfg.fspd = pr.fspd; cfg.fglow = pr.fglow; cfg.fout = pr.fout; cfg.fpd = pr.fpd; }
@@ -2505,8 +2515,7 @@
     });
     col.addEventListener('input', () => { const [h, s2] = hueOf(col.value); cfg.h = h; cfg.s = Math.max(10, s2); sS.r.value = cfg.s; sS.v.textContent = cfg.s + '%'; chg(); });
     const chk = (label, key) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' ' + label); };
-    const syncChk = chk('Synchronizuj kolory motywu gry z motywem okien dodatków', 'sync');
-    syncChk.querySelector('input').addEventListener('change', () => { if (cfg.sync && cfg.theme === 'none') { cfg.theme = 'custom'; sel.value = 'custom'; showCol(); chg(); } });
+    const fsyncChk = chk('Kolory ramek i cząsteczek zgodne z motywem głównym (motyw okien dodatków)', 'fsync');
     showCol();
     const dinfo = el('div', { style: 'font-size:11px;color:#90a4ae;margin-bottom:6px' }, 'Zbiera nazwy paneli gry i ich tła (tylko odczyt). Przydatne, gdy jakiś panel nie zmienia koloru – wyślij wynik autorowi.');
     const out = isolate(el('textarea', { rows: 12, readOnly: true, placeholder: 'Wynik diagnostyki' })); out.style.fontSize = '10px';
@@ -2545,16 +2554,19 @@
     const fW = slide('Grubość ramki', 2, 20, 1, 'fw', x => x + ' px');
     const fSp = slide('Prędkość animacji', 0.3, 3, 0.1, 'fspd', x => x.toFixed(1) + '×');
     const fGl = slide('Blask', 0, 1, 0.05, 'fglow', x => Math.round(x * 100) + '%');
-    const fOut = slide('Wysunięcie poza panel (− do środka, + na zewnątrz)', -20, 60, 1, 'fout', x => (x > 0 ? '+' : '') + x + ' px');
+    const fOut = slide('Wysunięcie ramki całego okna poza grę', -20, 60, 1, 'fout', x => (x > 0 ? '+' : '') + x + ' px');
+    const fGp = slide('Odstęp między ramkami paneli', 0, 14, 1, 'fgap', x => x + ' px');
     const gCut = slide('Zapas wokół okrągłego paska życia', 0, 60, 1, 'gcut', x => x + ' px');
     const fPd = slide('Gęstość cząsteczek', 0.2, 3, 0.1, 'fpd', x => x.toFixed(1) + '×');
     const ptBox = el('div', {}, ...PT.map(([k, l]) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg.fpt[k] })); c.addEventListener('change', () => { cfg.fpt[k] = c.checked; chg(); }); return el('label', { style: 'display:inline-block;margin:2px 10px 2px 0;cursor:pointer;white-space:nowrap' }, c, ' ' + l); }));
     const fCol = isolate(el('select', {}));
-    [['win', 'Kolory: z motywu okien dodatków (synchronizacja)'], ['theme', 'Kolory: z motywu gry (wybrany wyżej)'], ['fire', 'Ogień'], ['ice', 'Lód'], ['storm', 'Burza'], ['magic', 'Magia'], ['gold', 'Złoto'], ['blood', 'Krew'], ['green', 'Toksyczna zieleń'], ['custom', 'Własne (3 kolory)…']].forEach(([v, l]) => fCol.append(el('option', { value: v, textContent: l, selected: cfg.fpal === v })));
+    [['theme', 'Z koloru interfejsu gry (zakładka Kolory)'], ['fire', 'Ogień'], ['ice', 'Lód'], ['storm', 'Burza'], ['magic', 'Magia'], ['gold', 'Złoto'], ['blood', 'Krew'], ['green', 'Toksyczna zieleń'], ['custom', 'Własne (3 kolory)…']].forEach(([v, l]) => fCol.append(el('option', { value: v, textContent: l, selected: cfg.fpal === v })));
     const cc = k => { const i = isolate(el('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(cfg[k]) ? cfg[k] : '#ffffff' })); i.style.cssText = 'width:40px;height:22px;padding:0;border:0;background:none;vertical-align:middle;margin-right:6px'; i.addEventListener('input', () => { cfg[k] = i.value; chg(); }); return i; };
     const ccRow = el('div', { style: 'margin:4px 0;display:none' }, 'Jasny ', cc('fc1'), 'główny ', cc('fc2'), 'ciemny ', cc('fc3'));
     const showCC = () => { ccRow.style.display = cfg.fpal === 'custom' ? '' : 'none'; }; showCC();
     fCol.addEventListener('change', () => { cfg.fpal = fCol.value; showCC(); chg(); });
+    const palLock = () => { fCol.disabled = !!cfg.fsync; fCol.style.opacity = cfg.fsync ? .5 : 1; ccRow.style.opacity = cfg.fsync ? .4 : 1; ccRow.style.pointerEvents = cfg.fsync ? 'none' : ''; }; palLock();
+    fsyncChk.querySelector('input').addEventListener('change', palLock);
     const tgt = (label, k) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg.fT[k] })); c.addEventListener('change', () => { cfg.fT[k] = c.checked; chg(); }); return el('label', { style: 'display:inline-block;margin:2px 10px 2px 0;cursor:pointer;white-space:nowrap' }, c, ' ' + label); };
     const urlIn2 = (key, ph) => { const i = isolate(el('input', { type: 'text', placeholder: ph, value: cfg[key] || '' })); i.style.cssText = 'width:100%;box-sizing:border-box;margin:2px 0'; i.addEventListener('change', () => { cfg[key] = i.value.trim(); chg(); }); return i; };
     const fSl = slide('Własna ramka: obszar rogów (slice)', 5, 120, 1, 'fSlice', x => x + ' px');
@@ -2574,20 +2586,26 @@
     updWarn();
     const imgBox = el('div', {}, el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0' }, 'Wklej linki do własnych obrazków (puste = oryginał). Muszą być dostępne publicznie.'),
       el('div', {}, 'Tło czatu'), urlIn2('bgChat', 'https://…/tlo-czatu.jpg'), el('div', {}, 'Tło prawej kolumny'), urlIn2('bgRight', 'https://…/tlo-prawej.jpg'), el('div', {}, 'Górny pasek'), urlIn2('bgTop', 'https://…/gorny-pasek.png'));
+    const h5 = t => el('div', { style: 'font-weight:bold;margin:8px 0 2px' }, t);
+    const syncNote = cfg.sync ? [el('div', { style: 'color:#ffd54f;font-size:11px;margin:2px 0' }, 'Kolor interfejsu gry podąża teraz za motywem okien dodatków (ustawienie w menu głównym panelu).')] : [];
     const tabs = setTabs([
-      ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote, note('Ustawienia szczegółowe: „Kolory” (barwa interfejsu gry), „Ramki” (styl i miejsca), „Efekty” (cząsteczki), „Więcej” (własne grafiki, diagnostyka).')]],
-      ['Kolory', [info, sel, colRow, syncChk, sS.row, sL.row, el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Co przefarbować:'), chk('Ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Zielone przyciski interfejsu', 'btns')]],
-      ['Ramki', [warn, fSel, fCol, ccRow, fW.row, fSp.row, fGl.row, fOut.row,
+      ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote, note('Zakładki: „Kolory” (wszystkie kolory), „Ramki” (styl i miejsca), „Efekty” (cząsteczki), „Tempo” (prędkość, blask, gęstość), „Więcej” (własne grafiki, diagnostyka).')]],
+      ['Kolory', [h5('Interfejs gry'), ...syncNote, info, sel, colRow, sS.row, sL.row, el('div', { style: 'font-weight:bold;margin:6px 0 2px' }, 'Co przefarbować:'), chk('Ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Zielone przyciski interfejsu', 'btns'),
+        h5('Ramki i cząsteczki'), fsyncChk, fCol, ccRow]],
+      ['Ramki', [warn, fSel, fW.row, fGp.row, fOut.row,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
         chk('Ukryj oryginalną ramkę dookoła okna gry', 'hideOrig'), chk('Omijaj okrągły pasek życia (wycięcie)', 'gAvoid'), gCut.row,
         el('details', { style: 'margin-top:6px' }, el('summary', { textContent: 'Własna grafika ramki (styl „Własna grafika”)' }), note('Link do obrazka z ramką (rogi + krawędzie, np. PNG 3×3). Ustaw „slice” na wielkość rogu w obrazku.'), urlIn2('fUrl', 'https://…/ramka.png'), fSl.row)]],
-      ['Efekty', [note('Cząsteczki lecą od krawędzi miejsc zaznaczonych w zakładce „Ramki”. Można łączyć kilka naraz.'), ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt)), fPd.row]],
+      ['Efekty', [note('Cząsteczki lecą od krawędzi miejsc zaznaczonych w zakładce „Ramki”. Można łączyć kilka naraz.'), ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt))]],
+      ['Tempo', [note('Jedno miejsce na prędkość i intensywność: prędkość dotyczy animacji ramek i cząsteczek razem.'), fSp.row, fGl.row, fPd.row]],
       ['Więcej', [el('details', { open: true }, el('summary', { textContent: 'Własne grafiki (tła, górny pasek)' }), imgBox), el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Diagnostyka interfejsu' }), dinfo, btn, out)]]
     ]);
     box.append(tabs);
     }
     render();
     root.settingsBox = box;
+    root.getSync = () => !!cfg.sync;
+    root.setSync = v => { cfg.sync = !!v; if (cfg.sync && cfg.theme === 'none') cfg.theme = 'custom'; chg(); render(); };
     root.apply = apply;
     root.stop = apply;
     apply();
@@ -3380,7 +3398,7 @@
     syncTheme(getTheme());
     themeSel.addEventListener('change', () => { setTheme(themeSel.value); syncTheme(themeSel.value); });
     themeBtn.addEventListener('click', () => { const i = THEMES.findIndex(x => x[0] === getTheme()); const nt = THEMES[(i + 1) % THEMES.length][0]; setTheme(nt); syncTheme(nt); });
-    { const tb = el('div', { className: 'gi-rset' }, el('div', { style: 'font-weight:bold;margin-bottom:2px' }, 'Motyw okien'), themeSel, el('div', { style: 'color:#90a4ae;font-size:10px;margin-top:2px' }, 'Zmienia wygląd okien dodatków. Szybka zmiana: przycisk 🎨 w nagłówku.')); const first = [...menuView.children].find(c => c.className === 'gi-rset'); if (first) menuView.insertBefore(tb, first); else menuView.append(tb); }
+    { const tb = el('div', { className: 'gi-rset' }, el('div', { style: 'font-weight:bold;margin-bottom:2px' }, 'Motyw okien'), themeSel, el('div', { style: 'color:#90a4ae;font-size:10px;margin-top:2px' }, 'Zmienia wygląd okien dodatków. Szybka zmiana: przycisk 🎨 w nagłówku.'), (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(gtView.getSync && gtView.getSync()) })); c.addEventListener('change', () => { if (gtView.setSync) gtView.setSync(c.checked); }); return el('label', { style: 'display:block;margin-top:6px;cursor:pointer' }, c, ' Kolor interfejsu gry („Motyw gry”) podąża za tym motywem'); })()); const first = [...menuView.children].find(c => c.className === 'gi-rset'); if (first) menuView.insertBefore(tb, first); else menuView.append(tb); }
     const head = el('div', { id: 'gi-head', title: 'Przeciągnij, aby przesunąć okno. Dwuklik = pozycja i rozmiar domyślne.' }, backBtn, titleEl, themeBtn, closeBtn);
     panel = el('div', { id: 'gi-panel' }, head, menuView, ...ADDONS.map(a => a.view));
     showView(null);
@@ -3457,7 +3475,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.60.0');
+    log('Załadowano v2.61.0');
   }
 
   let tries = 0;
