@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.81.0
+// @version      2.82.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2375,6 +2375,29 @@
       [...document.body.children].forEach(c => walk(c, 0));
       return out;
     }
+    let followRaf = 0;
+    function follow() {
+      followRaf = 0;
+      let n = 0;
+      for (const k of Object.keys(frs)) {
+        const o = frs[k]; if (!/^[agx]_/.test(k) || !o.el) continue; n++;
+        const e = o.el, hide = () => { if (o.node.style.display !== 'none') o.node.style.display = 'none'; delete frRects[k]; };
+        if (!e.isConnected) { hide(); continue; }
+        const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') { hide(); continue; }
+        const r = e.getBoundingClientRect(); if (r.width < 60 || r.height < 30) { hide(); continue; }
+        const L = Math.round(r.left), T = Math.round(r.top), W = Math.round(r.width), H = Math.round(r.height), st = o.node.style;
+        const moved = o.fx !== L || o.fy !== T, sized = o.fw !== W || o.fh !== H;
+        if (st.display === 'none') st.display = '';
+        if (moved || sized) {
+          o.fx = L; o.fy = T; o.fw = W; o.fh = H;
+          st.left = L + 'px'; st.top = T + 'px'; st.width = W + 'px'; st.height = H + 'px';
+          frRects[k] = { l: r.left, t: r.top, w: r.width, h: r.height };
+          if (sized) frGeo(o, W, H);
+          holeNode(o);
+        }
+      }
+      if (n) followRaf = requestAnimationFrame(follow);
+    }
     function frSync(force) {
       const anim = gtEnabled && ANIM_FR.includes(cfg.fst);
       const parts = gtEnabled && Object.keys(cfg.fpt || {}).some(k => cfg.fpt[k]);
@@ -2392,7 +2415,7 @@
       });
       if (cfg.fT.other || cfg.themeOther) { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherCache.l = otherWins(); } }
       if (cfg.fT.other) otherCache.l.filter(n => n.isConnected).forEach((n, i) => { tmap['x_' + (n.id || i)] = () => n; });
-      Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].miss = (frs[k].miss || 0) + 1; if (frs[k].miss > (k[0] === 'x' ? 0 : 6)) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } } });
+      Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].miss = (frs[k].miss || 0) + 1; if (frs[k].miss > (k[0] === 'g' ? 2 : 0)) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } } });
       for (const key of Object.keys(tmap)) {
         const want = (anim || parts) && cfg.fT[key.startsWith('a_') ? 'addons' : key.startsWith('g_') ? 'gwins' : key.startsWith('x_') ? 'other' : key] && !(key.startsWith('a_') && cfg.addonTheme === false) && !(key.startsWith('x_') && cfg.themeOther === false);
         if (!want) { if (frs[key]) { frs[key].node.remove(); delete frs[key]; } delete frRects[key]; continue; }
@@ -2425,7 +2448,7 @@
         if (!anim) { if (o) o.node.style.display = 'none'; continue; }
         if (!o) { o = frs[key] = { node: el('div', { className: 'gi-gtf' }) }; document.body.append(o.node); }
         if (o.built !== cfg.fst || force) { frEnsureSvg(); frBuild(o, key); const [c1, c2, c3] = frColors(); const st = o.node.style; st.setProperty('--c1', c1); st.setProperty('--c2', c2); st.setProperty('--c3', c3); st.setProperty('--w', Wd + 'px'); st.setProperty('--spd', String(cfg.fspd)); st.setProperty('--glow', String(cfg.fglow)); o.node.className = 'gi-gtf s-' + cfg.fst + (cfg.fclip !== false ? ' clip' : '') + (cfg.fstatic ? ' freeze' : ''); }
-        o.miss = 0;
+        o.miss = 0; if (/^[agx]_/.test(key)) { o.el = tmap[key](); o.fx = Math.round(r.left); o.fy = Math.round(r.top); o.fw = Math.round(r.width); o.fh = Math.round(r.height); }
         const st = o.node.style; st.display = ''; st.left = Math.round(r.left) + 'px'; st.top = Math.round(r.top) + 'px'; st.width = Math.round(r.width) + 'px'; st.height = Math.round(r.height) + 'px';
         let mk = 'none';
         if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 4)}px)`; }
@@ -2437,6 +2460,7 @@
         holeNode(o);
       }
       frGlobe = gc;
+      if (!followRaf && Object.keys(frs).some(k => /^[agx]_/.test(k))) followRaf = requestAnimationFrame(follow);
       tipOn(anim || parts); if (anim || parts) updTips();
       try { if (frSvg && frSvg.pauseAnimations) { if (cfg.fstatic) frSvg.pauseAnimations(); else frSvg.unpauseAnimations(); } } catch (e) {  }
       if (!anim && !parts) { clearInterval(frTimer); frTimer = 0; pStop(); }
@@ -3801,7 +3825,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.81.0');
+    log('Załadowano v2.82.0');
   }
 
   let tries = 0;
