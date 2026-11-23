@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.59.0
+// @version      2.60.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2558,19 +2558,33 @@
     const tgt = (label, k) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg.fT[k] })); c.addEventListener('change', () => { cfg.fT[k] = c.checked; chg(); }); return el('label', { style: 'display:inline-block;margin:2px 10px 2px 0;cursor:pointer;white-space:nowrap' }, c, ' ' + label); };
     const urlIn2 = (key, ph) => { const i = isolate(el('input', { type: 'text', placeholder: ph, value: cfg[key] || '' })); i.style.cssText = 'width:100%;box-sizing:border-box;margin:2px 0'; i.addEventListener('change', () => { cfg[key] = i.value.trim(); chg(); }); return i; };
     const fSl = slide('Własna ramka: obszar rogów (slice)', 5, 120, 1, 'fSlice', x => x + ' px');
-    const framesBox = el('div', {}, el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0' }, 'Ramka rysowana na brzegach wybranych elementów gry (nakładka, nie zmienia układu). Ogień i Energia mocniej obciążają kartę graficzną.'), fSel, fCol, ccRow, fW.row, fSp.row, fGl.row, fOut.row,
-      el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować:'),
-      el('div', {}, tgt('Cały ekran gry', 'game'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Mapa', 'map'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats')),
-      chk('Ukryj oryginalną ramkę dookoła okna gry', 'hideOrig'),
-      chk('Omijaj okrągły pasek życia (wycięcie w ramce)', 'gAvoid'), gCut.row,
-      el('div', { style: 'font-weight:bold;margin-top:8px' }, 'Cząsteczki wokół ramek (można łączyć):'), ptBox, fPd.row,
-      el('div', { style: 'font-size:11px;color:#90a4ae;margin-top:6px' }, 'Styl „Własna grafika”: link do obrazka z ramką (rogi + krawędzie, np. PNG 3×3). Ustaw „slice” na wielkość rogu w obrazku.'), urlIn2('fUrl', 'https://…/ramka.png'), fSl.row);
+    const grid2 = 'display:grid;grid-template-columns:1fr 1fr;gap:0 8px;margin:4px 0';
+    const note = t => el('div', { style: 'font-size:11px;color:#90a4ae;margin:4px 0' }, t);
+    const tgtBox = el('div', { style: grid2 }, tgt('Cały ekran gry', 'game'), tgt('Mapa', 'map'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats'));
+    const setAllT = v => { Object.keys(cfg.fT).forEach(k => { cfg.fT[k] = v; }); tgtBox.querySelectorAll('input').forEach(i => { i.checked = v; }); chg(); updWarn(); };
+    const mkBtn = (t, f) => { const b = el('button', { textContent: t }); b.style.cssText = 'margin:2px 4px 2px 0;padding:1px 8px;font-size:11px'; b.addEventListener('click', f); return b; };
+    ptBox.style.cssText = grid2;
+    const clearPt = () => { cfg.fpt = {}; ptBox.querySelectorAll('input').forEach(i => { i.checked = false; }); chg(); updWarn(); };
+    const warn = el('div', { style: 'color:#ffd54f;font-size:11px;margin:4px 0;display:none' }, '⚠ Nic nie jest zaznaczone w „Gdzie rysować” – zaznacz miejsca poniżej, inaczej ramka i cząsteczki się nie pokażą.');
+    function updWarn() {
+      const used = (cfg.fst !== 'none' && (ANIM_FR.includes(cfg.fst) || STATIC_FR.includes(cfg.fst))) || Object.keys(cfg.fpt || {}).some(k => cfg.fpt[k]);
+      warn.style.display = used && !Object.keys(cfg.fT).some(k => cfg.fT[k]) ? '' : 'none';
+    }
+    fSel.addEventListener('change', updWarn); tgtBox.addEventListener('change', updWarn); ptBox.addEventListener('change', updWarn);
+    updWarn();
     const imgBox = el('div', {}, el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0' }, 'Wklej linki do własnych obrazków (puste = oryginał). Muszą być dostępne publicznie.'),
       el('div', {}, 'Tło czatu'), urlIn2('bgChat', 'https://…/tlo-czatu.jpg'), el('div', {}, 'Tło prawej kolumny'), urlIn2('bgRight', 'https://…/tlo-prawej.jpg'), el('div', {}, 'Górny pasek'), urlIn2('bgTop', 'https://…/gorny-pasek.png'));
-    box.append(pSel, offNote, info, sel, colRow, sS.row, sL.row, syncChk, chk('Przefarbuj ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Przefarbuj tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Przefarbuj zielone przyciski interfejsu', 'btns'),
-      el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Ramki (animowane i proste)' }), framesBox),
-      el('details', { style: 'margin-top:4px' }, el('summary', { textContent: 'Własne grafiki (tła, górny pasek)' }), imgBox),
-      el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Diagnostyka interfejsu' }), dinfo, btn, out));
+    const tabs = setTabs([
+      ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote, note('Ustawienia szczegółowe: „Kolory” (barwa interfejsu gry), „Ramki” (styl i miejsca), „Efekty” (cząsteczki), „Więcej” (własne grafiki, diagnostyka).')]],
+      ['Kolory', [info, sel, colRow, syncChk, sS.row, sL.row, el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Co przefarbować:'), chk('Ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Zielone przyciski interfejsu', 'btns')]],
+      ['Ramki', [warn, fSel, fCol, ccRow, fW.row, fSp.row, fGl.row, fOut.row,
+        el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
+        chk('Ukryj oryginalną ramkę dookoła okna gry', 'hideOrig'), chk('Omijaj okrągły pasek życia (wycięcie)', 'gAvoid'), gCut.row,
+        el('details', { style: 'margin-top:6px' }, el('summary', { textContent: 'Własna grafika ramki (styl „Własna grafika”)' }), note('Link do obrazka z ramką (rogi + krawędzie, np. PNG 3×3). Ustaw „slice” na wielkość rogu w obrazku.'), urlIn2('fUrl', 'https://…/ramka.png'), fSl.row)]],
+      ['Efekty', [note('Cząsteczki lecą od krawędzi miejsc zaznaczonych w zakładce „Ramki”. Można łączyć kilka naraz.'), ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt)), fPd.row]],
+      ['Więcej', [el('details', { open: true }, el('summary', { textContent: 'Własne grafiki (tła, górny pasek)' }), imgBox), el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Diagnostyka interfejsu' }), dinfo, btn, out)]]
+    ]);
+    box.append(tabs);
     }
     render();
     root.settingsBox = box;
@@ -3443,7 +3457,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.59.0');
+    log('Załadowano v2.60.0');
   }
 
   let tries = 0;
