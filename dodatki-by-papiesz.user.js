@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.51.1
+// @version      2.51.2
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2190,23 +2190,29 @@
       flameLen = w + h;
     }
     const isEquipped = (node, d) => {
-      const loc = d && d.loc != null ? String(d.loc) : '';
-      if (loc) return loc === 's';
-      if (d && Number(d.st) > 0) return true;
-      return !!node.closest('[class*="equip" i],[class*="eq-" i]');
+      if (node.closest('.eq-slot')) return true;
+      return !!(d && String(d.loc) === 's');
     };
     let testUntil = 0;
     function equippedRects() {
-      const out = [];
-      document.querySelectorAll('[class*="item-id-"]').forEach(node => {
-        if (node.closest('#gi-panel,.gi-float,[class*="tip" i],[class*="loot" i]')) return;
-        const id = idOf(node); if (!id) return;
-        if (!isEquipped(node, itemData(id))) return;
-        const r = node.getBoundingClientRect();
-        if (r.width < 4 || r.height < 4) return;
-        out.push(r);
-      });
-      return out;
+      const vis = r => r.width >= 20 && r.width <= 90 && r.height >= 20 && r.height <= 90;
+      let rs = [...document.querySelectorAll('.eq-slot')].filter(n => !n.closest('#gi-panel,.gi-float')).map(n => n.getBoundingClientRect()).filter(vis);
+      if (!rs.length) {
+        document.querySelectorAll('[class*="item-id-"]').forEach(node => {
+          if (node.closest('#gi-panel,.gi-float,[class*="tip" i],[class*="loot" i]')) return;
+          const id = idOf(node); if (!id || !isEquipped(node, itemData(id))) return;
+          const r = node.getBoundingClientRect(); if (vis(r)) rs.push(r);
+        });
+      }
+      const near = (a, b) => a.left <= b.right + 30 && b.left <= a.right + 30 && a.top <= b.bottom + 30 && b.top <= a.bottom + 30;
+      const seen = new Array(rs.length).fill(false); let best = [];
+      for (let i = 0; i < rs.length; i++) {
+        if (seen[i]) continue;
+        const grp = [], q = [i]; seen[i] = true;
+        while (q.length) { const k = q.pop(); grp.push(rs[k]); for (let j = 0; j < rs.length; j++) if (!seen[j] && near(rs[k], rs[j])) { seen[j] = true; q.push(j); } }
+        if (grp.length > best.length) best = grp;
+      }
+      return best;
     }
     function scan() {
       if (!auraEnabled) { ov.style.display = 'none'; return; }
@@ -2236,7 +2242,7 @@
     const dbgBtn = el('button', { textContent: 'Pokaż znalezione przedmioty' });
     dbgBtn.addEventListener('click', () => {
       const all = [...document.querySelectorAll('[class*="item-id-"]')].filter(n => !n.closest('#gi-panel,.gi-float')).slice(0, 80).map(n => { const id = idOf(n), d = itemData(id) || {}, r = n.getBoundingClientRect(); return { id, loc: d.loc, st: d.st, eq: isEquipped(n, d), w: Math.round(r.width), h: Math.round(r.height), cls: clsOf(n).slice(0, 50), parent: clsOf(n.parentElement || document.body).slice(0, 40) }; });
-      dbg.value = JSON.stringify({ znalezionoZalozonych: all.filter(x => x.eq).length, przedmioty: all }, null, 1); dbg.select();
+      const rs = equippedRects(); dbg.value = JSON.stringify({ polaEqSlot: document.querySelectorAll('.eq-slot').length, polaWGrupie: rs.length, obszar: rs.length ? [Math.round(Math.min(...rs.map(r => r.left))), Math.round(Math.min(...rs.map(r => r.top))), Math.round(Math.max(...rs.map(r => r.right))), Math.round(Math.max(...rs.map(r => r.bottom)))] : null, znalezionoZalozonych: all.filter(x => x.eq).length, przedmioty: all.slice(0, 30) }, null, 1); dbg.select();
       if (navigator.clipboard) navigator.clipboard.writeText(dbg.value).catch(() => {});
     });
     const root = el('div');
@@ -2817,7 +2823,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.51.1');
+    log('Załadowano v2.51.2');
   }
 
   let tries = 0;
