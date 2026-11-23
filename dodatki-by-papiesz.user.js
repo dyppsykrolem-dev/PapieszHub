@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.94.0
+// @version      2.95.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2729,7 +2729,7 @@
     function thinScan() {
       const root = document.querySelector('.interface-layer.layer') || document.body, mark = new Set();
       root.querySelectorAll('*').forEach(n => {
-        if (n.closest(OURS)) return;
+        if (n.closest(OURS + ',.new-chat-window')) return;
         const r = n.getBoundingClientRect(), tv = r.width > 0 && r.width <= 16 && r.height >= 60, th = r.height > 0 && r.height <= 16 && r.width >= 60;
         if (!tv && !th) return;
         if (n.children.length > 2 || (n.textContent || '').trim()) return;
@@ -2755,7 +2755,7 @@
       gwi.forEach(n => n.setAttribute('data-gi-gi', '1')); gwc.forEach(n => n.setAttribute('data-gi-gc', '1'));
       const bd = new Set();
       root.querySelectorAll('*').forEach(n => {
-        if (n.closest(OURS) || mark.has(n)) return;
+        if (mark.has(n) || n.closest(OURS + ',.new-chat-window')) return;
         const r = n.getBoundingClientRect(); if (r.width < 150 && r.height < 150) return;
         if (r.width < 8 || r.height < 8) return;
         const cs = getComputedStyle(n); if (cs.display === 'none') return;
@@ -3453,7 +3453,18 @@
       if (hp && ts - coverT > 150) {
         coverT = ts; const E = PW.Engine, bt = E && E.battle;
         let cov = !!(bt && (bt.show === true || bt.isBattle === true || bt.active === true || bt.battleStarted === true));
-        if (!cov && cfg.hide !== false) { const t = document.elementFromPoint(hp.x, hp.y); if (t && t !== document.body && t !== document.documentElement && t.tagName !== 'CANVAS' && !t.closest('#GAME_CANVAS,.game-layer')) cov = true; else if (t && t.closest('.border-window,.interface-element-window')) cov = true; }
+        if (!cov && cfg.hide !== false) { const t = document.elementFromPoint(hp.x, hp.y);
+          if (t && t !== document.body && t !== document.documentElement && t.tagName !== 'CANVAS' && !t.closest('#GAME_CANVAS,.game-layer')) {
+            let n = t;
+            for (let i = 0; n && n !== document.body && i < 12; i++, n = n.parentElement) {
+              const nm = n.id + ' ' + String(n.className && n.className.baseVal === undefined ? n.className : '');
+              if (/tip|toast|cursor|context|menu|bubble|nick|label|hover|target|tooltip/i.test(nm)) break;
+              if (n.matches('.border-window,.interface-element-window,.gi-float')) { cov = true; break; }
+              const cs = getComputedStyle(n), rr = n.getBoundingClientRect();
+              if (/fixed|absolute/.test(cs.position) && rr.width >= 150 && rr.height >= 90 && !n.querySelector('.game-layer')) { cov = true; break; }
+            }
+          }
+        }
         covered = cov;
       }
       if (covered) { if (cv.style.display !== 'none') cv.style.display = 'none'; raf = requestAnimationFrame(frame); return; }
@@ -3556,6 +3567,282 @@
     ]);
     root.test = () => start();
     root.stop = () => { cv.style.display = 'none'; };
+    return root;
+  }
+
+  const CH_ON_KEY = 'gi_chat_on_v1', CH_CFG_KEY = 'gi_chat_cfg_v1';
+  let chEnabled = (() => { try { return localStorage.getItem(CH_ON_KEY) === '1'; } catch (e) { return false; } })();
+  const CH_CHANNELS = [['global', 'Ogólny / lokalny', '#e0e0e0', /global|general|ogoln|local|lokaln|map\b/i], ['clan', 'Klan', '#8bc34a', /clan|klan/i], ['group', 'Drużyna', '#4fc3f7', /party|group|team|dru[zż]yn/i], ['private', 'Prywatne', '#ff80ab', /priv|whisper|szept|prywat|\bpm\b/i], ['trade', 'Handel', '#ffd54f', /trade|handel|market|aukcj/i], ['system', 'System / informacje', '#b0bec5', /system|server|serwer|info|notice/i]];
+  const CH_FONTS = ['', 'Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'Consolas', 'Segoe UI', 'Comic Sans MS', 'Impact'];
+  function buildChatView() {
+    const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
+    const cfg = Object.assign({ font: '', size: 0, bold: false, lh: 0, outline: false, recolor: false, colors: {}, hiOwn: false, ownColor: '#ffeb3b', ownBg: true, nick: false, rules: [] }, readLS(CH_CFG_KEY, {}));
+    cfg.colors = Object.assign({}, cfg.colors);
+    const save = () => { writeLS(CH_CFG_KEY, cfg); apply(); };
+    const style = document.createElement('style'); style.id = 'gi-chat-css'; document.head.append(style);
+    const WR = '.chat-message-wrapper';
+    const msgRe = /(^|[\s_-])message([\s_-]|$)/i, badRe = /wrapper|section|window|scroll|container|input|channel|card/i;
+    const clsOf = n => String(n.className && n.className.baseVal === undefined ? n.className : '');
+    const own = () => { try { const h = PW.Engine && PW.Engine.hero && PW.Engine.hero.d; return h && h.nick || ''; } catch (e) { return ''; } };
+    const css = () => {
+      if (!chEnabled) return '';
+      let o = '';
+      const f = [];
+      if (cfg.font) f.push(`font-family:${cfg.font.replace(/[;{}]/g, '')},sans-serif !important`);
+      if (cfg.size) f.push(`font-size:${cfg.size}px !important`);
+      if (cfg.bold) f.push('font-weight:bold !important');
+      if (cfg.outline) f.push('text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000 !important');
+      if (f.length) o += `.new-chat-window ${WR},.new-chat-window ${WR} *:not(img):not(svg):not(i){${f.join(';')}}\n`;
+      if (cfg.lh) o += `.new-chat-window ${WR} [data-gi-m]{line-height:${cfg.lh}px !important}\n`;
+      if (cfg.recolor) CH_CHANNELS.forEach(([k]) => { const c = cfg.colors[k]; if (c) o += `.new-chat-window [data-gi-ch="${k}"],.new-chat-window [data-gi-ch="${k}"] *:not([class*="nick" i]):not([class*="time" i]):not([class*="date" i]){color:${c} !important}\n`; });
+      o += `.new-chat-window [data-gi-c],.new-chat-window [data-gi-c] *:not([class*="time" i]){color:var(--gi-c) !important}\n`;
+      o += `.new-chat-window [data-gi-bg]{background:linear-gradient(90deg,var(--gi-bg),transparent) !important;border-radius:3px}\n`;
+      return o;
+    };
+    function classify(m) {
+      let s = clsOf(m); m.querySelectorAll('*').forEach((c, i) => { if (i < 30) s += ' ' + clsOf(c); });
+      for (const [k, , , re] of CH_CHANNELS) if (re.test(s)) return k;
+      return '';
+    }
+    function mark(m) {
+      if (!m || m.nodeType !== 1 || m.closest(GI_OWN)) return;
+      m.setAttribute('data-gi-m', '1');
+      const txt = (m.textContent || '').trim(); if (!txt) return;
+      const ch = classify(m); if (ch) m.setAttribute('data-gi-ch', ch); else m.removeAttribute('data-gi-ch');
+      let col = '', bg = '';
+      for (const r of cfg.rules) { if (!r || !r.re) continue; let ok = false; try { ok = new RegExp(r.re, 'i').test(txt); } catch (e) {  } if (ok) { col = r.color; break; } }
+      const me = own(); if (!col && cfg.hiOwn && me && txt.toLowerCase().includes(me.toLowerCase())) { col = cfg.ownColor; if (cfg.ownBg) bg = cfg.ownColor + '44'; }
+      if (col) { m.setAttribute('data-gi-c', '1'); m.style.setProperty('--gi-c', col); } else { m.removeAttribute('data-gi-c'); m.style.removeProperty('--gi-c'); }
+      if (bg) { m.setAttribute('data-gi-bg', '1'); m.style.setProperty('--gi-bg', bg); } else { m.removeAttribute('data-gi-bg'); m.style.removeProperty('--gi-bg'); }
+    }
+    function msgOf(n, w) {
+      let best = null, c = n.nodeType === 1 ? n : n.parentElement;
+      while (c && c !== w && w.contains(c)) { const cl = clsOf(c); if (msgRe.test(cl) && !badRe.test(cl)) best = c; c = c.parentElement; }
+      if (!best && n.nodeType === 1 && n.parentElement && w.contains(n.parentElement)) best = n;
+      return best;
+    }
+    function scanAll() {
+      document.querySelectorAll(WR).forEach(w => {
+        const set = new Set(); w.querySelectorAll('[class*="message" i]').forEach(n => { const m = msgOf(n, w); if (m) set.add(m); });
+        set.forEach(mark);
+      });
+    }
+    let pend = new Set(), tm = 0;
+    const flush = () => { tm = 0; const l = [...pend]; pend = new Set(); l.forEach(([n, w]) => { if (n.isConnected) mark(msgOf(n, w)); }); };
+    const mo = new MutationObserver(ms => {
+      if (!chEnabled) return;
+      for (const m of ms) for (const n of m.addedNodes) { if (n.nodeType !== 1 || n.closest(GI_OWN)) continue; const w = n.closest(WR); if (w) pend.add([n, w]); }
+      if (pend.size && !tm) tm = setTimeout(flush, 60);
+    });
+    function apply() { style.textContent = css(); if (chEnabled) { scanAll(); } else document.querySelectorAll('[data-gi-m]').forEach(n => { ['data-gi-m', 'data-gi-ch', 'data-gi-c', 'data-gi-bg'].forEach(a => n.removeAttribute(a)); }); }
+    mo.observe(document.body, { childList: true, subtree: true });
+    setInterval(() => { try { apply.last !== chEnabled && ((apply.last = chEnabled), apply()); if (chEnabled) scanAll(); } catch (e) {  } }, 3000);
+    const mkR = (key, label, min, max, step, fmt) => {
+      const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' });
+      const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:90px';
+      const show = () => { val.textContent = fmt(Number(r.value)); };
+      r.addEventListener('input', () => { cfg[key] = Number(r.value); show(); save(); }); show();
+      return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val);
+    };
+    const mkC = (key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
+    const fontSel = isolate(el('select', {})); CH_FONTS.forEach(f => fontSel.append(el('option', { value: f, textContent: f || 'Domyślna (z gry)', selected: cfg.font === f }))); fontSel.addEventListener('change', () => { cfg.font = fontSel.value; fontIn.value = ''; save(); });
+    const fontIn = isolate(el('input', { type: 'text', placeholder: 'lub wpisz własną nazwę czcionki', value: CH_FONTS.includes(cfg.font) ? '' : cfg.font })); fontIn.style.cssText = 'width:100%;box-sizing:border-box;margin:3px 0'; fontIn.addEventListener('change', () => { if (fontIn.value.trim()) { cfg.font = fontIn.value.trim(); fontSel.value = ''; } save(); });
+    const prev = el('div', { style: 'margin:6px 0;padding:6px;background:#0008;border:1px solid #fff3;border-radius:4px' }, 'Podgląd: Jan Papiesz: Dobry drop na Kryształowej Jaskini!');
+    const chanRows = CH_CHANNELS.map(([k, l, d]) => {
+      const c = isolate(el('input', { type: 'color', value: cfg.colors[k] || d })); c.addEventListener('input', () => { cfg.colors[k] = c.value; save(); });
+      return el('div', { style: 'margin:3px 0' }, c, ' ' + l);
+    });
+    const ownC = isolate(el('input', { type: 'color', value: cfg.ownColor })); ownC.addEventListener('input', () => { cfg.ownColor = ownC.value; save(); });
+    const rulesBox = el('div');
+    const drawRules = () => {
+      rulesBox.replaceChildren(...cfg.rules.map((r, i) => {
+        const re = isolate(el('input', { type: 'text', value: r.re, placeholder: 'tekst lub wyrażenie, np. legend|heroik' })); re.style.width = '55%'; re.addEventListener('change', () => { r.re = re.value; save(); });
+        const c = isolate(el('input', { type: 'color', value: r.color || '#ffeb3b' })); c.addEventListener('input', () => { r.color = c.value; save(); });
+        const x = el('button', { textContent: '×' }); x.addEventListener('click', () => { cfg.rules.splice(i, 1); save(); drawRules(); });
+        return el('div', { style: 'margin:3px 0' }, re, ' ', c, ' ', x);
+      }));
+    };
+    const addRule = el('button', { textContent: '+ Dodaj regułę' }); addRule.addEventListener('click', () => { cfg.rules.push({ re: '', color: '#ffeb3b' }); save(); drawRules(); });
+    drawRules();
+    const dbg = isolate(el('textarea', { rows: 8, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
+    const dbgBtn = el('button', { textContent: 'Zbierz dane o czacie' });
+    dbgBtn.addEventListener('click', () => {
+      const w = document.querySelector(WR), out = { wrapper: !!w, okna: [...document.querySelectorAll('.new-chat-window,[class*="chat" i]')].slice(0, 8).map(n => n.tagName + '.' + clsOf(n).slice(0, 60)), wiadomosci: [] };
+      if (w) { const set = new Set(); w.querySelectorAll('[class*="message" i]').forEach(n => { const m = msgOf(n, w); if (m) set.add(m); }); [...set].slice(-6).forEach(m => out.wiadomosci.push({ cls: clsOf(m).slice(0, 80), kanal: m.getAttribute('data-gi-ch') || '?', dzieci: [...m.children].slice(0, 4).map(c => c.tagName + '.' + clsOf(c).slice(0, 40)), tekst: (m.textContent || '').trim().slice(0, 60) })); }
+      dbg.value = JSON.stringify(out, null, 1);
+    });
+    const root = el('div');
+    root.settingsBox = setTabs([
+      ['Czcionka', [el('div', {}, 'Czcionka: ', fontSel), fontIn, mkR('size', 'Rozmiar tekstu', 0, 22, 1, v => v ? v + ' px' : 'z gry'), mkR('lh', 'Odstęp wierszy', 0, 30, 1, v => v ? v + ' px' : 'z gry'), mkC('bold', 'Pogrubiony tekst'), mkC('outline', 'Czarny obrys liter (lepsza czytelność)'), prev]],
+      ['Kolory', [mkC('recolor', 'Koloruj wiadomości według kanału'), ...chanRows, el('hr'), mkC('hiOwn', 'Wyróżnij wiadomości z moim nickiem'), el('div', {}, 'Kolor wyróżnienia: ', ownC), mkC('ownBg', 'Dodatkowo podświetl tło')]],
+      ['Reguły', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Wiadomość zawierająca podany tekst (lub wyrażenie regularne) dostaje wybrany kolor. Reguły mają pierwszeństwo przed kolorami kanałów. Przykład: „legend|heroik” albo nick znajomego.'), rulesBox, addRule]],
+      ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli kolory kanałów nie działają, kliknij i wklej mi wynik – dopasuję rozpoznawanie kanałów do Twojej gry.'), dbgBtn, dbg]]
+    ]);
+    root.test = () => apply(); root.apply = apply; root.stop = () => apply();
+    apply();
+    return root;
+  }
+
+  const DM_ON_KEY = 'gi_dmg_on_v1', DM_CFG_KEY = 'gi_dmg_cfg_v1';
+  let dmEnabled = (() => { try { return localStorage.getItem(DM_ON_KEY) === '1'; } catch (e) { return false; } })();
+  const DM_KINDS = [['dmg', 'Obrażenia', '#ffffff'], ['crit', 'Krytyki', '#ffd54f'], ['dot', 'Krwawienie i rany', '#ef5350'], ['heal', 'Leczenie / regeneracja', '#69f0ae'], ['bonus', 'Siła uderzenia i bonusy', '#ff9800'], ['block', 'Osłona i unik', '#90caf9'], ['combo', 'Kombinacje', '#ce93d8']];
+  const DM_ELEM = { fire: ['🔥', '#ff7a2f', /ogie[ńn]|ognist|płomie|pożog|żar/i], frost: ['❄', '#7fd8ff', /zimn|lod[ouz]|lód|mróz|mroź|zamroz/i], lightning: ['⚡', '#ffe94d', /błyskaw|piorun|elektr|wyładowa|burz/i], poison: ['☠', '#8bdc3a', /truciz|jad|zatru|toksycz/i], light: ['✦', '#fff3b0', /świat|święt|blask/i], dark: ['☾', '#b388ff', /cie[ńn]|mrok|ciemn|nekro/i], arcane: ['✺', '#e06bff', /magiczn\w+ obra|arkan/i] };
+  function buildDmgView() {
+    const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
+    const cfg = Object.assign({ on: { dmg: true, crit: true, dot: true, heal: true, bonus: true, block: true, combo: true }, colors: {}, elem: true, elemColor: true, size: 1, dur: 1.4, rise: 1, anim: 'float', who: 'all', scale: true, fmt: 'full', font: 'Impact, Arial Black, sans-serif', burst: true, pos: 'target', max: 40 }, readLS(DM_CFG_KEY, {}));
+    cfg.on = Object.assign({ dmg: true, crit: true, dot: true, heal: true, bonus: true, block: true, combo: true }, cfg.on); cfg.colors = Object.assign({}, cfg.colors);
+    const save = () => writeLS(DM_CFG_KEY, cfg);
+    const box = document.createElement('div'); box.id = 'gi-dmg'; box.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;z-index:99500';
+    document.body.append(box);
+    const done = new WeakSet(), tcache = new Map(), stack = new Map(), lastEv = [], lastRaw = [];
+    let maxSeen = 1;
+    const me = () => { try { const h = PW.Engine && PW.Engine.hero && PW.Engine.hero.d; return h && h.nick || ''; } catch (e) { return ''; } };
+    const num = s => Number(String(s).replace(/[^\d]/g, '')) || 0;
+    const fmtN = n => cfg.fmt === 'short' && n >= 1000 ? (n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'k') : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const clean = s => String(s || '').replace(/[:,.\-+]+$/g, '').replace(/^[\s:,.\-+]+/, '').trim();
+    const kcol = k => cfg.colors[k] || DM_KINDS.find(x => x[0] === k)[2];
+    const elemOf = t => { if (!cfg.elem) return null; const s = t.replace(/odporno[śs][^\n.]*/gi, ''); for (const k in DM_ELEM) if (DM_ELEM[k][2].test(s)) return k; return null; };
+    const RX = {
+      taken1: /(-?\d[\d\s.]*)\s*obra[żz]e[ńn]\s+otrzyma[łl](?:\(a\))?\s+([^\n(]+?)\s*\(/g,
+      taken2: /([^\n(]+?)\s*\(\s*[\d.,]+%\s*\)\s*otrzyma[łl](?:\(a\))?\s+-?(\d[\d\s.]*)\s*obra[żz]e[ńn]/g,
+      dot: /([^\n(]+?)\s*\(\s*[\d.,]+%\s*\)\s*:\s*(\d[\d\s.]*)\s*obra[żz]e[ńn]\s+(?:od|po)\s+([^\n.]+)/g,
+      heal1: /Przywr[óo]cono\s+(\d[\d\s.]*)\s*punkt[óo]w\s+[żz]ycia\s+([^\n(]+?)\s*\(/g,
+      heal2: /([^\n(]+?)\s*\(\s*[\d.,]+%\s*\)\s*:[^\n]*?zregenerowano\s+(\d[\d\s.]*)\s*punkt/gi,
+      hit: /([^\n(]+?)\s*\(\s*[\d.,]+%\s*\)\s*uderzy[łl](?:a)?\s+z\s+si[łl]ą\s*\+?(\d[\d\s.]*)(?:\s*\+\s*(\d[\d\s.]*))?/g,
+      dodge: /([^\n(]+?)\s*(?:\(\s*[\d.,]+%\s*\))?\s*(?:unik(?:n[ąa][łl]|n[ęe][łl]a)|uniknięto)/gi
+    };
+    function parse(row) {
+      const raw = (row.innerText || row.textContent || '').replace(/ /g, ' ');
+      if (!/obra[żz]e[ńn]|punkt[óo]w [żz]ycia|zregenerowano|uderzy[łl]|unik/i.test(raw)) return [];
+      const text = raw.replace(/\r/g, '');
+      const crit = /krytyczn(?!a os[łl]ona)/i.test(text), shield = /krytyczna os[łl]ona/i.test(text), comboM = text.match(/Kombinacja\s*x\s*(\d+)/i), skillM = text.match(/wykonuje\s+([^\n.]+)/i);
+      const el0 = elemOf((skillM ? skillM[1] + ' ' : '') + text);
+      const ev = [];
+      let m;
+      for (const re of ['taken1', 'taken2', 'dot', 'heal1', 'heal2', 'hit', 'dodge']) RX[re].lastIndex = 0;
+      while ((m = RX.taken1.exec(text))) ev.push({ kind: crit ? 'crit' : 'dmg', amount: num(m[1]), target: clean(m[2]), elem: el0, shield });
+      while ((m = RX.taken2.exec(text))) ev.push({ kind: crit ? 'crit' : 'dmg', amount: num(m[2]), target: clean(m[1]), elem: el0, shield });
+      while ((m = RX.dot.exec(text))) { const w = m[3] || ''; ev.push({ kind: 'dot', amount: num(m[2]), target: clean(m[1]), elem: /krwaw|ran|zranie/i.test(w) ? null : elemOf(w), label: /g[łl]ębok/i.test(w) ? 'głęboka rana' : /zranie/i.test(w) ? 'zranienie' : '' }); }
+      while ((m = RX.heal1.exec(text))) ev.push({ kind: 'heal', amount: num(m[1]), target: clean(m[2]) });
+      while ((m = RX.heal2.exec(text))) ev.push({ kind: 'heal', amount: num(m[2]), target: clean(m[1]), label: /ostatni ratunek/i.test(text) ? 'ostatni ratunek' : '' });
+      while ((m = RX.hit.exec(text))) { const who = clean(m[1]); ev.push({ kind: 'bonus', amount: num(m[2]), amount2: m[3] ? num(m[3]) : 0, target: who, actor: true }); }
+      while ((m = RX.dodge.exec(text))) { const t = clean(m[1]); if (t && t.length < 40 && !/obra/i.test(t)) ev.push({ kind: 'block', amount: 0, target: t, label: 'UNIK' }); }
+      if (ev.length) {
+        const last = ev.filter(e => e.kind === 'dmg' || e.kind === 'crit').pop();
+        if (comboM && last) last.combo = comboM[1];
+        if (skillM && ev[0]) ev[0].skill = clean(skillM[1]).slice(0, 28);
+      }
+      return ev;
+    }
+    function anchor(name, row) {
+      const now = performance.now(), c = tcache.get(name);
+      if (c && c.el.isConnected && now - c.t < 1500) { const r = c.el.getBoundingClientRect(); if (r.width > 0) return { x: r.left + r.width / 2, y: r.top + r.height * .3, found: true }; }
+      let logRoot = row; for (let n = row; n && n !== document.body; n = n.parentElement) if (n.scrollHeight > n.clientHeight + 4 && n.clientHeight > 40) { logRoot = n; break; }
+      if (cfg.pos === 'target') {
+        const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: t => { const v = t.nodeValue.trim(); return v === name ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+        let t; while ((t = tw.nextNode())) { const p = t.parentElement; if (!p || logRoot.contains(p) || p.closest(GI_OWN + ',.new-chat-window,script,style')) continue; const r = p.getBoundingClientRect(); if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight) { tcache.set(name, { el: p, t: now }); return { x: r.left + r.width / 2, y: r.top + r.height * .3, found: true }; } }
+      }
+      const g = document.querySelector('.game-layer'), r = g ? g.getBoundingClientRect() : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+      return { x: r.left + r.width / 2, y: r.top + r.height * .38, found: false };
+    }
+    function chip(txt, color, size, extra) { const d = document.createElement('div'); d.textContent = txt; d.style.cssText = `position:absolute;left:0;top:0;white-space:nowrap;font:${extra || 'bold'} ${size}px ${cfg.font};color:${color};text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000,0 0 8px ${color}88;will-change:transform,opacity;opacity:0`; return d; }
+    function anim(d, x, y, dx, dy, dur, delay, style, scl) {
+      const s = scl || 1, A = [];
+      if (style === 'arc') A.push({ transform: `translate(${x}px,${y}px) translate(-50%,-50%) scale(${.6 * s})`, opacity: 0 }, { transform: `translate(${x + dx * .4}px,${y - 42 * cfg.rise}px) translate(-50%,-50%) scale(${1.15 * s})`, opacity: 1, offset: .25 }, { transform: `translate(${x + dx}px,${y + 10}px) translate(-50%,-50%) scale(${s})`, opacity: 0 });
+      else if (style === 'bounce') A.push({ transform: `translate(${x}px,${y}px) translate(-50%,-50%) scale(${.5 * s})`, opacity: 0 }, { transform: `translate(${x + dx * .3}px,${y - 40 * cfg.rise}px) translate(-50%,-50%) scale(${1.2 * s})`, opacity: 1, offset: .2 }, { transform: `translate(${x + dx * .55}px,${y - 6}px) translate(-50%,-50%) scale(${s})`, opacity: 1, offset: .45 }, { transform: `translate(${x + dx * .75}px,${y - 22 * cfg.rise}px) translate(-50%,-50%) scale(${s})`, opacity: 1, offset: .65 }, { transform: `translate(${x + dx}px,${y - 4}px) translate(-50%,-50%) scale(${s * .9})`, opacity: 0 });
+      else if (style === 'pop') A.push({ transform: `translate(${x}px,${y}px) translate(-50%,-50%) scale(0.2)`, opacity: 0 }, { transform: `translate(${x}px,${y - 6}px) translate(-50%,-50%) scale(${1.6 * s})`, opacity: 1, offset: .15 }, { transform: `translate(${x}px,${y - 10}px) translate(-50%,-50%) scale(${s})`, opacity: 1, offset: .3 }, { transform: `translate(${x + dx * .3}px,${y - 70 * cfg.rise}px) translate(-50%,-50%) scale(${s * .9})`, opacity: 0 });
+      else if (style === 'shake') A.push({ transform: `translate(${x}px,${y}px) translate(-50%,-50%) scale(${.7 * s})`, opacity: 0 }, ...[-9, 8, -6, 5, -3, 0].map((j, i) => ({ transform: `translate(${x + j}px,${y - (8 + i * 4) * cfg.rise}px) translate(-50%,-50%) scale(${(1.1 - i * .02) * s})`, opacity: 1, offset: .08 + i * .07 })), { transform: `translate(${x}px,${y - 60 * cfg.rise}px) translate(-50%,-50%) scale(${s})`, opacity: 0 });
+      else A.push({ transform: `translate(${x}px,${y}px) translate(-50%,-50%) scale(${.7 * s})`, opacity: 0 }, { transform: `translate(${x + dx * .3}px,${y - 18 * cfg.rise}px) translate(-50%,-50%) scale(${1.15 * s})`, opacity: 1, offset: .18 }, { transform: `translate(${x + dx}px,${y + dy * cfg.rise}px) translate(-50%,-50%) scale(${s})`, opacity: 0 });
+      const a = d.animate(A, { duration: dur * 1000, delay: delay * 1000, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'both' });
+      a.onfinish = () => d.remove();
+    }
+    function burst(x, y, color, size) {
+      const d = document.createElement('div'); d.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:${size}px;height:${size}px;margin:${-size / 2}px 0 0 ${-size / 2}px;border-radius:50%;border:3px solid ${color};box-shadow:0 0 16px ${color},inset 0 0 12px ${color};opacity:0`;
+      box.append(d); const a = d.animate([{ transform: 'scale(.2)', opacity: .95 }, { transform: 'scale(1.5)', opacity: 0 }], { duration: 520, easing: 'ease-out' }); a.onfinish = () => d.remove();
+      for (let i = 0; i < 9; i++) { const p = document.createElement('div'), ang = i / 9 * 6.283 + Math.random() * .4; p.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:5px;height:5px;border-radius:50%;background:${color};box-shadow:0 0 6px ${color}`; box.append(p); const r = 40 + Math.random() * 30; const b = p.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${Math.cos(ang) * r}px,${Math.sin(ang) * r}px) scale(.2)`, opacity: 0 }], { duration: 520 + Math.random() * 200, easing: 'ease-out' }); b.onfinish = () => p.remove(); }
+    }
+    function show(e) {
+      if (!cfg.on[e.kind]) return;
+      const mine = me(), tm = e.target && mine && e.target.toLowerCase() === mine.toLowerCase();
+      if (cfg.who === 'me' && !tm) return; if (cfg.who === 'others' && tm) return;
+      if (box.childElementCount > cfg.max) box.firstChild.remove();
+      const a = e._a || anchor(e.target, e.row || document.body);
+      const k = (e.target || '') + '|' + Math.round(a.x / 20), n = (stack.get(k) || { n: 0, t: 0 }); const now = performance.now(); if (now - n.t > 900) n.n = 0; n.n++; n.t = now; stack.set(k, n);
+      let x = a.x + (Math.random() - .5) * 26, y = a.y - (n.n - 1) * 20 * cfg.size;
+      const ei = e.elem ? DM_ELEM[e.elem] : null, base = e.kind === 'crit' ? 30 : e.kind === 'dot' ? 17 : e.kind === 'heal' ? 22 : 24;
+      if (e.amount) maxSeen = Math.max(maxSeen * .995, e.amount);
+      const rel = cfg.scale && e.amount ? .8 + .7 * Math.min(1, e.amount / maxSeen) : 1, sz = Math.round(base * cfg.size * rel);
+      const col = cfg.elemColor && ei && (e.kind === 'dmg' || e.kind === 'crit') ? ei[1] : kcol(e.kind === 'dmg' && e.crit ? 'crit' : e.kind);
+      const dur = cfg.dur, style = e.kind === 'crit' ? (cfg.anim === 'float' ? 'pop' : cfg.anim) : e.kind === 'heal' ? 'float' : e.kind === 'dot' ? 'float' : cfg.anim;
+      let txt;
+      if (e.kind === 'heal') txt = '+' + fmtN(e.amount); else if (e.kind === 'dot') txt = '-' + fmtN(e.amount); else if (e.kind === 'bonus') txt = '+' + fmtN(e.amount) + (e.amount2 ? ' +' + fmtN(e.amount2) : ''); else if (e.kind === 'block') txt = e.label || 'BLOK'; else txt = '-' + fmtN(e.amount);
+      if (ei && e.kind !== 'bonus' && e.kind !== 'heal') txt = ei[0] + ' ' + txt;
+      if (e.kind === 'crit') txt += '!';
+      const d = chip(txt, col, sz); if (e.kind === 'bonus') { d.style.color = '#4dd0e1'; if (e.amount2) { d.textContent = ''; const a1 = document.createElement('span'); a1.textContent = '+' + fmtN(e.amount); a1.style.color = '#4dd0e1'; const a2 = document.createElement('span'); a2.textContent = ' +' + fmtN(e.amount2); a2.style.color = kcol('bonus'); d.append(a1, a2); } }
+      box.append(d);
+      const dx = (Math.random() < .5 ? -1 : 1) * (14 + Math.random() * 26), dy = e.kind === 'dot' ? 46 : e.kind === 'heal' ? -64 : -58;
+      anim(d, x, y, dx, dy, dur, 0, style, e.kind === 'crit' ? 1.12 : 1);
+      if (e.kind === 'crit' && cfg.burst) burst(x, y, col, 54 * cfg.size);
+      if (e.kind === 'heal' && cfg.burst) burst(x, y, kcol('heal'), 34 * cfg.size);
+      let off = 0;
+      const sub = (t, c, s2, extra) => { if (!cfg.on.combo && c === 'combo') return; const q = chip(t, c, Math.round(s2 * cfg.size), extra); box.append(q); off += 1; anim(q, x + 4, y - 24 * cfg.size * off - 6, 0, -34, dur * .95, .08 * off, 'float', 1); };
+      if (e.combo && cfg.on.combo) sub('Kombinacja x' + e.combo, kcol('combo'), 15, 'bold');
+      if (e.shield && cfg.on.block) sub('🛡 osłona', kcol('block'), 13, 'bold');
+      if (e.label && e.kind !== 'block') sub(e.label, e.kind === 'heal' ? kcol('heal') : '#ffab91', 12, 'normal');
+      if (e.skill && cfg.on.bonus && (e.kind === 'dmg' || e.kind === 'crit')) sub(e.skill, '#e0e0e0', 12, 'italic');
+      lastEv.push({ ...e, row: undefined, _a: undefined, znalazlem_cel: a.found }); if (lastEv.length > 8) lastEv.shift();
+    }
+    let queue = [], qt = 0;
+    const rowsOf = n => { const t = n.textContent || ''; if (t.length <= 500 || !n.children.length) return [n]; return [...n.children].flatMap(rowsOf); };
+    const mo = new MutationObserver(ms => {
+      if (!dmEnabled) return;
+      for (const m of ms) for (const n of m.addedNodes) {
+        if (n.nodeType !== 1 || n.closest(GI_OWN + ',#gi-dmg,.new-chat-window,.chat-message-wrapper')) continue;
+        const t = n.textContent || ''; if (t.length < 8 || !/obra[żz]e[ńn]|punkt[óo]w [żz]ycia|uderzy[łl]|unik/i.test(t)) continue;
+        rowsOf(n).forEach(r => { if (!done.has(r)) { done.add(r); queue.push(r); } });
+      }
+      if (queue.length && !qt) qt = setTimeout(drain, 40);
+    });
+    function drain() {
+      qt = 0; let rows = queue; queue = [];
+      if (rows.length > 14) rows = rows.slice(-5);
+      let i = 0; const evs = [];
+      rows.forEach(r => { if (!r.isConnected) return; const raw = (r.innerText || r.textContent || '').trim().slice(0, 300); let ev = []; try { ev = parse(r); } catch (e) {  } if (!ev.length) { if (/obra[żz]e[ńn]/i.test(raw)) { lastRaw.push('NIEROZPOZNANE: ' + raw); } return; } lastRaw.push(raw); ev.forEach(e => { e.row = r; evs.push(e); }); });
+      while (lastRaw.length > 10) lastRaw.shift();
+      evs.forEach(e => { setTimeout(() => { try { show(e); } catch (er) { log('obrażenia – błąd', er); } }, i * 110); i++; });
+    }
+    mo.observe(document.body, { childList: true, subtree: true });
+    const mkR = (key, label, min, max, step, fmt) => {
+      const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' });
+      const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:90px';
+      const sh = () => { val.textContent = fmt(Number(r.value)); };
+      r.addEventListener('input', () => { cfg[key] = Number(r.value); sh(); save(); }); sh();
+      return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val);
+    };
+    const mkC = (key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
+    const mkSel = (key, opts) => { const s = isolate(el('select', {})); opts.forEach(([v, l]) => s.append(el('option', { value: v, textContent: l, selected: cfg[key] === v }))); s.addEventListener('change', () => { cfg[key] = s.value; save(); }); return s; };
+    const kindRows = DM_KINDS.map(([k, l]) => {
+      const c = isolate(el('input', { type: 'checkbox', checked: cfg.on[k] !== false })); c.addEventListener('change', () => { cfg.on[k] = c.checked; save(); });
+      const col = isolate(el('input', { type: 'color', value: kcol(k) })); col.addEventListener('input', () => { cfg.colors[k] = col.value; save(); });
+      return el('div', { style: 'margin:3px 0' }, c, ' ', col, ' ' + l);
+    });
+    const test = () => {
+      const g = document.querySelector('.game-layer'), r = g ? g.getBoundingClientRect() : { left: 0, top: 0, width: innerWidth, height: innerHeight }, cx = r.left + r.width / 2;
+      const S = [[{ kind: 'dmg', amount: 2380, elem: 'fire' }, -140], [{ kind: 'crit', amount: 8905, elem: 'lightning', combo: '3', skill: 'Fuzja żywiołów' }, -60], [{ kind: 'dot', amount: 1850, label: 'głęboka rana' }, 20], [{ kind: 'heal', amount: 604 }, 90], [{ kind: 'bonus', amount: 1126, amount2: 2129 }, 150], [{ kind: 'dmg', amount: 1468, elem: 'frost', shield: true }, 210]];
+      S.forEach(([e, dx], i) => setTimeout(() => { const a = { x: cx + dx, y: r.top + r.height * .5 }; show(Object.assign({ target: '__test' + i, row: document.body, _a: a }, e)); }, i * 230));
+    };
+    const dbg = isolate(el('textarea', { rows: 8, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
+    const dbgBtn = el('button', { textContent: 'Pokaż ostatnie odczytane wiersze' });
+    dbgBtn.addEventListener('click', () => { dbg.value = JSON.stringify({ moj_nick: me(), wiersze: lastRaw.slice(-8), zdarzenia: lastEv.slice(-6) }, null, 1); });
+    const testBtn = el('button', { textContent: '▶ Pokaż przykład' }); testBtn.addEventListener('click', test);
+    const root = el('div');
+    root.settingsBox = setTabs([
+      ['Wygląd', [testBtn, el('div', { style: 'margin:5px 0' }, 'Animacja: ', mkSel('anim', [['float', 'Unoszenie'], ['arc', 'Łuk'], ['bounce', 'Odbicie'], ['pop', 'Wybuch'], ['shake', 'Drżenie']])), mkR('size', 'Rozmiar', .5, 2.5, .05, v => '×' + v.toFixed(2)), mkR('dur', 'Czas trwania', .6, 3, .1, v => v.toFixed(1) + ' s'), mkR('rise', 'Wysokość lotu', .3, 2.5, .1, v => '×' + v.toFixed(1)), mkC('scale', 'Większe liczby przy mocniejszych uderzeniach'), mkC('burst', 'Rozbłysk przy krytyku i leczeniu'), el('div', {}, 'Format liczb: ', mkSel('fmt', [['full', '2 380'], ['short', '2.4k']]))]],
+      ['Zdarzenia', [el('div', { style: 'font-weight:bold' }, 'Co pokazywać i jakim kolorem'), ...kindRows, mkC('elem', 'Ikona żywiołu (🔥 ❄ ⚡ ☠ ✦ ☾) przy obrażeniach'), mkC('elemColor', 'Kolor liczby zależny od żywiołu'), el('div', { style: 'margin-top:5px' }, 'Czyje liczby: ', mkSel('who', [['all', 'Wszystkie'], ['me', 'Tylko otrzymane przeze mnie'], ['others', 'Tylko otrzymane przez innych']]))]],
+      ['Pozycja', [el('div', {}, 'Gdzie pokazywać: ', mkSel('pos', [['target', 'Nad celem (jeśli go znajdę)'], ['center', 'Środek mapy']])), mkR('max', 'Limit naraz', 10, 80, 5, v => String(v)), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0' }, 'Liczby powstają z linii dziennika walki. Cel szukam po nicku w oknie walki; gdy go nie ma, liczby lecą ze środka mapy.')]],
+      ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli liczby się nie pojawiają, zrób walkę, kliknij i wklej mi wynik.'), dbgBtn, dbg]]
+    ]);
+    root.test = test; root.stop = () => { box.replaceChildren(); };
     return root;
   }
 
@@ -3952,6 +4239,8 @@
     const flameView = safeView('Efekt przy unikacie/heroiku', buildFlameView);
     const auraView = safeView('Aura ekwipunku', buildAuraView);
     const haView = safeView('Aura postaci', buildHeroAuraView);
+    const chView = safeView('Zmieniacz czatu', buildChatView);
+    const dmView = safeView('Obrażenia w walce', buildDmgView);
     const relogView = safeView('Przelogowanie', buildRelogView);
     const relogWin = (() => {
       try {
@@ -3982,6 +4271,8 @@
     const gtSetWin = mkSetWin('gi-gt-set', 'Ustawienia – Motyw gry', 'gi_win_gtset_v1', gtView.settingsBox || el('div'), 360);
     const auraSetWin = mkSetWin('gi-aura-set', 'Ustawienia – Aura ekwipunku', 'gi_win_auraset_v1', auraView.settingsBox || el('div'), 340);
     const haSetWin = mkSetWin('gi-ha-set', 'Ustawienia – Aura postaci', 'gi_win_haset_v1', haView.settingsBox || el('div'), 340);
+    const chSetWin = mkSetWin('gi-ch-set', 'Ustawienia – Zmieniacz czatu', 'gi_win_chset_v1', chView.settingsBox || el('div'), 340);
+    const dmSetWin = mkSetWin('gi-dm-set', 'Ustawienia – Obrażenia w walce', 'gi_win_dmset_v1', dmView.settingsBox || el('div'), 340);
     const flameSetWin = mkSetWin('gi-flame-set', 'Ustawienia – Efekt przy unikacie/heroiku', 'gi_win_flameset_v1', flameView.settingsBox || el('div'), 330);
     relogView.openSettings = () => relogSetWin.toggle();
     respView.openSettings = () => respSetWin.toggle();
@@ -4009,6 +4300,14 @@
         settings: () => haSetWin.toggle(),
         isOn: () => haEnabled,
         setOn: v => { haEnabled = v; try { localStorage.setItem(HA_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (haView.stop) haView.stop(); haSetWin.setOpen(false); } else if (haView.test) haView.test(); } },
+      { id: 'chat', icon: '💬', title: 'Zmieniacz czatu', desc: 'Własna czcionka, rozmiar i obrys tekstu czatu, kolory kanałów (klan, drużyna, prywatne, handel…), wyróżnianie wiadomości z Twoim nickiem oraz własne reguły kolorów dla wybranych słów.', view: el('div'), action: () => { if (chEnabled) chSetWin.toggle(); },
+        settings: () => chSetWin.toggle(),
+        isOn: () => chEnabled,
+        setOn: v => { chEnabled = v; try { localStorage.setItem(CH_ON_KEY, v ? '1' : '0'); } catch (e) {} if (chView.apply) chView.apply(); if (!v) chSetWin.setOpen(false); } },
+      { id: 'dmg', icon: '💥', title: 'Obrażenia w walce', desc: 'Animowane liczby obrażeń nad celem na podstawie dziennika walki: osobne style dla zwykłych trafień, krytyków, krwawienia, leczenia, bonusów, osłon i kombinacji, z ikoną i kolorem żywiołu. Styl animacji i kolory w ustawieniach.', view: el('div'), action: () => { if (dmEnabled && dmView.test) dmView.test(); },
+        settings: () => dmSetWin.toggle(),
+        isOn: () => dmEnabled,
+        setOn: v => { dmEnabled = v; try { localStorage.setItem(DM_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (dmView.stop) dmView.stop(); dmSetWin.setOpen(false); } else if (dmView.test) dmView.test(); } },
       { id: 'aura', icon: '✨', title: 'Aura ekwipunku', desc: 'Animowana aura (płomienie, obracająca się ramka lub poświata) dookoła całego miejsca, w którym leżą Twoje założone przedmioty. Styl, kolor i siłę ustawisz w ustawieniach.', view: el('div'), action: () => { if (auraEnabled && auraSetWin) auraSetWin.toggle(); },
         settings: () => auraSetWin.toggle(),
         isOn: () => auraEnabled,
@@ -4199,7 +4498,7 @@
       if (panel.style.display === 'block' && typeof win.x === 'number') placePanel(win.x, win.y);
     });
 
-    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, flameSetWin.el, gtSetWin.el);
+    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, chSetWin.el, dmSetWin.el, flameSetWin.el, gtSetWin.el);
     respWin.restore();
     applyResp();
     dropsWin.restore();
@@ -4209,7 +4508,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.94.0');
+    log('Załadowano v2.95.0');
   }
 
   let tries = 0;
