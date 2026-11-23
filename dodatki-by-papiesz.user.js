@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.96.1
+// @version      2.96.2
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3839,10 +3839,10 @@
     let queue = [], qt = 0;
     const rowsOf = n => { const t = n.textContent || ''; if (t.length <= 500 || !n.children.length) return [n]; return [...n.children].flatMap(rowsOf); };
     const mo = new MutationObserver(ms => {
-      if (!dmEnabled && !bsEnabled) return;
+      if (!dmEnabled) return;
       for (const m of ms) for (const n of m.addedNodes) {
         if (n.nodeType !== 1 || n.closest(GI_OWN + ',#gi-dmg,.new-chat-window,.chat-message-wrapper')) continue;
-        if (n.childElementCount > 80) continue; const t = n.textContent || ''; if (t.length < 4 || t.length > 4000 || !/obra[żz]e[ńn]|punkt[óo]w [żz]ycia|uderzy[łl]|unik|wykonuje|\btur[aęy]\b|kl[ąa]tw|dotyk/i.test(t)) continue;
+        if (n.childElementCount > 80) continue; const t = n.textContent || ''; if (t.length < 8 || t.length > 4000 || !/obra[żz]e[ńn]|punkt[óo]w [żz]ycia|uderzy[łl]|unik/i.test(t)) continue;
         rowsOf(n).forEach(r => { if (!done.has(r)) { done.add(r); queue.push(r); } });
       }
       if (queue.length && !qt) qt = setTimeout(drain, 40);
@@ -3858,7 +3858,6 @@
         if (sigSeen.has(sig) && nowT - sigSeen.get(sig) < 120000) return;
         sigSeen.set(sig, nowT);
         try { ev = parse(r); } catch (e) {  }
-        if (ev.meta && window.__giShared && window.__giShared.bsFeed) { try { window.__giShared.bsFeed(ev, ev.meta); } catch (e) {  } }
         if (!ev.length) { if (/obra[żz]e[ńn]/i.test(raw)) lastRaw.push('NIEROZPOZNANE: ' + raw); return; }
         lastRaw.push(raw);
         ev.forEach(e => {
@@ -3872,7 +3871,7 @@
       if (seen.size > 200) for (const [k, t] of seen) if (nowT - t > 2000) seen.delete(k);
       if (sigSeen.size > 400) for (const [k, t] of sigSeen) if (nowT - t > 120000) sigSeen.delete(k);
       while (lastRaw.length > 10) lastRaw.shift();
-      if (dmEnabled) evs.forEach(e => { setTimeout(() => { try { show(e); } catch (er) { log('obrażenia – błąd', er); } }, i * 140); i++; });
+      evs.forEach(e => { setTimeout(() => { try { show(e); } catch (er) { log('obrażenia – błąd', er); } }, i * 140); i++; });
     }
     mo.observe(document.body, { childList: true, subtree: true });
     const mkR = (key, label, min, max, step, fmt) => {
@@ -3906,106 +3905,6 @@
       ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli liczby się nie pojawiają, zrób walkę, kliknij i wklej mi wynik.'), dbgBtn, dbg]]
     ]);
     root.test = test; root.stop = () => { box.replaceChildren(); };
-    return root;
-  }
-
-  const BS_ON_KEY = 'gi_bstat_on_v1', BS_CFG_KEY = 'gi_bstat_cfg_v1';
-  let bsEnabled = (() => { try { return localStorage.getItem(BS_ON_KEY) === '1'; } catch (e) { return false; } })();
-  function buildBattleStatsView() {
-    const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
-    const cfg = Object.assign({ fighters: true, effects: true, mineFx: false, mode: 'battle', custom: [{ n: 'Dotyk', re: 'dotyk' }, { n: 'Klątwy', re: 'kl[ąa]tw' }] }, readLS(BS_CFG_KEY, {}));
-    const save = () => { writeLS(BS_CFG_KEY, cfg); draw(); };
-    const me = () => { try { const h = PW.Engine && PW.Engine.hero && PW.Engine.hero.d; return h && h.nick || ''; } catch (e) { return ''; } };
-    const mk = () => ({ t0: 0, t1: 0, turn: 0, actors: {}, fx: {}, sk: {}, cu: {} });
-    let cur = mk(), ses = mk(), hist = [], lastB = false, rt = 0;
-    const actor = (S, n) => S.actors[n] || (S.actors[n] = { dealt: 0, taken: 0, hits: 0, crits: 0, dodges: 0, maxHit: 0, heal: 0, dot: 0, acts: 0 });
-    const normFx = t => { t = String(t).replace(/\s*o\s*\d+([.,]\d+)?\s*%/gi, '').replace(/\d+([.,]\d+)?\s*%?/g, '').replace(/\s+/g, ' ').trim(); return t ? t[0].toUpperCase() + t.slice(1) : ''; };
-    const fmt = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    function addTo(S, ev, meta, now) {
-      if (!S.t0) S.t0 = now; S.t1 = now;
-      const mine = me().toLowerCase();
-      if (meta.turn) S.turn = Math.max(S.turn, meta.turn);
-      if (meta.attacker) actor(S, meta.attacker).acts++;
-      if (meta.skill) { actor(S, meta.skillActor || '?').acts++; const o = S.sk[meta.skill] || (S.sk[meta.skill] = { all: 0, mine: 0 }); o.all++; if (meta.skillActor && meta.skillActor.toLowerCase() === mine) o.mine++; }
-      ev.forEach(e => {
-        if (e.kind === 'dmg' || e.kind === 'crit') {
-          actor(S, e.target).taken += e.amount;
-          if (meta.attacker) { const a = actor(S, meta.attacker); a.dealt += e.amount; a.hits++; if (e.kind === 'crit') a.crits++; if (e.amount > a.maxHit) a.maxHit = e.amount; }
-        } else if (e.kind === 'dot') actor(S, e.target).dot += e.amount;
-        else if (e.kind === 'heal') actor(S, e.target).heal += e.amount;
-        else if (e.kind === 'block') actor(S, e.target).dodges++;
-      });
-      const isMine = meta.attacker && meta.attacker.toLowerCase() === mine;
-      meta.effs.forEach(x => { const k = normFx(x); if (!k || /^Cios krytyczny$/i.test(k)) return; const o = S.fx[k] || (S.fx[k] = { all: 0, mine: 0 }); o.all++; if (isMine) o.mine++; });
-      let ctext = meta.text; [meta.attacker, meta.skillActor, ...ev.map(e => e.target), mine && me()].filter(n => n && n.length > 1).forEach(n => { ctext = ctext.split(n).join(' '); });
-      cfg.custom.forEach(c => { try { if (c.re && new RegExp(c.re, 'i').test(ctext)) S.cu[c.n] = (S.cu[c.n] || 0) + 1; } catch (e) {  } });
-    }
-    function newBattle() { if (cur.t0) { hist.push(cur); if (hist.length > 10) hist.shift(); } cur = mk(); }
-    (window.__giShared = window.__giShared || {}).bsFeed = (ev, meta) => {
-      if (!bsEnabled) return;
-      const now = Date.now(), b = inBattle();
-      if ((b && !lastB) || (cur.t1 && now - cur.t1 > 45000)) newBattle();
-      lastB = b;
-      addTo(cur, ev, meta, now); addTo(ses, ev, meta, now);
-      if (!rt) rt = setTimeout(() => { rt = 0; draw(); }, 250);
-    };
-    const root = el('div', { className: 'gi-bs' }); root.style.cssText = 'padding:6px 8px;font-size:12px;min-width:250px;max-width:340px';
-    const row = (k, v, col) => { const d = el('div', { style: 'display:flex;justify-content:space-between;gap:10px;padding:1px 0' }); d.append(el('span', { textContent: k, style: 'color:#b0bec5' }), el('span', { textContent: v, style: 'font-weight:bold;color:' + (col || '#fff') })); return d; };
-    const head = t => el('div', { textContent: t, style: 'font-weight:bold;margin:7px 0 2px;border-bottom:1px solid #ffffff33;color:#ffd54f' });
-    const chips = (list) => { const w = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px' }); list.forEach(([n, c]) => w.append(el('span', { textContent: n + ' ×' + c, style: 'background:#ffffff1a;border-radius:9px;padding:1px 7px' }))); return w; };
-    function draw() {
-      const S = cfg.mode === 'ses' ? ses : cur, mn = me(), A = S.actors, mm = Object.keys(A).find(k => k.toLowerCase() === mn.toLowerCase()), a = mm ? A[mm] : actor({ actors: {} }, 'x');
-      const dur = S.t0 ? Math.max(1, Math.round((S.t1 - S.t0) / 1000)) : 0, mt = (n => n.toString().padStart(2, '0'));
-      const tab = el('div', { style: 'display:flex;gap:4px;margin-bottom:4px' });
-      [['battle', 'Ta walka'], ['ses', 'Cała sesja']].forEach(([m, l]) => { const b = el('button', { textContent: l }); if (cfg.mode === m) b.style.fontWeight = 'bold'; b.addEventListener('click', () => { cfg.mode = m; save(); }); tab.append(b); });
-      const rs = el('button', { textContent: 'Wyzeruj', title: 'Zeruje bieżący widok' }); rs.addEventListener('click', () => { if (cfg.mode === 'ses') ses = mk(); else cur = mk(); draw(); }); tab.append(rs);
-      const nodes = [tab];
-      if (!S.t0) nodes.push(el('div', { textContent: 'Czekam na dziennik walki… Rozpocznij walkę.', style: 'color:#90a4ae;padding:6px 0' }));
-      else {
-        nodes.push(row('Czas', Math.floor(dur / 60) + ':' + mt(dur % 60)));
-        nodes.push(row('Tury', S.turn ? String(S.turn) : (a.acts + ' (Twoje akcje)')));
-        nodes.push(head('Ty' + (mn ? ' – ' + mn : '')));
-        nodes.push(row('Zadane obrażenia', fmt(a.dealt), '#ff8a65'), row('Otrzymane obrażenia', fmt(a.taken), '#ef5350'));
-        nodes.push(row('Trafienia', fmt(a.hits)), row('Krytyki', a.crits + (a.hits ? ' (' + Math.round(a.crits / a.hits * 100) + '%)' : ''), '#ffd54f'));
-        nodes.push(row('Największy cios', fmt(a.maxHit)), row('Średnio na cios', a.hits ? fmt(a.dealt / a.hits) : '0'), row('Średnio na turę', a.acts ? fmt(a.dealt / a.acts) : '0'));
-        nodes.push(row('Uniki', String(a.dodges), '#90caf9'), row('Leczenie', fmt(a.heal), '#69f0ae'), row('Rany i krwawienie', fmt(a.dot), '#ef5350'));
-        if (cfg.fighters) {
-          nodes.push(head('Walczący'));
-          const t = el('table', { style: 'width:100%;border-collapse:collapse;font-size:11px' });
-          t.append(el('tr', {}, ...['', 'zadane', 'otrz.', 'kryt.'].map((h, i) => el('th', { textContent: h, style: 'text-align:' + (i ? 'right' : 'left') + ';color:#90a4ae;font-weight:normal' }))));
-          Object.keys(A).sort((x, y) => A[y].dealt + A[y].taken - A[x].dealt - A[x].taken).slice(0, 8).forEach(n => { const q = A[n]; t.append(el('tr', {}, el('td', { textContent: n.length > 16 ? n.slice(0, 15) + '…' : n, style: n === mm ? 'color:#ffd54f' : '' }), ...[fmt(q.dealt), fmt(q.taken), String(q.crits)].map(v => el('td', { textContent: v, style: 'text-align:right' })))); });
-          nodes.push(t);
-        }
-        if (cfg.effects) {
-          const fx = Object.entries(S.fx).map(([k, v]) => [k, cfg.mineFx ? v.mine : v.all]).filter(x => x[1]).sort((x, y) => y[1] - x[1]).slice(0, 14);
-          const sk = Object.entries(S.sk).map(([k, v]) => [k, cfg.mineFx ? v.mine : v.all]).filter(x => x[1]).sort((x, y) => y[1] - x[1]).slice(0, 10);
-          if (fx.length) { nodes.push(head('Efekty' + (cfg.mineFx ? ' (Twoje)' : ''))); nodes.push(chips(fx)); }
-          if (sk.length) { nodes.push(head('Umiejętności' + (cfg.mineFx ? ' (Twoje)' : ''))); nodes.push(chips(sk)); }
-        }
-        const cu = Object.entries(S.cu);
-        if (cu.length) { nodes.push(head('Własne liczniki')); nodes.push(chips(cu)); }
-      }
-      root.replaceChildren(...nodes);
-    }
-    const mkC = (key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
-    const cbox = el('div');
-    const drawC = () => {
-      cbox.replaceChildren(...cfg.custom.map((c, i) => {
-        const n = isolate(el('input', { type: 'text', value: c.n, placeholder: 'nazwa' })); n.style.width = '30%'; n.addEventListener('change', () => { c.n = n.value; save(); });
-        const r = isolate(el('input', { type: 'text', value: c.re, placeholder: 'szukany tekst (może być wyrażenie)' })); r.style.width = '45%'; r.addEventListener('change', () => { c.re = r.value; save(); });
-        const x = el('button', { textContent: '×' }); x.addEventListener('click', () => { cfg.custom.splice(i, 1); save(); drawC(); });
-        return el('div', { style: 'margin:3px 0' }, n, ' ', r, ' ', x);
-      }));
-    };
-    const add = el('button', { textContent: '+ Dodaj licznik' }); add.addEventListener('click', () => { cfg.custom.push({ n: 'Nowy', re: '' }); save(); drawC(); });
-    drawC();
-    const clr = el('button', { textContent: 'Wyzeruj całą sesję i historię' }); clr.addEventListener('click', () => { ses = mk(); cur = mk(); hist = []; draw(); });
-    root.settingsBox = setTabs([
-      ['Widok', [mkC('fighters', 'Tabela wszystkich walczących'), mkC('effects', 'Efekty i umiejętności (liczone automatycznie z dziennika)'), mkC('mineFx', 'Efekty i umiejętności tylko moje'), el('div', { style: 'margin-top:6px' }, clr)]],
-      ['Własne liczniki', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Licznik zwiększa się o 1 za każdy wiersz dziennika walki zawierający podany tekst (wielkość liter bez znaczenia). Przykłady: „dotyk”, „kl[ąa]tw”, „zamro”. Efekty typu „+Zamrożenie” liczą się też same, w sekcji Efekty.'), cbox, add]]
-    ]);
-    root.test = draw; root.stop = () => {};
-    draw();
     return root;
   }
 
@@ -4404,10 +4303,6 @@
     const haView = safeView('Aura postaci', buildHeroAuraView);
     const chView = safeView('Zmieniacz czatu', buildChatView);
     const dmView = safeView('Obrażenia w walce', buildDmgView);
-    const bsView = safeView('Statystyki walki', buildBattleStatsView);
-    const bsWin = (() => {
-      try { return makeFloatWindow({ id: 'gi-bs-win', title: 'Statystyki walki', key: 'gi_win_bs_v1', content: bsView, width: 290, top: 140, mini: true, autoSize: true }); } catch (err) { log('błąd okna statystyk', err); return { el: el('div'), toggle() {}, restore() {}, setOpen() {} }; }
-    })();
     const relogView = safeView('Przelogowanie', buildRelogView);
     const relogWin = (() => {
       try {
@@ -4440,7 +4335,6 @@
     const haSetWin = mkSetWin('gi-ha-set', 'Ustawienia – Aura postaci', 'gi_win_haset_v1', haView.settingsBox || el('div'), 340);
     const chSetWin = mkSetWin('gi-ch-set', 'Ustawienia – Zmieniacz czatu', 'gi_win_chset_v1', chView.settingsBox || el('div'), 340);
     const dmSetWin = mkSetWin('gi-dm-set', 'Ustawienia – Obrażenia w walce', 'gi_win_dmset_v1', dmView.settingsBox || el('div'), 340);
-    const bsSetWin = mkSetWin('gi-bs-set', 'Ustawienia – Statystyki walki', 'gi_win_bsset_v1', bsView.settingsBox || el('div'), 340);
     const flameSetWin = mkSetWin('gi-flame-set', 'Ustawienia – Efekt przy unikacie/heroiku', 'gi_win_flameset_v1', flameView.settingsBox || el('div'), 330);
     relogView.openSettings = () => relogSetWin.toggle();
     respView.openSettings = () => respSetWin.toggle();
@@ -4476,10 +4370,6 @@
         settings: () => dmSetWin.toggle(),
         isOn: () => dmEnabled,
         setOn: v => { dmEnabled = v; try { localStorage.setItem(DM_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (dmView.stop) dmView.stop(); dmSetWin.setOpen(false); } else if (dmView.test) dmView.test(); } },
-      { id: 'bstat', icon: '📊', title: 'Statystyki walki', desc: 'Okno z podsumowaniem walki na żywo: obrażenia zadane i otrzymane, tury, trafienia, krytyki, uniki, leczenie, rany, tabela wszystkich walczących oraz liczniki efektów i umiejętności (np. Zamrożenie, klątwy, dotyk) liczone z dziennika walki. Można dodać własne liczniki.', view: el('div'), action: () => { if (bsEnabled) bsWin.toggle(); },
-        settings: () => bsSetWin.toggle(),
-        isOn: () => bsEnabled,
-        setOn: v => { bsEnabled = v; try { localStorage.setItem(BS_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { bsWin.setOpen(false); bsSetWin.setOpen(false); } else bsWin.setOpen(true); } },
       { id: 'aura', icon: '✨', title: 'Aura ekwipunku', desc: 'Animowana aura (płomienie, obracająca się ramka lub poświata) dookoła całego miejsca, w którym leżą Twoje założone przedmioty. Styl, kolor i siłę ustawisz w ustawieniach.', view: el('div'), action: () => { if (auraEnabled && auraSetWin) auraSetWin.toggle(); },
         settings: () => auraSetWin.toggle(),
         isOn: () => auraEnabled,
@@ -4670,18 +4560,17 @@
       if (panel.style.display === 'block' && typeof win.x === 'number') placePanel(win.x, win.y);
     });
 
-    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, chSetWin.el, dmSetWin.el, bsWin.el, bsSetWin.el, flameSetWin.el, gtSetWin.el);
+    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, chSetWin.el, dmSetWin.el, flameSetWin.el, gtSetWin.el);
     respWin.restore();
     applyResp();
     dropsWin.restore();
     applyDrops();
-    if (bsEnabled) bsWin.restore();
     relogWin.restore();
     applyRelog();
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.96.1');
+    log('Załadowano v2.96.2');
   }
 
   let tries = 0;
