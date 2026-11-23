@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.54.0
+// @version      2.55.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2133,12 +2133,73 @@
     return root;
   }
 
-  const GT_ON_KEY = 'gi_gt_on_v1';
+  const GT_ON_KEY = 'gi_gt_on_v1', GT_CFG_KEY = 'gi_gt_cfg_v1';
   let gtEnabled = (() => { try { return localStorage.getItem(GT_ON_KEY) === '1'; } catch (e) { return false; } })();
   function buildGameThemeView() {
     const root = el('div');
     const box = el('div');
-    const info = el('div', { style: 'font-size:11px;color:#90a4ae;margin-bottom:6px' }, 'Etap 1: diagnostyka interfejsu gry. Zbiera nazwy paneli, ich tła i ramki (tylko odczyt, nic nie zmienia). Wyślij wynik, a na jego podstawie zbuduję motywy.');
+    const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true }, readLS(GT_CFG_KEY, {}));
+    const save = () => writeLS(GT_CFG_KEY, cfg);
+    let styleEl = null;
+    function css() {
+      const H = cfg.h, S = cfg.s, L = cfg.l;
+      const c = (sf, l) => `hsl(${H} ${Math.round(S * sf)}% ${Math.max(2, Math.min(92, Math.round(l * L)))}%)`;
+      const tint = `hsl(${H} ${Math.round(S)}% 50%)`;
+      const fil = (S ? `grayscale(1) sepia(1) hue-rotate(${H - 38}deg) saturate(${(1 + S / 35).toFixed(2)})` : 'grayscale(1)') + ` brightness(${(0.55 + 0.45 * L).toFixed(2)})`;
+      let o = '';
+      if (cfg.frame) o += `html .top.positioner>.bg,html .bottom-panel-graphic,html .hud-container{filter:${fil} !important}\n`;
+      if (cfg.panels) o += `
+        html .left-column.main-column,html .new-chat-window,html .chat-input-wrapper{background-color:${c(.35, 12)} !important}
+        html .left-column.main-column,html .scroll-wrapper.chat-message-wrapper{border-color:${c(.45, 40)} !important}
+        html .right-column.main-column,html .interface-element-item-slot-grid-stretch,html .eq-slot.interface-element-one-item-slot-background-to-repeat{background-color:${tint} !important;background-blend-mode:luminosity !important}
+        html .stats-wrapper.interface-element-background-color-3{background-color:${c(.3, 16)} !important}
+        html .equipment-outline-1,html .equipment-outline-4{background-color:${c(.5, 6)} !important}
+        html .equipment-outline-2{background-color:${c(.35, 40)} !important}
+        html .equipment-outline-3{background-color:${c(.35, 50)} !important}
+        html .inventory-grid-bg.interface-element-grid-border{border-color:${c(.4, 24)} !important}
+        html .interface-element-one-black-tile.bag-slot-wrapper,html .chat-channel-card{background-image:linear-gradient(${c(.3, 17)},${c(.3, 12)}) !important}
+        html .chat-channel-card.active{background-image:linear-gradient(${c(.35, 42)},${c(.35, 25)}) !important}\n`;
+      if (cfg.btns) o += `html .widget-button.green,html .button.green{background-image:linear-gradient(${c(1, 40)},${c(1, 13)}) !important}\n`;
+      return o;
+    }
+    function apply() {
+      if (styleEl) { styleEl.remove(); styleEl = null; }
+      if (!gtEnabled || cfg.theme === 'none') return;
+      styleEl = el('style', { id: 'gi-gt-css', textContent: css() });
+      document.head.append(styleEl);
+    }
+    const chg = () => { save(); apply(); };
+
+    const info = el('div', { style: 'font-size:11px;color:#90a4ae;margin-bottom:6px' }, 'Przefarbowuje wygląd samej gry: ramki, tła czatu i ekwipunku, przyciski. Działa tylko u Ciebie. Włącz dodatek przełącznikiem w menu.');
+    const sel = isolate(el('select', {}));
+    sel.append(el('option', { value: 'none', textContent: 'Oryginalny wygląd gry (bez zmian)', selected: cfg.theme === 'none' }));
+    PRE.forEach(([id, nm]) => sel.append(el('option', { value: id, textContent: nm, selected: cfg.theme === id })));
+    sel.append(el('option', { value: 'custom', textContent: 'Własny kolor…', selected: cfg.theme === 'custom' }));
+    const col = isolate(el('input', { type: 'color' })); col.style.cssText = 'width:44px;height:24px;padding:0;border:0;background:none;vertical-align:middle';
+    const hex = (h, s) => { const a = s / 100 * .5; const f = n => { const k = (n + h / 30) % 12; const v = .5 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); return Math.round(v * 255).toString(16).padStart(2, '0'); }; return '#' + f(0) + f(8) + f(4); };
+    const hueOf = hx => { const r = parseInt(hx.slice(1, 3), 16) / 255, g = parseInt(hx.slice(3, 5), 16) / 255, b = parseInt(hx.slice(5, 7), 16) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0; if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; } h = Math.round(h * 60); if (h < 0) h += 360; const l = (mx + mn) / 2, sat = d ? d / (1 - Math.abs(2 * l - 1)) : 0; return [h, Math.round(sat * 100)]; };
+    col.value = hex(cfg.h, cfg.s);
+    const colRow = el('div', { style: 'margin:4px 0;display:none' }, 'Kolor: ', col);
+    const slide = (label, min, max, step, key, fmt) => {
+      const v = el('span', { style: 'float:right;color:#90a4ae' }, fmt(cfg[key]));
+      const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.width = '100%';
+      r.addEventListener('input', () => { cfg[key] = Number(r.value); v.textContent = fmt(cfg[key]); chg(); });
+      return { row: el('div', { style: 'margin:4px 0' }, el('div', {}, label, v), r), r, v };
+    };
+    const sS = slide('Siła koloru', 0, 90, 1, 's', x => x + '%');
+    const sL = slide('Jasność', 0.6, 1.5, 0.05, 'l', x => Math.round(x * 100) + '%');
+    const showCol = () => { colRow.style.display = cfg.theme === 'custom' ? '' : 'none'; };
+    sel.addEventListener('change', () => {
+      cfg.theme = sel.value;
+      const pr = PRE.find(x => x[0] === cfg.theme);
+      if (pr) { cfg.h = pr[2]; cfg.s = pr[3]; sS.r.value = cfg.s; sS.v.textContent = cfg.s + '%'; col.value = hex(cfg.h, cfg.s); }
+      showCol(); chg();
+    });
+    col.addEventListener('input', () => { const [h, s2] = hueOf(col.value); cfg.h = h; cfg.s = Math.max(10, s2); sS.r.value = cfg.s; sS.v.textContent = cfg.s + '%'; chg(); });
+    const chk = (label, key) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' ' + label); };
+    showCol();
+    const dinfo = el('div', { style: 'font-size:11px;color:#90a4ae;margin-bottom:6px' }, 'Zbiera nazwy paneli gry i ich tła (tylko odczyt). Przydatne, gdy jakiś panel nie zmienia koloru – wyślij wynik autorowi.');
     const out = isolate(el('textarea', { rows: 12, readOnly: true, placeholder: 'Wynik diagnostyki' })); out.style.fontSize = '10px';
     const btn = el('button', { textContent: 'Zbierz diagnostykę interfejsu' });
     const short = v => String(v || '').replace(/data:[^")]{0,40}[^")]*/g, m => m.slice(0, 40) + '…(' + m.length + ' zn.)').replace(/https?:\/\/[^/"]+/g, '').slice(0, 170);
@@ -2166,9 +2227,12 @@
       if (navigator.clipboard) navigator.clipboard.writeText(out.value).catch(() => {});
       btn.textContent = 'Gotowe – skopiowane do schowka (kliknij, aby powtórzyć)';
     });
-    box.append(info, btn, out);
+    box.append(info, sel, colRow, sS.row, sL.row, chk('Ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Zielone przyciski interfejsu', 'btns'),
+      el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Diagnostyka interfejsu' }), dinfo, btn, out));
     root.settingsBox = box;
-    root.stop = () => {};
+    root.apply = apply;
+    root.stop = apply;
+    apply();
     return root;
   }
 
@@ -2838,10 +2902,10 @@
         settings: () => auraSetWin.toggle(),
         isOn: () => auraEnabled,
         setOn: v => { auraEnabled = v; try { localStorage.setItem(AURA_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (auraView.stop) auraView.stop(); auraSetWin.setOpen(false); } } },
-      { id: 'gt', icon: '🖼', title: 'Motyw gry', desc: 'Zmiana wyglądu ramek i teł paneli samej gry (czat, ekwipunek itp.). Na razie etap testowy: w ustawieniach jest diagnostyka interfejsu, po której zbuduję motywy.', view: el('div'), action: () => { if (gtEnabled) gtSetWin.toggle(); },
+      { id: 'gt', icon: '🖼', title: 'Motyw gry', desc: 'Przefarbowuje wygląd samej gry: ramki, tła czatu i ekwipunku, przyciski. Kolor, siłę i jasność ustawisz w ustawieniach. Działa tylko u Ciebie.', view: el('div'), action: () => gtSetWin.toggle(),
         settings: () => gtSetWin.toggle(),
         isOn: () => gtEnabled,
-        setOn: v => { gtEnabled = v; try { localStorage.setItem(GT_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) gtSetWin.setOpen(false); } },
+        setOn: v => { gtEnabled = v; try { localStorage.setItem(GT_ON_KEY, v ? '1' : '0'); } catch (e) {} if (gtView.apply) gtView.apply(); if (!v) gtSetWin.setOpen(false); } },
       { id: 'relog', icon: '👥', title: 'Przelogowanie', desc: 'Własny pasek postaci z outfitami, nickiem i poziomem. Klik (lub dwuklik) przełącza postać. Można filtrować po świecie, ustawić liczbę rzędów i tryb „ultra clear” (same outfity).', view: el('div'), action: () => { if (relogEnabled) relogWin.toggle(); },
         settings: () => relogSetWin.toggle(),
         isOn: () => relogEnabled,
