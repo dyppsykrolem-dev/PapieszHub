@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.82.0
+// @version      2.83.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2306,6 +2306,7 @@
       if (PAL[cfg.fpal]) return PAL[cfg.fpal];
       const E = eff(), H = E.h, S = Math.max(25, E.s); return [`hsl(${H} ${S}% 82%)`, `hsl(${H} ${S}% 58%)`, `hsl(${H} ${S}% 32%)`];
     };
+    (window.__giShared = window.__giShared || {}).frColors = () => frColors();
     function frEnsureSvg() {
       if (frSvg && frSvg.isConnected) return;
       const NS = 'http://www.w3.org/2000/svg';
@@ -2965,9 +2966,11 @@
     const rgbHex = h => /^#[0-9a-f]{6}$/i.test(h) ? h : '#ff6d00';
     const mix = (h, k) => { const n = parseInt(rgbHex(h).slice(1), 16); const f = c => Math.round(c + (255 - c) * k); return '#' + [f(n >> 16 & 255), f(n >> 8 & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); };
     const hslHex = (h, sat, l) => { sat /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = sat * Math.min(l, 1 - l), f = n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))))); return '#' + [f(0), f(8), f(4)].map(v => v.toString(16).padStart(2, '0')).join(''); };
+    const toHex = c => { c = String(c).trim(); if (/^#[0-9a-f]{6}$/i.test(c)) return c; const m = c.match(/hsl\(\s*([\d.]+)\s*,?\s*([\d.]+)%\s*,?\s*([\d.]+)%/i); return m ? hslHex(+m[1], +m[2], +m[3]) : '#ff6d00'; };
     const syncPal = () => {
-      const gt = readLS(GT_CFG_KEY, {}); let on = false; try { on = localStorage.getItem(GT_ON_KEY) === '1'; } catch (e) {  }
-      if (on && gt.theme && gt.theme !== 'none' && !gt.sync) { const sat = Math.max(25, Number(gt.s) || 0), h = Number(gt.h) || 0; return [hslHex(h, sat, 58), hslHex(h, sat, 75), hslHex(h, sat, 90)]; }
+      let on = false; try { on = localStorage.getItem(GT_ON_KEY) === '1'; } catch (e) {  }
+      const sh = window.__giShared;
+      if (on && sh && sh.frColors) { try { const [a, b, c] = sh.frColors().map(toHex); return [b, mix(b, .3), a]; } catch (e) {  } }
       const P = PALETTES[getTheme()] || { acc: '#c9b25a', h: '#f1e3a6', btnbd: '#d9c36a' };
       return [rgbHex(P.acc), mix(P.acc, .35), mix(P.h || P.acc, .85)];
     };
@@ -3129,7 +3132,7 @@
     customIn.style.cssText = 'width:34px;height:20px;padding:0;vertical-align:middle';
     customIn.addEventListener('input', () => { cfg.custom = customIn.value; save(); });
     const syncCb = el('input', { type: 'checkbox', checked: !!cfg.sync });
-    const syncRow = el('label', { style: 'display:block;margin:2px 0 6px;cursor:pointer' }, syncCb, ' Synchronizuj aurę z motywem (kolor jak w motywie gry / okien)');
+    const syncRow = el('label', { style: 'display:block;margin:2px 0 6px;cursor:pointer' }, syncCb, ' Synchronizuj aurę z motywem (te same kolory co wybrane ramki motywu gry)');
     const syncLock = () => { colorSel.disabled = !!cfg.sync; colorSel.style.opacity = cfg.sync ? .5 : 1; };
     syncCb.addEventListener('change', () => { cfg.sync = syncCb.checked; syncLock(); save(); });
     const customRow = el('div', { style: 'margin:2px 0;display:' + (cfg.color === 'custom' ? '' : 'none') }, 'Własny kolor: ', customIn);
@@ -3825,7 +3828,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.82.0');
+    log('Załadowano v2.83.0');
   }
 
   let tries = 0;
