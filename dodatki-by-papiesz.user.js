@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.61.0
+// @version      2.63.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2141,7 +2141,7 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, fout: 0, gAvoid: true, gcut: 6, fgap: 3, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, fout: 0, gAvoid: true, gcut: 6, fgap: 3, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
     cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, cfg.fT);
     if (cfg.fst === 'ripple') cfg.fst = 'ring';
     if (cfg.fpal === 'win') { cfg.fsync = true; cfg.fpal = 'theme'; }
@@ -2159,6 +2159,10 @@
       let o = '';
       const rc = cfg.theme !== 'none';
       if (cfg.hideOrig) o += `html .interface-layer.layer{border-image:none !important;border-color:transparent !important}\n`;
+      if (cfg.hideIn) o += `html .left-column.main-column,html .scroll-wrapper.chat-message-wrapper,html .inventory-grid-bg.interface-element-grid-border,html .right-column.main-column,html .new-chat-window{border-color:transparent !important;box-shadow:none !important}
+        html .equipment-outline{background-color:transparent !important}
+        html .interface-element-active-card-background-stretch{border-image:none !important}\n`;
+      if (cfg.hideBars) o += `html .positioner>.bg{background-image:none !important}\n`;
       if (rc && cfg.frame) o += `html .top.positioner>.bg,html .bottom-panel-graphic,html .hud-container{filter:${fil} !important}\n`;
       if (rc && cfg.panels) o += `
         html .left-column.main-column,html .new-chat-window,html .chat-input-wrapper{background-color:${c(.35, 12)} !important}
@@ -2289,19 +2293,38 @@
       const anim = gtEnabled && ANIM_FR.includes(cfg.fst);
       const parts = gtEnabled && Object.keys(cfg.fpt || {}).some(k => cfg.fpt[k]);
       const gc = globeCircle(), out = Number(cfg.fout) || 0, barTop = barTopY();
+      const Wd = Math.min(14, Math.max(2, cfg.fw)), gap = Math.max(0, Number(cfg.fgap) || 0);
+      const R = {};
       for (const key of Object.keys(frTargets)) {
         const want = (anim || parts) && cfg.fT[key];
-        let o = frs[key];
-        if (!want) { if (o) { o.node.remove(); delete frs[key]; } delete frRects[key]; continue; }
+        if (!want) { if (frs[key]) { frs[key].node.remove(); delete frs[key]; } delete frRects[key]; continue; }
         const t = frTargets[key](); let r0 = t && t.getBoundingClientRect();
         if (r0 && barTop != null && ['map', 'chat', 'right', 'grid', 'stats'].includes(key) && r0.bottom > barTop) r0 = { left: r0.left, right: r0.right, top: r0.top, bottom: barTop, width: r0.width, height: Math.max(0, barTop - r0.top) };
-        if (!r0 || r0.width < 30 || r0.height < 14) { delete frRects[key]; if (o) o.node.style.display = 'none'; continue; }
-        const Wd = Math.min(14, Math.max(2, cfg.fw)), ex = key === 'game' ? Wd + out : -Math.max(0, Number(cfg.fgap) || 0);
-        const r = { left: r0.left - ex, top: r0.top - ex, width: r0.width + 2 * ex, height: r0.height + 2 * ex };
+        if (!r0 || r0.width < 30 || r0.height < 14) { delete frRects[key]; if (frs[key]) frs[key].node.style.display = 'none'; continue; }
+        const ex = key === 'game' ? Wd + out : -gap;
+        R[key] = { l: r0.left - ex, t: r0.top - ex, r: r0.right + ex, b: r0.bottom + ex };
+      }
+      const ORDER = ['top', 'bottom', 'chat', 'right', 'map', 'grid', 'stats'];
+      const inside = (x, y) => x.l >= y.l - 1 && x.r <= y.r + 1 && x.t >= y.t - 1 && x.b <= y.b + 1;
+      ORDER.forEach((kb, i) => {
+        const B = R[kb]; if (!B) return;
+        for (let j = 0; j < i; j++) {
+          const A = R[ORDER[j]]; if (!A || inside(B, A) || inside(A, B)) continue;
+          const ox = Math.min(A.r + gap, B.r) - Math.max(A.l - gap, B.l), oy = Math.min(A.b + gap, B.b) - Math.max(A.t - gap, B.t);
+          if (ox > 0 && oy > 0) {
+            if (oy <= ox) { if ((B.t + B.b) / 2 >= (A.t + A.b) / 2) B.t = A.b + gap; else B.b = A.t - gap; }
+            else { if ((B.l + B.r) / 2 >= (A.l + A.r) / 2) B.l = A.r + gap; else B.r = A.l - gap; }
+          }
+        }
+      });
+      for (const key of Object.keys(R)) {
+        const q = R[key], r = { left: q.l, top: q.t, width: q.r - q.l, height: q.b - q.t };
+        if (r.width < 30 || r.height < 14) { delete frRects[key]; if (frs[key]) frs[key].node.style.display = 'none'; continue; }
         frRects[key] = { l: r.left, t: r.top, w: r.width, h: r.height };
+        let o = frs[key];
         if (!anim) { if (o) o.node.style.display = 'none'; continue; }
         if (!o) { o = frs[key] = { node: el('div', { className: 'gi-gtf' }) }; document.body.append(o.node); }
-        if (o.built !== cfg.fst || force) { frEnsureSvg(); frBuild(o, key); const [c1, c2, c3] = frColors(); const st = o.node.style; st.setProperty('--c1', c1); st.setProperty('--c2', c2); st.setProperty('--c3', c3); st.setProperty('--w', Math.min(14, Math.max(2, cfg.fw)) + 'px'); st.setProperty('--spd', String(cfg.fspd)); st.setProperty('--glow', String(cfg.fglow)); o.node.className = 'gi-gtf s-' + cfg.fst; }
+        if (o.built !== cfg.fst || force) { frEnsureSvg(); frBuild(o, key); const [c1, c2, c3] = frColors(); const st = o.node.style; st.setProperty('--c1', c1); st.setProperty('--c2', c2); st.setProperty('--c3', c3); st.setProperty('--w', Wd + 'px'); st.setProperty('--spd', String(cfg.fspd)); st.setProperty('--glow', String(cfg.fglow)); o.node.className = 'gi-gtf s-' + cfg.fst; }
         const st = o.node.style; st.display = ''; st.left = Math.round(r.left) + 'px'; st.top = Math.round(r.top) + 'px'; st.width = Math.round(r.width) + 'px'; st.height = Math.round(r.height) + 'px';
         let mk = 'none';
         if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 4)}px)`; }
@@ -2478,7 +2501,7 @@
       cfg.fst = pr.fst; cfg.fpal = pr.fpal || 'theme'; if (pr.fc1) { cfg.fc1 = pr.fc1; cfg.fc2 = pr.fc2; cfg.fc3 = pr.fc3; }
       cfg.fT = Object.assign({}, pr.t); cfg.fpt = Object.assign({}, pr.pt);
       if (pr.fw) { cfg.fw = pr.fw; cfg.fspd = pr.fspd; cfg.fglow = pr.fglow; cfg.fout = pr.fout; cfg.fpd = pr.fpd; }
-      cfg.gAvoid = true; cfg.hideOrig = false;
+      cfg.gAvoid = true; cfg.hideOrig = pr.fst !== 'none'; cfg.hideIn = pr.fst !== 'none';
       chg(); render();
     }
     function render() {
@@ -2592,9 +2615,10 @@
       ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote, note('Zakładki: „Kolory” (wszystkie kolory), „Ramki” (styl i miejsca), „Efekty” (cząsteczki), „Tempo” (prędkość, blask, gęstość), „Więcej” (własne grafiki, diagnostyka).')]],
       ['Kolory', [h5('Interfejs gry'), ...syncNote, info, sel, colRow, sS.row, sL.row, el('div', { style: 'font-weight:bold;margin:6px 0 2px' }, 'Co przefarbować:'), chk('Ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Zielone przyciski interfejsu', 'btns'),
         h5('Ramki i cząsteczki'), fsyncChk, fCol, ccRow]],
-      ['Ramki', [warn, fSel, fW.row, fGp.row, fOut.row,
+      ['Ramki', [warn, fSel, fGp.row, fOut.row,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
-        chk('Ukryj oryginalną ramkę dookoła okna gry', 'hideOrig'), chk('Omijaj okrągły pasek życia (wycięcie)', 'gAvoid'), gCut.row,
+        el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Oryginalne ramki gry:'), chk('Ukryj ramkę dookoła okna gry', 'hideOrig'), chk('Ukryj ramki wewnętrzne (czat, ekwipunek, statystyki, obwódki paneli)', 'hideIn'), chk('Ukryj grafikę górnego i dolnego paska', 'hideBars'),
+        chk('Omijaj okrągły pasek życia (wycięcie)', 'gAvoid'), gCut.row,
         el('details', { style: 'margin-top:6px' }, el('summary', { textContent: 'Własna grafika ramki (styl „Własna grafika”)' }), note('Link do obrazka z ramką (rogi + krawędzie, np. PNG 3×3). Ustaw „slice” na wielkość rogu w obrazku.'), urlIn2('fUrl', 'https://…/ramka.png'), fSl.row)]],
       ['Efekty', [note('Cząsteczki lecą od krawędzi miejsc zaznaczonych w zakładce „Ramki”. Można łączyć kilka naraz.'), ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt))]],
       ['Tempo', [note('Jedno miejsce na prędkość i intensywność: prędkość dotyczy animacji ramek i cząsteczek razem.'), fSp.row, fGl.row, fPd.row]],
@@ -3475,7 +3499,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.61.0');
+    log('Załadowano v2.63.0');
   }
 
   let tries = 0;
