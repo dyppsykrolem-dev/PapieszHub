@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.73.0
+// @version      2.74.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2141,8 +2141,8 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], addonTheme: true, hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
-    cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true }, cfg.fT);
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], addonTheme: true, hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, cfg.fT);
     if (cfg.fst === 'ripple') cfg.fst = 'ring';
     if (cfg.fpal === 'win') { cfg.fsync = true; cfg.fpal = 'theme'; }
     if (cfg.gcut === 16) cfg.gcut = 6;
@@ -2165,7 +2165,7 @@
       if (cfg.hideIn) o += `html .left-column.main-column,html .scroll-wrapper.chat-message-wrapper,html .inventory-grid-bg.interface-element-grid-border,html .right-column.main-column,html .new-chat-window{border-color:transparent !important;box-shadow:none !important}
         html .equipment-outline{background-color:transparent !important}
         html .interface-element-active-card-background-stretch{border-image:none !important}\n`;
-      if (rc && cfg.frame) o += `html [data-gi-gw]{filter:${fil} !important}\n`;
+      if (rc && cfg.panels) o += `html [data-gi-gi]{background-color:hsl(${H} ${Math.round(S * .8)}% 34%) !important;background-blend-mode:luminosity !important}html [data-gi-gc]{background-color:hsl(${H} ${Math.round(S * .5)}% calc(var(--gi-l) * 1% * ${L})) !important}\n`;
       if (cfg.hideThin) o += `html [data-gi-thin]{visibility:hidden !important}html [data-gi-bd]{border-color:transparent !important;border-image:none !important;box-shadow:none !important;outline:none !important}\n`;
       if (cfg.hideBars) o += `html .positioner>.bg{background-image:none !important}\n`;
       if (cfg.hideIn) o += `html .left-column.main-column::before,html .left-column.main-column::after,html .right-column.main-column::before,html .right-column.main-column::after,html .game-layer::before,html .game-layer::after{background:none !important;border-color:transparent !important;box-shadow:none !important}html .game-layer{outline:none !important;box-shadow:none !important}\n`;
@@ -2318,11 +2318,11 @@
         o.rects = cfg.fst === 'chase' ? [mk()] : Array.from({ length: cfg.fst === 'twin' ? 12 : 6 }, mk);
         o.node.append(sv); o.sv = sv;
       } else { o.rects = null; o.node.innerHTML = '<i class="g"></i><i class="r"></i><i class="in"></i>'; }
-      o.built = cfg.fst; o.geo = '';
+      o.built = cfg.fst; o.geo = ''; o.W = 0;
     }
     function frGeo(o, w, h) {
-      const g = w + 'x' + h + '|' + cfg.fw + '|' + cfg.fst; if (!o.rects || o.geo === g) return; o.geo = g;
-      const W = Math.min(14, Math.max(2, cfg.fw)), P = 2 * (w - W) + 2 * (h - W);
+      const g = w + 'x' + h + '|' + o.W + '|' + cfg.fst; if (!o.rects || o.geo === g) return; o.geo = g;
+      const W = Math.min(14, Math.max(2, o.W || cfg.fw)), P = 2 * (w - W) + 2 * (h - W);
       o.node.style.setProperty('--P', String(Math.round(P)));
       o.rects.forEach(r => { r.setAttribute('x', W / 2); r.setAttribute('y', W / 2); r.setAttribute('width', Math.max(1, w - W)); r.setAttribute('height', Math.max(1, h - W)); r.setAttribute('stroke-width', W); });
       if (cfg.fst === 'chase') {
@@ -2349,21 +2349,30 @@
       const Wd = Math.min(14, Math.max(2, cfg.fw)), gap = Math.max(0, Number(cfg.fgap) || 0);
       const R = {};
       const tmap = Object.assign({}, frTargets);
-      document.querySelectorAll('.gi-float:not(.gi-bare)').forEach((n, i) => { const rr = n.getBoundingClientRect(); if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') return; if (getComputedStyle(n).display === 'none' || rr.width < 60) return; tmap['a_' + (n.id || i)] = () => n; });
+      document.querySelectorAll('.gi-float').forEach((n, i) => { const rr = n.getBoundingClientRect(); if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') return; if (getComputedStyle(n).display === 'none' || rr.width < 60) return; tmap['a_' + (n.id || i)] = () => n; });
       document.querySelectorAll('.border-window').forEach((n, i) => {
         if (n.closest(OURS) || (n.parentElement && n.parentElement.closest('.border-window'))) return;
         const cs = getComputedStyle(n), rr = n.getBoundingClientRect();
         if (cs.display === 'none' || cs.visibility === 'hidden' || rr.width < 90 || rr.height < 60 || rr.width * rr.height > innerWidth * innerHeight * 0.7 || !/absolute|fixed/.test(cs.position)) return;
         tmap['g_' + (n.id || i)] = () => n;
       });
-      Object.keys(frs).forEach(k => { if (/^[ag]_/.test(k) && !tmap[k]) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } });
+      if (cfg.fT.other) [...document.body.children].forEach((n, i) => {
+        if (n.closest(OURS) || n.matches('script,style,canvas,iframe,link,svg,#gi-gtp,.gi-gtf') || /tip|toast|cursor|loader|context/i.test(n.id + ' ' + String(n.className && n.className.baseVal === undefined ? n.className : ''))) return;
+        if (n.querySelector('.interface-layer.layer') || n.matches('.interface-layer,.game-layer')) return;
+        const cs = getComputedStyle(n), rr = n.getBoundingClientRect();
+        if (!/fixed|absolute/.test(cs.position) || cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < .3 || cs.pointerEvents === 'none') return;
+        if (rr.width < 110 || rr.height < 50 || rr.width > innerWidth * .6 || rr.height > innerHeight * .9 || rr.right < 0 || rr.bottom < 0 || rr.left > innerWidth || rr.top > innerHeight) return;
+        if (!(n.textContent || '').trim() && !n.querySelector('img,canvas')) return;
+        tmap['x_' + (n.id || i)] = () => n;
+      });
+      Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } });
       for (const key of Object.keys(tmap)) {
-        const want = (anim || parts) && cfg.fT[key.startsWith('a_') ? 'addons' : key.startsWith('g_') ? 'gwins' : key];
+        const want = (anim || parts) && cfg.fT[key.startsWith('a_') ? 'addons' : key.startsWith('g_') ? 'gwins' : key.startsWith('x_') ? 'other' : key];
         if (!want) { if (frs[key]) { frs[key].node.remove(); delete frs[key]; } delete frRects[key]; continue; }
         const t = tmap[key](); let r0 = t && t.getBoundingClientRect();
         if (r0 && barTop != null && ['map', 'chat', 'right', 'grid', 'stats'].includes(key) && r0.bottom > barTop) r0 = { left: r0.left, right: r0.right, top: r0.top, bottom: barTop, width: r0.width, height: Math.max(0, barTop - r0.top) };
         if (!r0 || r0.width < 30 || r0.height < 14) { delete frRects[key]; if (frs[key]) frs[key].node.style.display = 'none'; continue; }
-        const ex = key === 'game' ? out : (/^[ag]_/.test(key) || key === 'top' || key === 'bottom') ? 0 : -gap;
+        const ex = key === 'game' ? out : (/^[agx]_/.test(key) || key === 'top' || key === 'bottom') ? 0 : -gap;
         R[key] = { l: r0.left - ex, t: r0.top - ex, r: r0.right + ex, b: r0.bottom + ex };
       }
       const ORDER = ['top', 'bottom', 'chat', 'right', 'map', 'grid', 'stats'];
@@ -2393,6 +2402,8 @@
         let mk = 'none';
         if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 4)}px)`; }
         if (o.mk !== mk) { o.mk = mk; st.webkitMaskImage = mk; st.maskImage = mk; }
+        const wk = (key === 'game' || /^[agx]_/.test(key)) ? Wd : Math.max(3, Math.round(Wd * 0.55));
+        if (o.W !== wk) { o.W = wk; o.node.style.setProperty('--w', wk + 'px'); o.geo = ''; }
         frGeo(o, Math.round(r.width), Math.round(r.height));
         holeNode(o);
       }
@@ -2528,19 +2539,21 @@
         if (cs.backgroundImage === 'none' && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.borderImageSource === 'none') return;
         mark.add(n);
       });
-      const gw = new Set();
-      if (cfg.theme !== 'none' && cfg.frame) document.querySelectorAll('.border-window').forEach(w => {
+      const gwi = new Set(), gwc = new Set();
+      if (cfg.theme !== 'none' && cfg.panels) document.querySelectorAll('.border-window').forEach(w => {
         if (w.closest(OURS) || w.offsetParent === null && getComputedStyle(w).position !== 'fixed') return;
-        w.querySelectorAll('*').forEach(n => {
-          const r = n.getBoundingClientRect(); if (r.width < 40 || r.height < 20) return;
-          if (/item|icon|npc|avatar|portrait|outfit|char|hero|img|canvas|slot|button|btn/i.test(String(n.className && n.className.baseVal === undefined ? n.className : ''))) return;
-          if (n.querySelector('[class*="item"],img,canvas,[class*="icon"]')) return;
+        [w, ...w.querySelectorAll('*')].forEach(n => {
+          const r = n.getBoundingClientRect(); if (r.width < 30 || r.height < 18) return;
+          if (/item-id|icon|npc|avatar|portrait|outfit|canvas|slot|button|btn|checkbox|close/i.test(String(n.className && n.className.baseVal === undefined ? n.className : ''))) return;
           const cs = getComputedStyle(n); if (cs.display === 'none') return;
-          if (cs.backgroundImage !== 'none' && /url\(/.test(cs.backgroundImage)) gw.add(n);
+          if (/url\(/.test(cs.backgroundImage)) { gwi.add(n); return; }
+          const m = cs.backgroundColor.match(/rgba?\(([^)]+)\)/);
+          if (m) { const [rr, gg, bb, aa = 1] = m[1].split(',').map(parseFloat); if (aa > .35) { const mx = Math.max(rr, gg, bb) / 255, mn = Math.min(rr, gg, bb) / 255; n.style.setProperty('--gi-l', String(Math.round((mx + mn) / 2 * 100))); gwc.add(n); } }
         });
       });
-      document.querySelectorAll('[data-gi-gw]').forEach(n => { if (!gw.has(n)) n.removeAttribute('data-gi-gw'); });
-      gw.forEach(n => n.setAttribute('data-gi-gw', '1'));
+      document.querySelectorAll('[data-gi-gi]').forEach(n => { if (!gwi.has(n)) n.removeAttribute('data-gi-gi'); });
+      document.querySelectorAll('[data-gi-gc]').forEach(n => { if (!gwc.has(n)) { n.removeAttribute('data-gi-gc'); n.style.removeProperty('--gi-l'); } });
+      gwi.forEach(n => n.setAttribute('data-gi-gi', '1')); gwc.forEach(n => n.setAttribute('data-gi-gc', '1'));
       const bd = new Set();
       root.querySelectorAll('*').forEach(n => {
         if (n.closest(OURS) || mark.has(n)) return;
@@ -2558,7 +2571,7 @@
     function thinSync() {
       clearInterval(thinTimer); thinTimer = 0;
       if (gtEnabled && (cfg.hideThin || cfg.theme !== 'none')) { thinScan(); thinTimer = setInterval(thinScan, 2500); }
-      else document.querySelectorAll('[data-gi-thin],[data-gi-bd],[data-gi-gw]').forEach(n => { n.removeAttribute('data-gi-thin'); n.removeAttribute('data-gi-bd'); n.removeAttribute('data-gi-gw'); });
+      else document.querySelectorAll('[data-gi-thin],[data-gi-bd],[data-gi-gi],[data-gi-gc]').forEach(n => { n.removeAttribute('data-gi-thin'); n.removeAttribute('data-gi-bd'); n.removeAttribute('data-gi-gw'); n.removeAttribute('data-gi-gi'); n.removeAttribute('data-gi-gc'); });
     }
     const chg = () => { save(); apply(); thinSync(); };
 
@@ -2652,7 +2665,7 @@
       cfg.theme = pr.theme; if (pr.h !== undefined) { cfg.h = pr.h; cfg.s = pr.s; }
       cfg.fsync = !!pr.fsync; cfg.l = 1; cfg.frame = true; cfg.panels = true; cfg.btns = true;
       cfg.fst = pr.fst; cfg.fpal = pr.fpal || 'theme'; if (pr.fc1) { cfg.fc1 = pr.fc1; cfg.fc2 = pr.fc2; cfg.fc3 = pr.fc3; }
-      cfg.fT = Object.assign({ addons: cfg.fT.addons, gwins: cfg.fT.gwins }, pr.t); cfg.fpt = Object.assign({}, pr.pt);
+      cfg.fT = Object.assign({ addons: cfg.fT.addons, gwins: cfg.fT.gwins, other: cfg.fT.other }, pr.t); cfg.fpt = Object.assign({}, pr.pt);
       if (pr.fw) { cfg.fw = pr.fw; cfg.fspd = pr.fspd; cfg.fglow = pr.fglow; cfg.fout = pr.fout; cfg.fpd = pr.fpd; }
       cfg.gAvoid = true; cfg.hideOrig = pr.fst !== 'none'; cfg.hideIn = pr.fst !== 'none'; cfg.hideThin = pr.fst !== 'none';
       chg(); render();
@@ -2752,7 +2765,7 @@
     const fSl = slide('Własna ramka: obszar rogów (slice)', 5, 120, 1, 'fSlice', x => x + ' px');
     const grid2 = 'display:grid;grid-template-columns:1fr 1fr;gap:0 8px;margin:4px 0';
     const note = t => el('div', { style: 'font-size:11px;color:#90a4ae;margin:4px 0' }, t);
-    const tgtBox = el('div', { style: grid2 }, tgt('Cały ekran gry', 'game'), tgt('Mapa', 'map'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats'), tgt('Okna dodatków (minutnik, dropy…)', 'addons'), tgt('Okna gry (łupy, ekwipunek…)', 'gwins'));
+    const tgtBox = el('div', { style: grid2 }, tgt('Cały ekran gry', 'game'), tgt('Mapa', 'map'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats'), tgt('Okna dodatków (minutnik, dropy…)', 'addons'), tgt('Okna gry (łupy, ekwipunek…)', 'gwins'), tgt('Okna innych dodatków (Lootlog…)', 'other'));
     const setAllT = v => { Object.keys(cfg.fT).forEach(k => { cfg.fT[k] = v; }); tgtBox.querySelectorAll('input').forEach(i => { i.checked = v; }); chg(); updWarn(); };
     const mkBtn = (t, f) => { const b = el('button', { textContent: t }); b.style.cssText = 'margin:2px 4px 2px 0;padding:1px 8px;font-size:11px'; b.addEventListener('click', f); return b; };
     ptBox.style.cssText = grid2;
@@ -3706,7 +3719,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.73.0');
+    log('Załadowano v2.74.0');
   }
 
   let tries = 0;
