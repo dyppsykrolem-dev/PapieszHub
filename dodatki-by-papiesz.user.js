@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.90.0
+// @version      2.92.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3372,28 +3372,44 @@
     };
     const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
     let P = [], bolts = [], raf = 0, last = 0, T = 0, boltT = 0, hue = 0, info = '';
-    function heroPos() {
+    let smooth = null, coverT = 0, covered = false;
+    function heroPos(dt) {
       const lay = document.querySelector('.game-layer'), gc = document.querySelector('#GAME_CANVAS') || (lay && lay.querySelector('canvas'));
       const box = (gc || lay); if (!box) return null;
       const r = box.getBoundingClientRect(); if (r.width < 50 || r.height < 50) return null;
       let x = r.left + r.width / 2, y = r.top + r.height / 2 + 6, how = 'środek';
       const E = window.Engine, h = E && E.hero, m = E && E.map;
-      if (cfg.pos === 'auto' && h && gc && gc.width) {
-        const sc = r.width / gc.width, rx = Number(h.rx), ry = Number(h.ry), off = m && (m.offset || m.cameraOffset);
-        if (isFinite(rx) && isFinite(ry) && off && isFinite(off[0]) && isFinite(off[1])) {
-          const ax = r.left + (rx - off[0]) * sc, ay = r.top + (ry - off[1]) * sc;
-          if (ax > r.left && ax < r.right && ay > r.top && ay < r.bottom && Math.abs(ax - x) < r.width * .45 && Math.abs(ay - y) < r.height * .45) { x = ax + 16 * sc; y = ay + 28 * sc; how = 'rx/ry+offset'; }
+      if (cfg.pos === 'auto' && h && m) {
+        const d = h.d || {}, md = m.d || {}, TS = 32;
+        const gw = (gc && gc.width) || r.width, gh = (gc && gc.height) || r.height, sc = r.width / gw;
+        const mx = Number(md.x || (m.size && m.size.x) || m.width), my = Number(md.y || (m.size && m.size.y) || m.height);
+        let tx = Number(h.rx), ty = Number(h.ry);
+        if (!(isFinite(tx) && isFinite(ty) && tx > 0 && ty > 0)) { tx = Number(d.x); ty = Number(d.y); }
+        if (isFinite(tx) && isFinite(ty) && isFinite(mx) && isFinite(my) && mx >= 5 && my >= 5 && tx <= mx + 1 && ty <= my + 1) {
+          const hx = tx * TS + TS / 2, hy = ty * TS + TS - 4, mw = mx * TS, mh = my * TS;
+          const sx = mw <= gw ? (gw - mw) / 2 + hx : hx - Math.min(Math.max(hx - gw / 2, 0), mw - gw);
+          const sy = mh <= gh ? (gh - mh) / 2 + hy : hy - Math.min(Math.max(hy - gh / 2, 0), mh - gh);
+          x = r.left + sx * sc; y = r.top + sy * sc; how = 'mapa ' + mx + 'x' + my + ', postać ' + tx + ',' + ty;
         }
       }
       info = how + ' @' + Math.round(x) + ',' + Math.round(y);
-      return { x: x + cfg.ox, y: y + cfg.oy, r };
+      x += cfg.ox; y += cfg.oy;
+      if (!smooth || Math.abs(smooth.x - x) > 260 || Math.abs(smooth.y - y) > 260) smooth = { x, y }; else { const k = 1 - Math.exp(-14 * (dt || .016)); smooth.x += (x - smooth.x) * k; smooth.y += (y - smooth.y) * k; }
+      return { x: smooth.x, y: smooth.y, r };
     }
     const E1 = (a, b, k) => a + (b - a) * k;
     function frame(ts) {
       raf = 0;
       if (!haEnabled) { cv.style.display = 'none'; return; }
       const dt = Math.min(.05, (ts - (last || ts)) / 1000) * cfg.spd; last = ts; T += dt; hue = (hue + dt * 60) % 360;
-      const hp = heroPos();
+      const hp = heroPos(dt / Math.max(.05, cfg.spd));
+      if (hp && ts - coverT > 150) {
+        coverT = ts; const E = window.Engine, bt = E && E.battle;
+        let cov = !!(bt && (bt.show === true || bt.isBattle === true || bt.active === true || bt.battleStarted === true));
+        if (!cov && cfg.hide !== false) { const t = document.elementFromPoint(hp.x, hp.y); if (t && t !== document.body && t !== document.documentElement && t.tagName !== 'CANVAS' && !t.closest('#GAME_CANVAS,.game-layer')) cov = true; else if (t && t.closest('.border-window,.interface-element-window')) cov = true; }
+        covered = cov;
+      }
+      if (covered) { if (cv.style.display !== 'none') cv.style.display = 'none'; raf = requestAnimationFrame(frame); return; }
       if (!hp || document.hidden || (cfg.hide && !document.querySelector('.game-layer'))) { cv.style.display = 'none'; raf = requestAnimationFrame(frame); return; }
       const S = cfg.size, R = 44 * S, W = Math.ceil(R * 3.4), H = Math.ceil(R * 3.6);
       if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
@@ -3480,7 +3496,7 @@
     posSel.addEventListener('change', () => { cfg.pos = posSel.value; save(); });
     const dbg = isolate(el('textarea', { rows: 6, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
     const dbgBtn = el('button', { textContent: 'Pokaż dane o pozycji postaci' });
-    dbgBtn.addEventListener('click', () => { const E = window.Engine, h = E && E.hero, m = E && E.map, gc = document.querySelector('#GAME_CANVAS'); dbg.value = JSON.stringify({ pozycja: info, heroKeys: h ? Object.keys(h).filter(k => /^(x|y|rx|ry|px|py|offset|d)$/i.test(k)) : null, rx: h && h.rx, ry: h && h.ry, dx: h && h.d && h.d.x, dy: h && h.d && h.d.y, offset: m && (m.offset || m.cameraOffset), mapKeys: m ? Object.keys(m).filter(k => /off|size|scale|zoom/i.test(k)) : null, canvas: gc ? [gc.width, gc.height, Math.round(gc.getBoundingClientRect().width)] : null }, null, 1); });
+    dbgBtn.addEventListener('click', () => { const E = window.Engine, h = E && E.hero, m = E && E.map, gc = document.querySelector('#GAME_CANVAS'); dbg.value = JSON.stringify({ pozycja: info, mapD: m && m.d ? { x: m.d.x, y: m.d.y, keys: Object.keys(m.d).slice(0, 25) } : null, heroKeys: h ? Object.keys(h).filter(k => /^(x|y|rx|ry|px|py|offset|d)$/i.test(k)) : null, rx: h && h.rx, ry: h && h.ry, dx: h && h.d && h.d.x, dy: h && h.d && h.d.y, offset: m && (m.offset || m.cameraOffset), mapKeys: m ? Object.keys(m).filter(k => /off|size|scale|zoom/i.test(k)) : null, canvas: gc ? [gc.width, gc.height, Math.round(gc.getBoundingClientRect().width)] : null }, null, 1); });
     const root = el('div');
     root.settingsBox = setTabs([
       ['Efekty', [el('div', { style: 'font-weight:bold' }, 'Gotowe zestawy'), presetBox, el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Warstwy (łącz dowolnie)'), ...HA_FX.map(([k, l]) => mkFx(k, l))]],
@@ -4146,7 +4162,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.90.0');
+    log('Załadowano v2.92.0');
   }
 
   let tries = 0;
