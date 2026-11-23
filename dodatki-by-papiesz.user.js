@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.95.2
+// @version      2.95.3
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -37,6 +37,30 @@
   const safe = (fn, fb) => { try { const r = fn(); return r === undefined ? fb : r; } catch (e) { return fb; } };
   const log = (...a) => console.log('%c[Zmieniacz grafik]', 'color:#4fc3f7;font-weight:bold', ...a);
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
+  const DRW = { on: false, box: null };
+  try {
+    const CP = W.CanvasRenderingContext2D && W.CanvasRenderingContext2D.prototype;
+    if (CP && !CP.drawImage.__giDW) {
+      const od = CP.drawImage;
+      const nd = function () {
+        if (DRW.on && !DRW.box) {
+          try {
+            const a = arguments, n = a.length; let dx, dy, dw, dh;
+            if (n >= 9) { dx = a[5]; dy = a[6]; dw = a[7]; dh = a[8]; } else if (n >= 5) { dx = a[1]; dy = a[2]; dw = a[3]; dh = a[4]; } else { dx = a[1]; dy = a[2]; dw = a[0].width || 0; dh = a[0].height || 0; }
+            if (dh >= 16 && dw >= 8) { const t = this.getTransform ? this.getTransform() : { a: 1, c: 0, e: 0, b: 0, d: 1, f: 0 }, cx = dx + dw / 2; DRW.box = { x: t.a * cx + t.c * dy + t.e, top: t.b * cx + t.d * dy + t.f, bot: t.b * cx + t.d * (dy + dh) + t.f, cw: this.canvas ? this.canvas.width : 0 }; }
+          } catch (e) {  }
+        }
+        return od.apply(this, arguments);
+      };
+      nd.__giDW = true; CP.drawImage = nd;
+    }
+  } catch (e) {  }
+  function hookDraw(o, cb) {
+    if (!o || typeof o.draw !== 'function' || o.draw.__giDW) return false;
+    const orig = o.draw;
+    const wr = function () { DRW.on = true; DRW.box = null; try { return orig.apply(this, arguments); } finally { DRW.on = false; if (DRW.box) cb(DRW.box); } };
+    wr.__giDW = true; try { o.draw = wr; return true; } catch (e) { return false; }
+  }
   const _bt = { t: 0, v: false };
   function inBattle() {
     const n = performance.now(); if (n - _bt.t < 250) return _bt.v; _bt.t = n;
@@ -3699,7 +3723,22 @@
     const save = () => writeLS(DM_CFG_KEY, cfg);
     const box = document.createElement('div'); box.id = 'gi-dmg'; box.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;z-index:99500';
     document.body.append(box);
-    const done = new WeakSet(), tcache = new Map(), stack = new Map(), lastEv = [], lastRaw = [];
+    const done = new WeakSet(), tcache = new Map(), stack = new Map(), lastEv = [], lastRaw = [], fcap = new Map();
+    const nameOf = o => { const d = o.d && typeof o.d === 'object' ? o.d : o, nm = d.nick || d.name || o.nick || o.name; return typeof nm === 'string' && nm.length > 1 && nm.length < 40 ? nm : ''; };
+    let discN = 0;
+    function discover() {
+      const b = PW.Engine && PW.Engine.battle; if (!b || typeof b !== 'object') return;
+      const seenO = new Set(); let n = 0, hooked = 0;
+      (function walk(o, d) {
+        if (!o || typeof o !== 'object' || seenO.has(o) || n > 700 || d > 4) return; seenO.add(o); n++;
+        const nm = nameOf(o); if (nm && typeof o.draw === 'function') { if (hookDraw(o, bx => fcap.set(nm, Object.assign({ t: performance.now() }, bx)))) hooked++; }
+        let keys; try { keys = Object.keys(o); } catch (e) { return; }
+        for (const k of keys) { if (k === 'parent' || k === 'engine' || k === 'Engine') continue; let v; try { v = o[k]; } catch (e) { continue; } if (v && typeof v === 'object') walk(v, d + 1); }
+      })(b, 0);
+      discN = n;
+    }
+    setInterval(() => { try { if (dmEnabled) discover(); } catch (e) {  } }, 600);
+    const capPos = name => { const c = fcap.get(name); if (!c || performance.now() - c.t > 1500 || !c.cw) return null; const g = document.querySelector('#GAME_CANVAS') || document.querySelector('.game-layer'); if (!g) return null; const r = g.getBoundingClientRect(), sc = r.width / c.cw; return { x: r.left + c.x * sc, y: r.top + (c.top + (c.bot - c.top) * .1) * sc, found: true }; };
     let maxSeen = 1, pendHit = null;
     const seen = new Map();
     const me = () => { try { const h = PW.Engine && PW.Engine.hero && PW.Engine.hero.d; return h && h.nick || ''; } catch (e) { return ''; } };
@@ -3742,6 +3781,7 @@
     }
     function anchor(name, row) {
       const now = performance.now();
+      if (cfg.pos === 'target') { const cp = capPos(name); if (cp) return cp; }
       if (cfg.pos === 'target' && name && me() && name.toLowerCase() === me().toLowerCase()) { try { const hs = window.__giShared && window.__giShared.heroScreen && window.__giShared.heroScreen(); if (hs) return { x: hs.x, y: hs.y, found: true, hero: true }; } catch (e) {  } }
       const c = tcache.get(name);
       if (c && c.el.isConnected && now - c.t < 1500) { const r = c.el.getBoundingClientRect(); if (r.width > 0) return { x: r.left + r.width / 2, y: r.top + r.height * .3, found: true }; }
@@ -3795,6 +3835,7 @@
       if (e.shield && cfg.on.block) add('🛡', kcol('block'));
       if (e.label && e.kind !== 'block') add(e.label, e.kind === 'heal' ? kcol('heal') : '#ffab91', 'normal');
       if (e.skill && (e.kind === 'dmg' || e.kind === 'crit')) add(e.skill, '#cfd8dc', 'normal');
+      if (!a.found && e.target) { const q = document.createElement('span'); q.textContent = e.target.slice(0, 14); q.style.cssText = `font-size:${small}px;color:#cfd8dc;font-weight:normal`; d.insertBefore(q, main); }
       box.append(d);
       const dx = (Math.random() < .5 ? -1 : 1) * (10 + Math.random() * 20), dy = e.kind === 'dot' ? 36 : e.kind === 'heal' ? -50 : -44;
       anim(d, x, y, dx, dy, cfg.dur, 0, style, e.kind === 'crit' ? 1.08 : 1);
@@ -3856,7 +3897,7 @@
     };
     const dbg = isolate(el('textarea', { rows: 8, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
     const dbgBtn = el('button', { textContent: 'Pokaż ostatnie odczytane wiersze' });
-    dbgBtn.addEventListener('click', () => { dbg.value = JSON.stringify({ moj_nick: me(), wiersze: lastRaw.slice(-8), zdarzenia: lastEv.slice(-6) }, null, 1); });
+    dbgBtn.addEventListener('click', () => { const b = PW.Engine && PW.Engine.battle; dbg.value = JSON.stringify({ moj_nick: me(), walka_klucze: b ? Object.keys(b).slice(0, 40) : null, przejrzane_obiekty: discN, rozpoznani_walczacy: [...fcap.entries()].map(([k, v]) => k + ' @' + Math.round(v.x) + ',' + Math.round(v.top) + ' wiek ' + Math.round(performance.now() - v.t)), wiersze: lastRaw.slice(-8), zdarzenia: lastEv.slice(-6) }, null, 1); });
     const testBtn = el('button', { textContent: '▶ Pokaż przykład' }); testBtn.addEventListener('click', test);
     const root = el('div');
     root.settingsBox = setTabs([
@@ -4531,7 +4572,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.95.2');
+    log('Załadowano v2.95.3');
   }
 
   let tries = 0;
