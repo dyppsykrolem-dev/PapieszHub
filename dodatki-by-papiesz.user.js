@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.70.0
+// @version      2.72.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2141,13 +2141,14 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], addonTheme: true, hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
     cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true }, cfg.fT);
     if (cfg.fst === 'ripple') cfg.fst = 'ring';
     if (cfg.fpal === 'win') { cfg.fsync = true; cfg.fpal = 'theme'; }
     if (cfg.gcut === 16) cfg.gcut = 6;
     if (STATIC_FR.includes(cfg.fst)) cfg.fst = 'ring';
-    Object.assign(cfg, { gAvoid: true, gcut: 6, fgap: 5, fout: 0, fclip: true, frame: true, panels: true, btns: true, hideBars: false, bgChat: '', bgRight: '', bgTop: '' });
+    cfg.hideSel = [];
+    Object.assign(cfg, { gAvoid: true, gcut: 6, fgap: 2, fout: 0, fclip: true, frame: true, panels: true, btns: true, hideBars: false, bgChat: '', bgRight: '', bgTop: '' });
     const save = () => writeLS(GT_CFG_KEY, cfg);
     let styleEl = null;
     const SYNC = { game: [0, 0], fantasy: [130, 45], classic: [205, 55], crimson: [2, 60], violet: [272, 45], gold: [42, 70], mono: [0, 0] };
@@ -2180,7 +2181,7 @@
         html .inventory-grid-bg.interface-element-grid-border{border-color:${c(.4, 24)} !important}
         html .interface-element-one-black-tile.bag-slot-wrapper,html .chat-channel-card{background-image:linear-gradient(${c(.3, 17)},${c(.3, 12)}) !important}
         html .chat-channel-card.active{background-image:linear-gradient(${c(.35, 42)},${c(.35, 25)}) !important}\n`;
-      if (rc) o += `
+      if (rc && cfg.addonTheme !== false) o += `
         html .gi-float:not(.gi-bare),html #gi-panel{background:linear-gradient(${c(.45, 17)},${c(.45, 9)}) !important;border-color:${c(.5, 38)} !important}
         html .gi-float:not(.gi-bare) .gi-fhead,html #gi-head{background:linear-gradient(${c(.5, 24)},${c(.5, 13)}) !important;border-bottom-color:${c(.55, 42)} !important}
         html .gi-float:not(.gi-bare) .gi-ft,html .gi-float:not(.gi-bare) .gi-fhead>span,html .gi-mtitle,html .gi-float h4,html #gi-panel h4,html .gi-float summary{color:${c(.8, 82)} !important;border-color:${c(.5, 38)} !important}
@@ -2358,7 +2359,7 @@
       }
       const ORDER = ['top', 'bottom', 'chat', 'right', 'map', 'grid', 'stats'];
       const inside = (x, y) => x.l >= y.l - 1 && x.r <= y.r + 1 && x.t >= y.t - 1 && x.b <= y.b + 1;
-      const mg = Wd + 6;
+      const mg = Math.max(3, Math.round(Wd / 2));
       ORDER.forEach((kb, i) => {
         const B = R[kb]; if (!B) return;
         for (let j = 0; j < i; j++) {
@@ -2668,6 +2669,7 @@
     });
     col.addEventListener('input', () => { const [h, s2] = hueOf(col.value); cfg.h = h; cfg.s = Math.max(10, s2); sS.r.value = cfg.s; sS.v.textContent = cfg.s + '%'; chg(); });
     const chk = (label, key) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' ' + label); };
+    const addonChk = chk('Motyw gry na oknach dodatków (tło, nagłówki, przyciski)', 'addonTheme');
     const fsyncChk = chk('Kolory ramek i cząsteczek zgodne z motywem głównym (motyw okien dodatków)', 'fsync');
     showCol();
     const dinfo = el('div', { style: 'font-size:11px;color:#90a4ae;margin-bottom:6px' }, 'Zbiera nazwy paneli gry i ich tła (tylko odczyt). Przydatne, gdy jakiś panel nie zmienia koloru – wyślij wynik autorowi.');
@@ -2779,11 +2781,11 @@
     const hideAllChk = (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(cfg.hideOrig && cfg.hideIn && cfg.hideThin) })); c.addEventListener('change', () => { cfg.hideOrig = c.checked; cfg.hideIn = c.checked; cfg.hideThin = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' Ukryj oryginalne ramki gry (zewnętrzną, wewnętrzne i cienkie linie)'); })();
     const tabs = setTabs([
       ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote]],
-      ['Kolory', [h5('Interfejs gry'), ...syncNote, sel, colRow, sS.row, sL.row, h5('Ramki i cząsteczki'), fsyncChk, fCol, ccRow]],
+      ['Kolory', [h5('Interfejs gry'), ...syncNote, sel, colRow, sS.row, sL.row, h5('Okna dodatków'), addonChk, h5('Ramki i cząsteczki'), fCol, ccRow]],
       ['Ramki', [warn, fSel,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Oryginalne ramki gry:'), hideAllChk,
-        el('div', { style: 'margin-top:4px' }, pickBtn), pickIn, pickFullL, pickRow, pickInfo, hidList]],
+        ]],
       ['Efekty', [ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt))]],
       ['Tempo', [chk('Zatrzymaj animacje (efekty zostają, tylko się nie ruszają)', 'fstatic'), fSp.row, fGl.row, fPd.row, note('Prędkość dotyczy ramek i cząsteczek razem.')]],
       ['Więcej', [el('details', {}, el('summary', { textContent: 'Diagnostyka interfejsu (dla autora)' }), dinfo, btn, out)]]
@@ -3678,7 +3680,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.70.0');
+    log('Załadowano v2.72.0');
   }
 
   let tries = 0;
