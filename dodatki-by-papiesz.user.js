@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.69.0
+// @version      2.70.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2242,7 +2242,16 @@
     };
     const frTargets = {
       game: () => document.querySelector('.interface-layer.layer'),
-      top: () => document.querySelector('.top.positioner>.bg'),
+      top: () => {
+        const tp = document.querySelector('.top.positioner'), bg = document.querySelector('.top.positioner>.bg'); if (!tp && !bg) return null;
+        let L = 1e9, T = 1e9, Rr = -1e9, B = -1e9;
+        const add = r => { if (r.width < 8 || r.height < 8 || r.top > 220 || r.top < -5) return; L = Math.min(L, r.left); T = Math.min(T, r.top); Rr = Math.max(Rr, r.right); B = Math.max(B, r.bottom); };
+        if (bg) add(bg.getBoundingClientRect());
+        if (tp) { add(tp.getBoundingClientRect()); tp.querySelectorAll('*').forEach(n => { if (n.closest(OURS)) return; const r = n.getBoundingClientRect(); if (r.height <= 140) add(r); }); }
+        if (L > Rr) return null;
+        const gl = document.querySelector('.interface-layer.layer'); if (gl) { const g = gl.getBoundingClientRect(); L = Math.max(L, g.left); Rr = Math.min(Rr, g.right); }
+        return { getBoundingClientRect: () => ({ left: L, right: Rr, top: T, bottom: B, width: Rr - L, height: B - T }) };
+      },
       chat: () => document.querySelector('.left-column.main-column'),
       right: () => document.querySelector('.right-column.main-column'),
       map: () => document.querySelector('.game-layer'),
@@ -2344,7 +2353,7 @@
         const t = tmap[key](); let r0 = t && t.getBoundingClientRect();
         if (r0 && barTop != null && ['map', 'chat', 'right', 'grid', 'stats'].includes(key) && r0.bottom > barTop) r0 = { left: r0.left, right: r0.right, top: r0.top, bottom: barTop, width: r0.width, height: Math.max(0, barTop - r0.top) };
         if (!r0 || r0.width < 30 || r0.height < 14) { delete frRects[key]; if (frs[key]) frs[key].node.style.display = 'none'; continue; }
-        const ex = key === 'game' ? Wd + out : key.startsWith('a_') ? 0 : -gap;
+        const ex = key === 'game' ? out : (key.startsWith('a_') || key === 'top' || key === 'bottom') ? 0 : -gap;
         R[key] = { l: r0.left - ex, t: r0.top - ex, r: r0.right + ex, b: r0.bottom + ex };
       }
       const ORDER = ['top', 'bottom', 'chat', 'right', 'map', 'grid', 'stats'];
@@ -3124,6 +3133,20 @@
 
   function installTheme() {
     document.head.append(el('style', { id: 'gi-theme-css', textContent: `
+      /* czytelniejsze ustawienia motywu gry */
+      #gi-gt-set{width:440px !important;font-size:13px}
+      #gi-gt-set .gi-stabs{flex-wrap:wrap;gap:5px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.12)}
+      #gi-gt-set .gi-stab{padding:5px 8px !important;font-size:12.5px !important;cursor:pointer;flex:1;text-align:center}
+      #gi-gt-set .gi-spane{line-height:1.45}
+      #gi-gt-set .gi-spane>div[style*="bold"]{font-size:13px;margin:14px 0 6px !important;padding:3px 0 3px 8px;border-left:3px solid #4fc3f7;background:rgba(255,255,255,.05);letter-spacing:.3px}
+      #gi-gt-set .gi-spane>div[style*="bold"]:first-child{margin-top:2px !important}
+      #gi-gt-set label{padding:3px 5px;border-radius:4px;line-height:1.35}
+      #gi-gt-set label:hover{background:rgba(255,255,255,.07)}
+      #gi-gt-set input[type=checkbox]{width:15px;height:15px;vertical-align:-3px;margin-right:4px}
+      #gi-gt-set select{padding:4px 6px;font-size:13px;max-width:100%}
+      #gi-gt-set button{padding:4px 10px !important;font-size:12px !important;margin:3px 5px 3px 0 !important;cursor:pointer}
+      #gi-gt-set input[type=range]{width:100%;margin:2px 0 8px}
+      #gi-gt-set .gi-spane>div[style*="font-size: 11px"]{opacity:.85;font-size:12px !important;margin:6px 0 !important}
       .gi-stabs{display:flex;gap:4px;margin:0 0 6px}
       .gi-stab{flex:1;text-align:center;padding:3px 0;font:bold 11px Arial,sans-serif;color:#9e9e9e;background:#111;border:1px solid #333;border-radius:10px;cursor:pointer;user-select:none}
       .gi-stab:hover{color:#fff;border-color:#666}
@@ -3655,7 +3678,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.69.0');
+    log('Załadowano v2.70.0');
   }
 
   let tries = 0;
