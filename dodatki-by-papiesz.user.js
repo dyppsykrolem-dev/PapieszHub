@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.67.0
+// @version      2.68.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2141,8 +2141,8 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
-    cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, cfg.fT);
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true }, cfg.fT);
     if (cfg.fst === 'ripple') cfg.fst = 'ring';
     if (cfg.fpal === 'win') { cfg.fsync = true; cfg.fpal = 'theme'; }
     if (cfg.gcut === 16) cfg.gcut = 6;
@@ -2164,7 +2164,7 @@
       if (cfg.hideIn) o += `html .left-column.main-column,html .scroll-wrapper.chat-message-wrapper,html .inventory-grid-bg.interface-element-grid-border,html .right-column.main-column,html .new-chat-window{border-color:transparent !important;box-shadow:none !important}
         html .equipment-outline{background-color:transparent !important}
         html .interface-element-active-card-background-stretch{border-image:none !important}\n`;
-      if (cfg.hideThin) o += `html [data-gi-thin]{visibility:hidden !important}\n`;
+      if (cfg.hideThin) o += `html [data-gi-thin]{visibility:hidden !important}html [data-gi-bd]{border-color:transparent !important;border-image:none !important;box-shadow:none !important;outline:none !important}\n`;
       if (cfg.hideBars) o += `html .positioner>.bg{background-image:none !important}\n`;
       if (cfg.hideIn) o += `html .left-column.main-column::before,html .left-column.main-column::after,html .right-column.main-column::before,html .right-column.main-column::after,html .game-layer::before,html .game-layer::after{background:none !important;border-color:transparent !important;box-shadow:none !important}html .game-layer{outline:none !important;box-shadow:none !important}\n`;
       (cfg.hideSel || []).forEach(h => { if (!h || !h.s || /[{},<>;]/.test(h.s)) return; o += h.f ? `html ${h.s}{visibility:hidden !important}\n` : `html ${h.s},html ${h.s}::before,html ${h.s}::after{background:none !important;border-color:transparent !important;box-shadow:none !important;outline:none !important;border-image:none !important}\n`; });
@@ -2328,25 +2328,30 @@
       const gc = globeCircle(), out = Number(cfg.fout) || 0, barTop = barTopY();
       const Wd = Math.min(14, Math.max(2, cfg.fw)), gap = Math.max(0, Number(cfg.fgap) || 0);
       const R = {};
-      for (const key of Object.keys(frTargets)) {
-        const want = (anim || parts) && cfg.fT[key];
+      const tmap = Object.assign({}, frTargets);
+      document.querySelectorAll('.gi-float:not(.gi-bare)').forEach((n, i) => { const rr = n.getBoundingClientRect(); if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') return; if (getComputedStyle(n).display === 'none' || rr.width < 60) return; tmap['a_' + (n.id || i)] = () => n; });
+      Object.keys(frs).forEach(k => { if (k.startsWith('a_') && !tmap[k]) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } });
+      for (const key of Object.keys(tmap)) {
+        const want = (anim || parts) && cfg.fT[key.startsWith('a_') ? 'addons' : key];
         if (!want) { if (frs[key]) { frs[key].node.remove(); delete frs[key]; } delete frRects[key]; continue; }
-        const t = frTargets[key](); let r0 = t && t.getBoundingClientRect();
+        const t = tmap[key](); let r0 = t && t.getBoundingClientRect();
         if (r0 && barTop != null && ['map', 'chat', 'right', 'grid', 'stats'].includes(key) && r0.bottom > barTop) r0 = { left: r0.left, right: r0.right, top: r0.top, bottom: barTop, width: r0.width, height: Math.max(0, barTop - r0.top) };
         if (!r0 || r0.width < 30 || r0.height < 14) { delete frRects[key]; if (frs[key]) frs[key].node.style.display = 'none'; continue; }
-        const ex = key === 'game' ? Wd + out : -gap;
+        const ex = key === 'game' ? Wd + out : key.startsWith('a_') ? 0 : -gap;
         R[key] = { l: r0.left - ex, t: r0.top - ex, r: r0.right + ex, b: r0.bottom + ex };
       }
       const ORDER = ['top', 'bottom', 'chat', 'right', 'map', 'grid', 'stats'];
       const inside = (x, y) => x.l >= y.l - 1 && x.r <= y.r + 1 && x.t >= y.t - 1 && x.b <= y.b + 1;
+      const mg = Wd + 6;
       ORDER.forEach((kb, i) => {
         const B = R[kb]; if (!B) return;
         for (let j = 0; j < i; j++) {
-          const A = R[ORDER[j]]; if (!A || inside(B, A) || inside(A, B)) continue;
-          const ox = Math.min(A.r + gap, B.r) - Math.max(A.l - gap, B.l), oy = Math.min(A.b + gap, B.b) - Math.max(A.t - gap, B.t);
+          const A = R[ORDER[j]]; if (!A) continue;
+          if (inside(B, A) || inside(A, B)) { const C = inside(B, A) ? B : A, D = C === B ? A : B; C.l = Math.max(C.l, D.l + mg); C.t = Math.max(C.t, D.t + mg); C.r = Math.min(C.r, D.r - mg); C.b = Math.min(C.b, D.b - mg); continue; }
+          const ox = Math.min(A.r + mg, B.r) - Math.max(A.l - mg, B.l), oy = Math.min(A.b + mg, B.b) - Math.max(A.t - mg, B.t);
           if (ox > 0 && oy > 0) {
-            if (oy <= ox) { if ((B.t + B.b) / 2 >= (A.t + A.b) / 2) B.t = A.b + gap; else B.b = A.t - gap; }
-            else { if ((B.l + B.r) / 2 >= (A.l + A.r) / 2) B.l = A.r + gap; else B.r = A.l - gap; }
+            if (oy <= ox) { if ((B.t + B.b) / 2 >= (A.t + A.b) / 2) B.t = A.b + mg; else B.b = A.t - mg; }
+            else { if ((B.l + B.r) / 2 >= (A.l + A.r) / 2) B.l = A.r + mg; else B.r = A.l - mg; }
           }
         }
       });
@@ -2489,7 +2494,7 @@
       const root = document.querySelector('.interface-layer.layer') || document.body, mark = new Set();
       root.querySelectorAll('*').forEach(n => {
         if (n.closest(OURS)) return;
-        const r = n.getBoundingClientRect(), tv = r.width > 0 && r.width <= 12 && r.height >= 100, th = r.height > 0 && r.height <= 12 && r.width >= 100;
+        const r = n.getBoundingClientRect(), tv = r.width > 0 && r.width <= 16 && r.height >= 60, th = r.height > 0 && r.height <= 16 && r.width >= 60;
         if (!tv && !th) return;
         if (n.children.length > 2 || (n.textContent || '').trim()) return;
         if (THIN_SKIP.test(String(n.className && n.className.baseVal === undefined ? n.className : '') + ' ' + n.id)) return;
@@ -2497,13 +2502,24 @@
         if (cs.backgroundImage === 'none' && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.borderImageSource === 'none') return;
         mark.add(n);
       });
+      const bd = new Set();
+      root.querySelectorAll('*').forEach(n => {
+        if (n.closest(OURS) || mark.has(n)) return;
+        const r = n.getBoundingClientRect(); if (r.width < 150 && r.height < 150) return;
+        if (r.width < 8 || r.height < 8) return;
+        const cs = getComputedStyle(n); if (cs.display === 'none') return;
+        const sides = ['Top', 'Right', 'Bottom', 'Left'].some(x => parseFloat(cs['border' + x + 'Width']) > 0 && cs['border' + x + 'Style'] !== 'none' && !/rgba?\(\s*0,\s*0,\s*0,\s*0\)|transparent/.test(cs['border' + x + 'Color']));
+        if (sides || cs.borderImageSource !== 'none' || (cs.boxShadow !== 'none' && /inset/.test(cs.boxShadow)) || (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0)) bd.add(n);
+      });
+      document.querySelectorAll('[data-gi-bd]').forEach(n => { if (!bd.has(n)) n.removeAttribute('data-gi-bd'); });
+      bd.forEach(n => n.setAttribute('data-gi-bd', '1'));
       document.querySelectorAll('[data-gi-thin]').forEach(n => { if (!mark.has(n)) n.removeAttribute('data-gi-thin'); });
       mark.forEach(n => n.setAttribute('data-gi-thin', '1'));
     }
     function thinSync() {
       clearInterval(thinTimer); thinTimer = 0;
       if (gtEnabled && cfg.hideThin) { thinScan(); thinTimer = setInterval(thinScan, 2500); }
-      else document.querySelectorAll('[data-gi-thin]').forEach(n => n.removeAttribute('data-gi-thin'));
+      else document.querySelectorAll('[data-gi-thin],[data-gi-bd]').forEach(n => { n.removeAttribute('data-gi-thin'); n.removeAttribute('data-gi-bd'); });
     }
     const chg = () => { save(); apply(); thinSync(); };
 
@@ -2597,7 +2613,7 @@
       cfg.theme = pr.theme; if (pr.h !== undefined) { cfg.h = pr.h; cfg.s = pr.s; }
       cfg.fsync = !!pr.fsync; cfg.l = 1; cfg.frame = true; cfg.panels = true; cfg.btns = true;
       cfg.fst = pr.fst; cfg.fpal = pr.fpal || 'theme'; if (pr.fc1) { cfg.fc1 = pr.fc1; cfg.fc2 = pr.fc2; cfg.fc3 = pr.fc3; }
-      cfg.fT = Object.assign({}, pr.t); cfg.fpt = Object.assign({}, pr.pt);
+      cfg.fT = Object.assign({ addons: cfg.fT.addons }, pr.t); cfg.fpt = Object.assign({}, pr.pt);
       if (pr.fw) { cfg.fw = pr.fw; cfg.fspd = pr.fspd; cfg.fglow = pr.fglow; cfg.fout = pr.fout; cfg.fpd = pr.fpd; }
       cfg.gAvoid = true; cfg.hideOrig = pr.fst !== 'none'; cfg.hideIn = pr.fst !== 'none'; cfg.hideThin = pr.fst !== 'none';
       chg(); render();
@@ -2695,7 +2711,7 @@
     const fSl = slide('Własna ramka: obszar rogów (slice)', 5, 120, 1, 'fSlice', x => x + ' px');
     const grid2 = 'display:grid;grid-template-columns:1fr 1fr;gap:0 8px;margin:4px 0';
     const note = t => el('div', { style: 'font-size:11px;color:#90a4ae;margin:4px 0' }, t);
-    const tgtBox = el('div', { style: grid2 }, tgt('Cały ekran gry', 'game'), tgt('Mapa', 'map'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats'));
+    const tgtBox = el('div', { style: grid2 }, tgt('Cały ekran gry', 'game'), tgt('Mapa', 'map'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats'), tgt('Okna dodatków (minutnik, dropy…)', 'addons'));
     const setAllT = v => { Object.keys(cfg.fT).forEach(k => { cfg.fT[k] = v; }); tgtBox.querySelectorAll('input').forEach(i => { i.checked = v; }); chg(); updWarn(); };
     const mkBtn = (t, f) => { const b = el('button', { textContent: t }); b.style.cssText = 'margin:2px 4px 2px 0;padding:1px 8px;font-size:11px'; b.addEventListener('click', f); return b; };
     ptBox.style.cssText = grid2;
@@ -3632,7 +3648,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.67.0');
+    log('Załadowano v2.68.0');
   }
 
   let tries = 0;
