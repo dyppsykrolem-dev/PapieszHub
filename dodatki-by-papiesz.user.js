@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.75.0
+// @version      2.76.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2141,7 +2141,7 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], addonTheme: true, hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], lootState: true, addonTheme: true, hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
     cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, cfg.fT);
     if (cfg.fst === 'ripple') cfg.fst = 'ring';
     if (cfg.fpal === 'win') { cfg.fsync = true; cfg.fpal = 'theme'; }
@@ -2165,6 +2165,13 @@
       if (cfg.hideIn) o += `html .left-column.main-column,html .scroll-wrapper.chat-message-wrapper,html .inventory-grid-bg.interface-element-grid-border,html .right-column.main-column,html .new-chat-window{border-color:transparent !important;box-shadow:none !important}
         html .equipment-outline{background-color:transparent !important}
         html .interface-element-active-card-background-stretch{border-image:none !important}\n`;
+      if (cfg.lootState !== false) o += `
+        html [data-gi-ls="yes"]{box-shadow:inset 0 0 0 2px #66bb6a,inset 0 0 14px rgba(102,187,106,.45) !important;background-color:rgba(46,125,50,.28) !important}
+        html [data-gi-ls="very"]{box-shadow:inset 0 0 0 2px #ffca28,inset 0 0 16px rgba(255,202,40,.6) !important;background-color:rgba(255,160,0,.3) !important}
+        html [data-gi-ls="no"]{opacity:.45 !important;filter:grayscale(1) brightness(.8) !important}
+        html [data-gi-lw="yes"]{box-shadow:0 0 16px 4px rgba(102,187,106,.75) !important}
+        html [data-gi-lw="very"]{box-shadow:0 0 18px 5px rgba(255,202,40,.9) !important}
+        html [data-gi-lw="no"]{filter:grayscale(.85) brightness(.75) !important}\n`;
       if (rc && cfg.panels) o += `html [data-gi-gi]{background-color:hsl(${H} ${Math.round(S * .8)}% 34%) !important;background-blend-mode:luminosity !important}html [data-gi-gc]{background-color:hsl(${H} ${Math.round(S * .5)}% calc(var(--gi-l) * 1% * ${L})) !important}\n`;
       if (cfg.hideThin) o += `html [data-gi-thin]{visibility:hidden !important}html [data-gi-bd]{border-color:transparent !important;border-image:none !important;box-shadow:none !important;outline:none !important}\n`;
       if (cfg.hideBars) o += `html .positioner>.bg{background-image:none !important}\n`;
@@ -2825,11 +2832,30 @@
         ]],
       ['Efekty', [ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt))]],
       ['Tempo', [chk('Zatrzymaj animacje (efekty zostają, tylko się nie ruszają)', 'fstatic'), fSp.row, fGl.row, fPd.row, note('Prędkość dotyczy ramek i cząsteczek razem.')]],
-      ['Więcej', [el('details', {}, el('summary', { textContent: 'Diagnostyka interfejsu (dla autora)' }), dinfo, btn, out)]]
+      ['Więcej', [h5('Okno łupów'), chk('Wyróżniaj kolorem wybór „Chcę / Bardzo chcę / Nie chcę” w oknie łupów', 'lootState'), el('details', {}, el('summary', { textContent: 'Diagnostyka interfejsu (dla autora)' }), dinfo, btn, out)]]
     ]);
     box.append(tabs);
     }
     render();
+    let lootTimer = 0;
+    function lootScan() {
+      const marked = new Set();
+      if (cfg.lootState !== false) document.querySelectorAll('.border-window').forEach(w => {
+        if (w.closest(OURS) || w.offsetParent === null) return;
+        const labs = [...w.querySelectorAll('*')].filter(n => n.children.length === 0 && /^(nie |bardzo )?chc[eę]\.?$/i.test((n.textContent || '').trim()));
+        if (!labs.length) return;
+        let any = false, vy = false;
+        labs.forEach(l => {
+          const t = l.textContent.trim().toLowerCase(), st = /^nie/.test(t) ? 'no' : /^bardzo/.test(t) ? 'very' : 'yes';
+          if (st !== 'no') any = true; if (st === 'very') vy = true;
+          let col = l; for (let i = 0; i < 4 && col.parentElement && col.parentElement !== w; i++) { const par = col.parentElement; if (labs.filter(x => par.contains(x)).length > 1) break; col = par; }
+          col.setAttribute('data-gi-ls', st); marked.add(col);
+        });
+        w.setAttribute('data-gi-lw', vy ? 'very' : any ? 'yes' : 'no'); marked.add(w);
+      });
+      document.querySelectorAll('[data-gi-ls],[data-gi-lw]').forEach(n => { if (!marked.has(n)) { n.removeAttribute('data-gi-ls'); n.removeAttribute('data-gi-lw'); } });
+    }
+    lootTimer = setInterval(lootScan, 500);
     thinSync();
     root.settingsBox = box;
     root.getSync = () => !!cfg.sync;
@@ -3720,7 +3746,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.75.0');
+    log('Załadowano v2.76.0');
   }
 
   let tries = 0;
