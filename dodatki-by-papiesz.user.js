@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.78.0
+// @version      2.79.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2349,12 +2349,12 @@
       const r = n.getBoundingClientRect(); if (r.width < 20) return null;
       return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: Math.max(r.width, r.height) / 2 + cfg.gcut };
     };
-    const otherCache = { t: 0, l: [] };
+    const otherCache = { t: 0, l: [] }, otherSeen = new WeakMap();
     function otherWins(why) {
       const out = [], skip = (n, r) => { if (why) why.push({ sel: (n.tagName + '#' + n.id + '.' + String(n.className && n.className.baseVal === undefined ? n.className : '').slice(0, 50)), r, rect: Math.round(n.getBoundingClientRect().width) + 'x' + Math.round(n.getBoundingClientRect().height) }); return false; };
       const test = n => {
         if (n.nodeType !== 1 || n.closest(OURS) || n.matches('script,style,canvas,iframe,link,svg,#gi-gtp,.gi-gtf,.border-window')) return false;
-        if (/tip|toast|cursor|loader|context|party|team|group|riddle|quiz|captcha|battle|fight|zagad|dru[zż]yn|walk/i.test(n.id + ' ' + String(n.className && n.className.baseVal === undefined ? n.className : ''))) return skip(n, 'nazwa');
+        if (/tip|toast|cursor|loader|context|menu|popup|dropdown|bubble|party|team|group|riddle|quiz|captcha|battle|fight|zagad|dru[zż]yn|walk/i.test(n.id + ' ' + String(n.className && n.className.baseVal === undefined ? n.className : ''))) return skip(n, 'nazwa');
         if (n.querySelector('.interface-layer.layer') || n.matches('.interface-layer,.game-layer') || n.closest('.interface-layer')) return false;
         const cs = getComputedStyle(n), rr = n.getBoundingClientRect();
         if (!/fixed|absolute/.test(cs.position)) return false;
@@ -2362,6 +2362,9 @@
         if (rr.width < 110 || rr.height < 50 || rr.width > innerWidth * .6 || rr.height > innerHeight * .9) return skip(n, 'rozmiar');
         if (rr.right < 0 || rr.bottom < 0 || rr.left > innerWidth || rr.top > innerHeight) return skip(n, 'poza ekranem');
         if (!(n.textContent || '').trim() && !n.querySelector('img,canvas,svg')) return skip(n, 'pusty');
+        const gl = document.querySelector('.game-layer'); if (gl) { const g = gl.getBoundingClientRect(), cx = rr.left + rr.width / 2, cy = rr.top + rr.height / 2; if (cx > g.left && cx < g.right && cy > g.top && cy < g.bottom) return skip(n, 'nad mapą (menu/dymek gry)'); }
+        if (!otherSeen.has(n)) otherSeen.set(n, performance.now());
+        if (performance.now() - otherSeen.get(n) < 2000) return skip(n, 'zbyt świeże');
         return true;
       };
       const walk = (n, d) => {
@@ -2389,7 +2392,7 @@
       });
       if (cfg.fT.other) { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherCache.l = otherWins(); } }
       if (cfg.fT.other) otherCache.l.filter(n => n.isConnected).forEach((n, i) => { tmap['x_' + (n.id || i)] = () => n; });
-      Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].miss = (frs[k].miss || 0) + 1; if (frs[k].miss > 6) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } } });
+      Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].miss = (frs[k].miss || 0) + 1; if (frs[k].miss > (k[0] === 'x' ? 0 : 6)) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } } });
       for (const key of Object.keys(tmap)) {
         const want = (anim || parts) && cfg.fT[key.startsWith('a_') ? 'addons' : key.startsWith('g_') ? 'gwins' : key.startsWith('x_') ? 'other' : key];
         if (!want) { if (frs[key]) { frs[key].node.remove(); delete frs[key]; } delete frRects[key]; continue; }
@@ -2844,9 +2847,10 @@
     const hideAllChk = (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(cfg.hideOrig && cfg.hideIn && cfg.hideThin) })); c.addEventListener('change', () => { cfg.hideOrig = c.checked; cfg.hideIn = c.checked; cfg.hideThin = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' Ukryj oryginalne ramki gry (zewnętrzną, wewnętrzne i cienkie linie)'); })();
     const tabs = setTabs([
       ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote]],
-      ['Kolory', [h5('Interfejs gry'), ...syncNote, sel, colRow, sS.row, sL.row, h5('Okna dodatków'), addonChk, h5('Ramki i cząsteczki'), fCol, ccRow]],
+      ['Kolory', [h5('Interfejs gry'), ...syncNote, sel, colRow, sS.row, sL.row, h5('Okna dodatków'), addonChk]],
       ['Ramki', [warn, fSel,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
+        el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Kolor ramek i cząsteczek:'), fCol, ccRow,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Oryginalne ramki gry:'), hideAllChk,
         ]],
       ['Efekty', [ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt))]],
@@ -2867,7 +2871,7 @@
         labs.forEach(l => {
           const t = l.textContent.trim().toLowerCase(), st = /^nie/.test(t) ? 'no' : /^bardzo/.test(t) ? 'very' : 'yes';
           if (st !== 'no') any = true; if (st === 'very') vy = true;
-          let col = l; for (let i = 0; i < 4 && col.parentElement && col.parentElement !== w; i++) { const par = col.parentElement; if (labs.filter(x => par.contains(x)).length > 1) break; col = par; }
+          let col = l; for (let i = 0; i < 4 && col.parentElement && col.parentElement !== w; i++) { const par = col.parentElement; if (labs.filter(x => par.contains(x)).length > 1) break; if (par.getBoundingClientRect().width > w.getBoundingClientRect().width * 0.55) break; col = par; }
           col.setAttribute('data-gi-ls', st); marked.add(col);
         });
         w.setAttribute('data-gi-lw', vy ? 'very' : any ? 'yes' : 'no'); marked.add(w);
@@ -3765,7 +3769,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.78.0');
+    log('Załadowano v2.79.0');
   }
 
   let tries = 0;
