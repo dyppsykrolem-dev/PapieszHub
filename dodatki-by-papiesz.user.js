@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.68.0
+// @version      2.69.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2180,6 +2180,13 @@
         html .inventory-grid-bg.interface-element-grid-border{border-color:${c(.4, 24)} !important}
         html .interface-element-one-black-tile.bag-slot-wrapper,html .chat-channel-card{background-image:linear-gradient(${c(.3, 17)},${c(.3, 12)}) !important}
         html .chat-channel-card.active{background-image:linear-gradient(${c(.35, 42)},${c(.35, 25)}) !important}\n`;
+      if (rc) o += `
+        html .gi-float:not(.gi-bare),html #gi-panel{background:linear-gradient(${c(.45, 17)},${c(.45, 9)}) !important;border-color:${c(.5, 38)} !important}
+        html .gi-float:not(.gi-bare) .gi-fhead,html #gi-head{background:linear-gradient(${c(.5, 24)},${c(.5, 13)}) !important;border-bottom-color:${c(.55, 42)} !important}
+        html .gi-float:not(.gi-bare) .gi-ft,html .gi-float:not(.gi-bare) .gi-fhead>span,html .gi-mtitle,html .gi-float h4,html #gi-panel h4,html .gi-float summary{color:${c(.8, 82)} !important;border-color:${c(.5, 38)} !important}
+        html .gi-float:not(.gi-bare) button,html .gi-float:not(.gi-bare) select,html #gi-panel button,html #gi-panel select{background:linear-gradient(${c(.5, 26)},${c(.5, 15)}) !important;border:1px solid ${c(.55, 44)} !important}
+        html .gi-float:not(.gi-bare) .gi-fhead button,html #gi-head button,html .gi-themebtn{background:none !important;border:0 !important}
+        html .gi-float input[type=text],html .gi-float input[type=number],html .gi-float textarea,html #gi-panel input[type=text],html #gi-panel textarea{background:${c(.45, 7)} !important;border:1px solid ${c(.5, 32)} !important}\n`;
       if (rc && cfg.btns) o += `html .widget-button.green,html .button.green{background-image:linear-gradient(${c(1, 40)},${c(1, 13)}) !important}\n`;
       const bgu = u => { const x = cleanUrl(u || ''); return x ? x.replace(/["\\()\s]/g, encodeURIComponent) : ''; };
       const uc = bgu(cfg.bgChat), ur = bgu(cfg.bgRight), ut = bgu(cfg.bgTop);
@@ -3648,7 +3655,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.68.0');
+    log('Załadowano v2.69.0');
   }
 
   let tries = 0;
