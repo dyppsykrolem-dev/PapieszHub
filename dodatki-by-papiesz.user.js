@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.92.0
+// @version      2.93.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3372,14 +3372,43 @@
     };
     const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
     let P = [], bolts = [], raf = 0, last = 0, T = 0, boltT = 0, hue = 0, info = '';
+    const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
     let smooth = null, coverT = 0, covered = false;
+    let capOn = false, capBox = null, cap = null, capT = 0, hookedHero = null;
+    try {
+      const CP = PW.CanvasRenderingContext2D && PW.CanvasRenderingContext2D.prototype;
+      if (CP && !CP.drawImage.__giHA) {
+        const od = CP.drawImage;
+        const nd = function () {
+          if (capOn && !capBox) {
+            try {
+              const a = arguments, n = a.length; let dx, dy, dw, dh;
+              if (n >= 9) { dx = a[5]; dy = a[6]; dw = a[7]; dh = a[8]; } else if (n >= 5) { dx = a[1]; dy = a[2]; dw = a[3]; dh = a[4]; } else { dx = a[1]; dy = a[2]; dw = a[0].width || a[0].videoWidth || 0; dh = a[0].height || a[0].videoHeight || 0; }
+              if (dh >= 16 && dw >= 8) { const t = this.getTransform ? this.getTransform() : { a: 1, c: 0, e: 0, b: 0, d: 1, f: 0 }; capBox = { x: t.a * (dx + dw / 2) + t.c * (dy + dh) + t.e, y: t.b * (dx + dw / 2) + t.d * (dy + dh) + t.f, cw: this.canvas ? this.canvas.width : 0 }; }
+            } catch (e) {  }
+          }
+          return od.apply(this, arguments);
+        };
+        nd.__giHA = true; CP.drawImage = nd;
+      }
+    } catch (e) {  }
+    function hookHero(h) {
+      if (!h || hookedHero === h || typeof h.draw !== 'function' || h.draw.__giHA) return;
+      const orig = h.draw;
+      const wr = function () { capOn = true; capBox = null; try { return orig.apply(this, arguments); } finally { capOn = false; if (capBox) { cap = capBox; capT = performance.now(); } } };
+      wr.__giHA = true; try { h.draw = wr; hookedHero = h; } catch (e) {  }
+    }
     function heroPos(dt) {
       const lay = document.querySelector('.game-layer'), gc = document.querySelector('#GAME_CANVAS') || (lay && lay.querySelector('canvas'));
       const box = (gc || lay); if (!box) return null;
       const r = box.getBoundingClientRect(); if (r.width < 50 || r.height < 50) return null;
       let x = r.left + r.width / 2, y = r.top + r.height / 2 + 6, how = 'środek';
-      const E = window.Engine, h = E && E.hero, m = E && E.map;
-      if (cfg.pos === 'auto' && h && m) {
+      const E = PW.Engine, h = E && E.hero, m = E && E.map;
+      if (cfg.pos === 'auto') hookHero(h);
+      if (cfg.pos === 'auto' && cap && performance.now() - capT < 700 && cap.cw > 0) {
+        const sc = r.width / (cap.cw || r.width);
+        x = r.left + cap.x * sc; y = r.top + (cap.y - 4) * sc; how = 'rysowanie';
+      } else if (cfg.pos === 'auto' && h && m) {
         const d = h.d || {}, md = m.d || {}, TS = 32;
         const gw = (gc && gc.width) || r.width, gh = (gc && gc.height) || r.height, sc = r.width / gw;
         const mx = Number(md.x || (m.size && m.size.x) || m.width), my = Number(md.y || (m.size && m.size.y) || m.height);
@@ -3404,7 +3433,7 @@
       const dt = Math.min(.05, (ts - (last || ts)) / 1000) * cfg.spd; last = ts; T += dt; hue = (hue + dt * 60) % 360;
       const hp = heroPos(dt / Math.max(.05, cfg.spd));
       if (hp && ts - coverT > 150) {
-        coverT = ts; const E = window.Engine, bt = E && E.battle;
+        coverT = ts; const E = PW.Engine, bt = E && E.battle;
         let cov = !!(bt && (bt.show === true || bt.isBattle === true || bt.active === true || bt.battleStarted === true));
         if (!cov && cfg.hide !== false) { const t = document.elementFromPoint(hp.x, hp.y); if (t && t !== document.body && t !== document.documentElement && t.tagName !== 'CANVAS' && !t.closest('#GAME_CANVAS,.game-layer')) cov = true; else if (t && t.closest('.border-window,.interface-element-window')) cov = true; }
         covered = cov;
@@ -3496,7 +3525,7 @@
     posSel.addEventListener('change', () => { cfg.pos = posSel.value; save(); });
     const dbg = isolate(el('textarea', { rows: 6, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
     const dbgBtn = el('button', { textContent: 'Pokaż dane o pozycji postaci' });
-    dbgBtn.addEventListener('click', () => { const E = window.Engine, h = E && E.hero, m = E && E.map, gc = document.querySelector('#GAME_CANVAS'); dbg.value = JSON.stringify({ pozycja: info, mapD: m && m.d ? { x: m.d.x, y: m.d.y, keys: Object.keys(m.d).slice(0, 25) } : null, heroKeys: h ? Object.keys(h).filter(k => /^(x|y|rx|ry|px|py|offset|d)$/i.test(k)) : null, rx: h && h.rx, ry: h && h.ry, dx: h && h.d && h.d.x, dy: h && h.d && h.d.y, offset: m && (m.offset || m.cameraOffset), mapKeys: m ? Object.keys(m).filter(k => /off|size|scale|zoom/i.test(k)) : null, canvas: gc ? [gc.width, gc.height, Math.round(gc.getBoundingClientRect().width)] : null }, null, 1); });
+    dbgBtn.addEventListener('click', () => { const E = PW.Engine, h = E && E.hero, m = E && E.map, gc = document.querySelector('#GAME_CANVAS'); dbg.value = JSON.stringify({ pozycja: info, rysowanie: cap ? { x: Math.round(cap.x), y: Math.round(cap.y), wiek: Math.round(performance.now() - capT) } : null, hookNaPostaci: !!hookedHero, mapD: m && m.d ? { x: m.d.x, y: m.d.y, keys: Object.keys(m.d).slice(0, 25) } : null, heroKeys: h ? Object.keys(h).filter(k => /^(x|y|rx|ry|px|py|offset|d)$/i.test(k)) : null, rx: h && h.rx, ry: h && h.ry, dx: h && h.d && h.d.x, dy: h && h.d && h.d.y, offset: m && (m.offset || m.cameraOffset), mapKeys: m ? Object.keys(m).filter(k => /off|size|scale|zoom/i.test(k)) : null, canvas: gc ? [gc.width, gc.height, Math.round(gc.getBoundingClientRect().width)] : null }, null, 1); });
     const root = el('div');
     root.settingsBox = setTabs([
       ['Efekty', [el('div', { style: 'font-weight:bold' }, 'Gotowe zestawy'), presetBox, el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Warstwy (łącz dowolnie)'), ...HA_FX.map(([k, l]) => mkFx(k, l))]],
@@ -4162,7 +4191,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.92.0');
+    log('Załadowano v2.93.0');
   }
 
   let tries = 0;
