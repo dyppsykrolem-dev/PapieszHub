@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.49.3
+// @version      2.49.4
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -1558,7 +1558,20 @@
         tipEl.style.cssText = 'position:fixed;z-index:100001;pointer-events:none;max-width:340px;width:max-content;display:block';
         tipEl.innerHTML = rec.tip;
         [tipEl.firstElementChild].filter(Boolean).forEach(x => { x.style.setProperty('position', 'static', 'important'); x.style.setProperty('transform', 'none', 'important'); x.style.setProperty('margin', '0', 'important'); if (x.style) { const p = x.style.position; if (p === 'absolute' || p === 'fixed') x.style.position = 'static'; x.style.left = x.style.top = x.style.right = x.style.bottom = 'auto'; x.style.transform = 'none'; if (x.style.display === 'none') x.style.display = 'block'; x.style.visibility = 'visible'; x.style.opacity = '1'; } });
-        document.body.append(tipEl); moveTip(ev); return;
+        document.body.append(tipEl);
+        // dymek z gry rysuje ikonę na canvasie/tle, którego zapis HTML nie zachowuje – wstawiamy obrazek przedmiotu
+        try {
+          const src = rec._src || rec.snap || '';
+          if (src) {
+            const cvs = [...tipEl.querySelectorAll('canvas')];
+            cvs.forEach(cv => { const im = new Image(); im.src = src; im.className = cv.className; im.style.cssText = 'width:' + (cv.clientWidth || 32) + 'px;height:' + (cv.clientHeight || 32) + 'px;object-fit:contain;image-rendering:pixelated'; cv.replaceWith(im); });
+            if (!cvs.length) {
+              const box = [...tipEl.querySelectorAll('div,span')].find(n => !n.children.length && !n.textContent.trim() && n.offsetWidth >= 24 && n.offsetWidth <= 80 && Math.abs(n.offsetWidth - n.offsetHeight) < 6);
+              if (box) { box.style.setProperty('background', 'url("' + src + '") center/contain no-repeat', 'important'); box.style.imageRendering = 'pixelated'; }
+            }
+          }
+        } catch (err) { /* ikona w dymku jest dodatkiem */ }
+        moveTip(ev); return;
       }
       tipEl.style.cssText = 'position:fixed;z-index:100001;max-width:300px;pointer-events:none;background:rgba(8,8,8,.97);border:1px solid ' + c + ';box-shadow:0 0 8px ' + c + ';border-radius:4px;padding:6px 8px;color:#ddd;font:12px/1.4 Arial,sans-serif';
       tipEl.append(el('div', { textContent: rec.name, style: 'font-weight:bold;color:' + c }));
@@ -1620,7 +1633,7 @@
         slot.addEventListener('mousemove', ev => moveTip(ev));
         slot.addEventListener('mouseleave', hideTip);
         const urls = itemUrls(rec.icon);
-        const next = () => { const u = urls.shift() || (rec.snap && !rec.snapTried ? (rec.snapTried = 1, rec.snap) : ''); if (!u) { slot.textContent = '?'; return; } const im = new Image(); im.onload = () => { im.style.cssText = 'max-width:100%;max-height:100%;image-rendering:pixelated'; slot.textContent = ''; slot.append(im); }; im.onerror = next; im.src = u; };
+        const next = () => { const u = urls.shift() || (rec.snap && !rec.snapTried ? (rec.snapTried = 1, rec.snap) : ''); if (!u) { slot.textContent = '?'; return; } const im = new Image(); im.onload = () => { rec._src = u; im.style.cssText = 'max-width:100%;max-height:100%;image-rendering:pixelated'; slot.textContent = ''; slot.append(im); }; im.onerror = next; im.src = u; };
         next();
         slot.addEventListener('contextmenu', ev => { ev.preventDefault(); hideTip(); if (kind === 'leg') dst.leg = dst.leg.filter(x => x !== rec); else dst.left = dst.left.filter(x => x !== rec); saveD(); renderD(); });
       }
@@ -2806,7 +2819,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.49.3');
+    log('Załadowano v2.49.4');
   }
 
   let tries = 0;
