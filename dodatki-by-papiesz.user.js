@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.86.0
+// @version      2.90.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2230,12 +2230,13 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], themeOther: true, lootState: true, addonTheme: true, hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], fgrad: false, fgf: 34, keepTempo: false, keepColors: false, themeOther: true, lootState: false, addonTheme: true, hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
     cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, cfg.fT);
     if (cfg.fst === 'ripple') cfg.fst = 'ring';
     if (cfg.fpal === 'win') { cfg.fsync = true; cfg.fpal = 'theme'; }
     if (cfg.gcut === 16) cfg.gcut = 6;
     if (STATIC_FR.includes(cfg.fst)) cfg.fst = 'ring';
+    if (!cfg.mig87) { cfg.mig87 = true; cfg.lootState = false; cfg.fT.gwins = false; writeLS(GT_CFG_KEY, cfg); }
     cfg.hideSel = [];
     Object.assign(cfg, { gAvoid: true, gcut: 6, fgap: 2, fout: 0, fclip: true, frame: true, panels: true, btns: true, hideBars: false, bgChat: '', bgRight: '', bgTop: '' });
     const save = () => writeLS(GT_CFG_KEY, cfg);
@@ -2466,6 +2467,41 @@
       [...document.body.children].forEach(c => walk(c, 0));
       return out;
     }
+    const frRank = k => /^[agx]_/.test(k) ? 0 : k === 'game' ? 1 : 2 + ['top', 'bottom', 'chat', 'right', 'map', 'grid', 'stats'].indexOf(k);
+    let maskCv = null, maskTimer = 0;
+    function frMasks() {
+      maskTimer = 0;
+      if (!cfg.fgrad) { for (const k of Object.keys(frs)) { const o = frs[k]; if (o.msig) { o.msig = ''; o.mk = null; o.node.style.webkitMaskImage = ''; o.node.style.maskImage = ''; o.node.style.maskSize = ''; } } return; }
+      const F = Math.max(8, Number(cfg.fgf) || 34), keys = Object.keys(frs).filter(k => frRects[k] && frs[k].node.style.display !== 'none');
+      const gc = frGlobe;
+      for (const k of keys) {
+        const o = frs[k], r = frRects[k], rk = frRank(k), holes = [];
+        for (const a of keys) {
+          if (a === k || frRank(a) >= rk || (a === 'game' && !/^[agx]_/.test(k))) continue;
+          const A = frRects[a], wa = frs[a].W || 6;
+          if (A.l - F < r.l + r.w && A.l + A.w + F > r.l && A.t - F < r.t + r.h && A.t + A.h + F > r.t) holes.push([Math.round(A.l - r.l), Math.round(A.t - r.t), Math.round(A.w), Math.round(A.h), wa]);
+        }
+        let globe = null;
+        if (gc) { const dx = Math.max(r.l - gc.x, 0, gc.x - (r.l + r.w)), dy = Math.max(r.t - gc.y, 0, gc.y - (r.t + r.h)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) globe = [Math.round(gc.x - r.l), Math.round(gc.y - r.t), Math.round(gc.r)]; }
+        const sig = JSON.stringify([Math.round(r.w), Math.round(r.h), holes, globe, F, o.W]);
+        if (o.msig === sig) continue; o.msig = sig; o.mk = '#grad';
+        const st = o.node.style;
+        if (!holes.length && !globe) { st.webkitMaskImage = 'none'; st.maskImage = 'none'; continue; }
+        const w = Math.max(1, Math.round(r.w)), h = Math.max(1, Math.round(r.h)), sc = Math.min(1, 640 / Math.max(w, h));
+        if (!maskCv) maskCv = document.createElement('canvas');
+        maskCv.width = Math.max(1, Math.round(w * sc)); maskCv.height = Math.max(1, Math.round(h * sc));
+        const c = maskCv.getContext('2d'); c.clearRect(0, 0, maskCv.width, maskCv.height);
+        c.fillStyle = '#000'; c.fillRect(0, 0, maskCv.width, maskCv.height);
+        c.globalCompositeOperation = 'destination-out'; c.strokeStyle = '#000';
+        c.filter = 'blur(' + (F * .32 * sc).toFixed(1) + 'px)';
+        holes.forEach(([x, y, aw, ah, wa]) => { c.lineWidth = (wa + F * .3) * sc; c.strokeRect((x + wa / 2) * sc, (y + wa / 2) * sc, (aw - wa) * sc, (ah - wa) * sc); });
+        c.filter = 'none';
+        if (globe) { const [gx, gy, gr] = globe, g = c.createRadialGradient(gx * sc, gy * sc, gr * sc, gx * sc, gy * sc, (gr + 4) * sc); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(gx * sc, gy * sc, (gr + 4) * sc, 0, 6.283); c.fill(); c.fillStyle = '#000'; c.beginPath(); c.arc(gx * sc, gy * sc, gr * sc, 0, 6.283); c.fill(); }
+        const url = 'url(' + maskCv.toDataURL('image/png') + ')';
+        st.webkitMaskImage = url; st.maskImage = url; st.maskSize = '100% 100%'; st.webkitMaskSize = '100% 100%';
+      }
+    }
+    const frMasksSoon = () => { if (!maskTimer && cfg.fgrad) maskTimer = setTimeout(frMasks, 90); };
     let followRaf = 0;
     function follow() {
       followRaf = 0;
@@ -2484,7 +2520,7 @@
           st.left = L + 'px'; st.top = T + 'px'; st.width = W + 'px'; st.height = H + 'px';
           frRects[k] = { l: r.left, t: r.top, w: r.width, h: r.height };
           if (sized) frGeo(o, W, H);
-          holeNode(o);
+          holeNode(o); frMasksSoon();
         }
       }
       if (n) followRaf = requestAnimationFrame(follow);
@@ -2543,7 +2579,7 @@
         const st = o.node.style; st.display = ''; st.left = Math.round(r.left) + 'px'; st.top = Math.round(r.top) + 'px'; st.width = Math.round(r.width) + 'px'; st.height = Math.round(r.height) + 'px';
         let mk = 'none';
         if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 4)}px)`; }
-        if (o.mk !== mk) { o.mk = mk; st.webkitMaskImage = mk; st.maskImage = mk; }
+        if (!cfg.fgrad && o.mk !== mk) { o.mk = mk; st.webkitMaskImage = mk; st.maskImage = mk; st.maskSize = ''; }
         if (/^[agx]_/.test(key)) { const te = tmap[key](), zt = te && te.nodeType === 1 ? parseInt(getComputedStyle(te).zIndex, 10) : NaN; const zz = Math.max(99000, (isNaN(zt) ? 0 : zt) + 1); if (o.z !== zz) { o.z = zz; o.node.style.zIndex = String(zz); } }
         const wk = (key === 'game' || /^[agx]_/.test(key)) ? Wd : Math.max(3, Math.round(Wd * 0.55));
         if (o.W !== wk) { o.W = wk; o.node.style.setProperty('--w', wk + 'px'); o.geo = ''; }
@@ -2551,6 +2587,7 @@
         holeNode(o);
       }
       frGlobe = gc;
+      frMasks();
       if (!followRaf && Object.keys(frs).some(k => /^[agx]_/.test(k))) followRaf = requestAnimationFrame(follow);
       tipOn(anim || parts); if (anim || parts) updTips();
       try { if (frSvg && frSvg.pauseAnimations) { if (cfg.fstatic) frSvg.pauseAnimations(); else frSvg.unpauseAnimations(); } } catch (e) {  }
@@ -2806,11 +2843,15 @@
       { n: 'Wyłącz wszystko', d: 'Oryginalny wygląd gry', theme: 'none', fst: 'none', t: TG(), pt: {} }
     ];
     function applyPreset(pr) {
-      cfg.theme = pr.theme; if (pr.h !== undefined) { cfg.h = pr.h; cfg.s = pr.s; }
-      cfg.fsync = !!pr.fsync; cfg.l = 1; cfg.frame = true; cfg.panels = true; cfg.btns = true;
-      cfg.fst = pr.fst; cfg.fpal = pr.fpal || 'theme'; if (pr.fc1) { cfg.fc1 = pr.fc1; cfg.fc2 = pr.fc2; cfg.fc3 = pr.fc3; }
+      cfg.frame = true; cfg.panels = true; cfg.btns = true;
+      if (!cfg.keepColors) {
+        cfg.theme = pr.theme; if (pr.h !== undefined) { cfg.h = pr.h; cfg.s = pr.s; }
+        cfg.fsync = !!pr.fsync; cfg.l = 1;
+        cfg.fpal = pr.fpal || 'theme'; if (pr.fc1) { cfg.fc1 = pr.fc1; cfg.fc2 = pr.fc2; cfg.fc3 = pr.fc3; }
+      }
+      cfg.fst = pr.fst;
       cfg.fT = Object.assign({ addons: cfg.fT.addons, gwins: cfg.fT.gwins, other: cfg.fT.other }, pr.t); cfg.fpt = Object.assign({}, pr.pt);
-      if (pr.fw) { cfg.fw = pr.fw; cfg.fspd = pr.fspd; cfg.fglow = pr.fglow; cfg.fout = pr.fout; cfg.fpd = pr.fpd; }
+      if (pr.fw && !cfg.keepTempo) { cfg.fw = pr.fw; cfg.fspd = pr.fspd; cfg.fglow = pr.fglow; cfg.fout = pr.fout; cfg.fpd = pr.fpd; }
       cfg.gAvoid = true; cfg.hideOrig = pr.fst !== 'none'; cfg.hideIn = pr.fst !== 'none'; cfg.hideThin = pr.fst !== 'none';
       chg(); render();
     }
@@ -2895,6 +2936,8 @@
     const fGl = slide('Blask', 0, 1, 0.05, 'fglow', x => Math.round(x * 100) + '%');
     const fOut = slide('Wysunięcie ramki całego okna poza grę', -20, 60, 1, 'fout', x => (x > 0 ? '+' : '') + x + ' px');
     const fGp = slide('Odstęp między ramkami paneli', 0, 14, 1, 'fgap', x => x + ' px');
+    const fGf = slide('Zasięg wygaszania', 10, 90, 2, 'fgf', x => x + ' px');
+    const gradChk = chk('Włącz gradient ramek (ramka łagodnie wygasa przy styku z inną ramką)', 'fgrad');
     const gCut = slide('Zapas wokół okrągłego paska życia', 0, 60, 1, 'gcut', x => x + ' px');
     const fPd = slide('Gęstość cząsteczek', 0.2, 3, 0.1, 'fpd', x => x.toFixed(1) + '×');
     const ptBox = el('div', {}, ...PT.map(([k, l]) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg.fpt[k] })); c.addEventListener('change', () => { cfg.fpt[k] = c.checked; chg(); }); return el('label', { style: 'display:inline-block;margin:2px 10px 2px 0;cursor:pointer;white-space:nowrap' }, c, ' ' + l); }));
@@ -2962,11 +3005,12 @@
     const syncNote = cfg.sync ? [el('div', { style: 'color:#ffd54f;font-size:11px;margin:2px 0' }, 'Kolor interfejsu gry podąża teraz za motywem okien dodatków (ustawienie w menu głównym panelu).')] : [];
     const hideAllChk = (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(cfg.hideOrig && cfg.hideIn && cfg.hideThin) })); c.addEventListener('change', () => { cfg.hideOrig = c.checked; cfg.hideIn = c.checked; cfg.hideThin = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' Ukryj oryginalne ramki gry (zewnętrzną, wewnętrzne i cienkie linie)'); })();
     const tabs = setTabs([
-      ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote]],
+      ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote, el('div', { style: 'font-weight:bold;margin-top:10px' }, 'Co ma zmieniać zestaw'), chk('Zachowaj moje tempo (prędkość, jasność, gęstość, grubość ramki) przy zmianie zestawu', 'keepTempo'), chk('Zestaw zmienia tylko efekty – zostaw kolory motywu bez zmian', 'keepColors')]],
       ['Kolory', [h5('Interfejs gry'), ...syncNote, sel, colRow, sS.row, sL.row, h5('Okna dodatków'), addonChk, otherChk]],
       ['Ramki', [warn, fSel,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Kolor ramek i cząsteczek:'), fCol, ccRow,
+        el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gradient ramek'), gradChk, fGf.row,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Oryginalne ramki gry:'), hideAllChk,
         ]],
       ['Efekty', [ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt))]],
@@ -3282,6 +3326,173 @@
     syncLock();
     root.test = () => { built = ''; scan(); };
     root.stop = () => { ov.style.display = 'none'; };
+    return root;
+  }
+
+  const HA_ON_KEY = 'gi_haura_on_v1', HA_CFG_KEY = 'gi_haura_cfg_v1';
+  let haEnabled = (() => { try { return localStorage.getItem(HA_ON_KEY) === '1'; } catch (e) { return false; } })();
+  const HA_FX = [['glow', 'Poświata przy stopach'], ['ring', 'Pulsujący pierścień'], ['runes', 'Krąg runiczny (obracający się)'], ['waves', 'Fale rozchodzące się'], ['scan', 'Radar (obracający się promień)'], ['orbit', 'Orbity światełek'], ['flames', 'Płomienie dookoła'], ['sparks', 'Iskry'], ['frost', 'Lodowe kryształki'], ['lightning', 'Łuki błyskawic'], ['smoke', 'Dym / mgła'], ['bubbles', 'Bąbelki'], ['leaves', 'Wirujące liście'], ['stars', 'Unoszące się gwiazdki'], ['pillar', 'Słup światła'], ['spiral', 'Spirala energii']];
+  const HA_PRESETS = {
+    'Ognisty krąg': { fx: { flames: true, sparks: true, ring: true, glow: true }, color: 'fire' },
+    'Lodowy': { fx: { frost: true, stars: true, ring: true, waves: true }, color: 'ice' },
+    'Burza': { fx: { lightning: true, ring: true, glow: true, smoke: true }, color: 'violet' },
+    'Magia': { fx: { runes: true, orbit: true, stars: true, glow: true }, color: 'rainbow' },
+    'Natura': { fx: { leaves: true, orbit: true, glow: true }, color: 'green' },
+    'Toksyczny': { fx: { bubbles: true, smoke: true, glow: true, ring: true }, color: 'green' },
+    'Święty': { fx: { pillar: true, spiral: true, stars: true, glow: true }, color: 'gold' },
+    'Technologia': { fx: { scan: true, ring: true, waves: true, orbit: true }, color: 'blue' },
+    'Smocza krew': { fx: { flames: true, lightning: true, sparks: true, runes: true }, color: 'blood' }
+  };
+  const haHex = h => { h = String(h).trim(); return /^#[0-9a-f]{6}$/i.test(h) ? h : '#ff6d00'; };
+  const haRgb = h => { const n = parseInt(haHex(h).slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const haMix = (h, k) => { const [r, g, b] = haRgb(h); const f = c => Math.round(c + (255 - c) * k); return '#' + [f(r), f(g), f(b)].map(v => v.toString(16).padStart(2, '0')).join(''); };
+  const haHsl = (h, s, l) => { s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l), f = n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))))); return '#' + [f(0), f(8), f(4)].map(v => v.toString(16).padStart(2, '0')).join(''); };
+  const haToHex = c => { c = String(c).trim(); if (/^#[0-9a-f]{6}$/i.test(c)) return c; const m = c.match(/hsl\(\s*([\d.]+)\s*,?\s*([\d.]+)%\s*,?\s*([\d.]+)%/i); return m ? haHsl(+m[1], +m[2], +m[3]) : '#ff6d00'; };
+  function buildHeroAuraView() {
+    const cfg = Object.assign({ fx: { glow: true, ring: true, flames: true, sparks: true }, color: 'fire', custom: '#ff3d71', sync: false, size: 1, spd: 1, op: 1, dens: 1, ox: 0, oy: 0, pos: 'auto', hide: true }, readLS(HA_CFG_KEY, {}));
+    const save = () => writeLS(HA_CFG_KEY, cfg);
+    const cv = document.createElement('canvas'); cv.id = 'gi-haura'; cv.style.cssText = 'position:fixed;left:0;top:0;pointer-events:none;z-index:50;display:none';
+    const ctx = cv.getContext('2d');
+    const palette = hue => {
+      if (cfg.sync) {
+        let on = false; try { on = localStorage.getItem(GT_ON_KEY) === '1'; } catch (e) {  }
+        const sh = window.__giShared;
+        if (on && sh && sh.frColors) { try { const [a, b] = sh.frColors().map(haToHex); return [b, haMix(b, .35), a]; } catch (e) {  } }
+      }
+      if (cfg.color === 'custom') return [haHex(cfg.custom), haMix(cfg.custom, .4), haMix(cfg.custom, .85)];
+      if (cfg.color === 'rainbow') return [haHsl(hue, 90, 55), haHsl(hue, 90, 72), haHsl(hue, 80, 92)];
+      return (AURA_COLORS[cfg.color] || AURA_COLORS.fire).slice(1);
+    };
+    const spriteCache = {};
+    const sprite = (c, a) => {
+      const key = c + '|' + a; if (spriteCache[key]) return spriteCache[key];
+      const s = document.createElement('canvas'); s.width = s.height = 48; const x = s.getContext('2d'), [r, g, b] = haRgb(c), gr = x.createRadialGradient(24, 24, 0, 24, 24, 24);
+      gr.addColorStop(0, `rgba(${r},${g},${b},${a})`); gr.addColorStop(.4, `rgba(${r},${g},${b},${a * .5})`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      x.fillStyle = gr; x.fillRect(0, 0, 48, 48); return (spriteCache[key] = s);
+    };
+    const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+    let P = [], bolts = [], raf = 0, last = 0, T = 0, boltT = 0, hue = 0, info = '';
+    function heroPos() {
+      const lay = document.querySelector('.game-layer'), gc = document.querySelector('#GAME_CANVAS') || (lay && lay.querySelector('canvas'));
+      const box = (gc || lay); if (!box) return null;
+      const r = box.getBoundingClientRect(); if (r.width < 50 || r.height < 50) return null;
+      let x = r.left + r.width / 2, y = r.top + r.height / 2 + 6, how = 'środek';
+      const E = window.Engine, h = E && E.hero, m = E && E.map;
+      if (cfg.pos === 'auto' && h && gc && gc.width) {
+        const sc = r.width / gc.width, rx = Number(h.rx), ry = Number(h.ry), off = m && (m.offset || m.cameraOffset);
+        if (isFinite(rx) && isFinite(ry) && off && isFinite(off[0]) && isFinite(off[1])) {
+          const ax = r.left + (rx - off[0]) * sc, ay = r.top + (ry - off[1]) * sc;
+          if (ax > r.left && ax < r.right && ay > r.top && ay < r.bottom && Math.abs(ax - x) < r.width * .45 && Math.abs(ay - y) < r.height * .45) { x = ax + 16 * sc; y = ay + 28 * sc; how = 'rx/ry+offset'; }
+        }
+      }
+      info = how + ' @' + Math.round(x) + ',' + Math.round(y);
+      return { x: x + cfg.ox, y: y + cfg.oy, r };
+    }
+    const E1 = (a, b, k) => a + (b - a) * k;
+    function frame(ts) {
+      raf = 0;
+      if (!haEnabled) { cv.style.display = 'none'; return; }
+      const dt = Math.min(.05, (ts - (last || ts)) / 1000) * cfg.spd; last = ts; T += dt; hue = (hue + dt * 60) % 360;
+      const hp = heroPos();
+      if (!hp || document.hidden || (cfg.hide && !document.querySelector('.game-layer'))) { cv.style.display = 'none'; raf = requestAnimationFrame(frame); return; }
+      const S = cfg.size, R = 44 * S, W = Math.ceil(R * 3.4), H = Math.ceil(R * 3.6);
+      if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+      const cx = W / 2, cy = H * .72;
+      cv.style.left = Math.round(hp.x - cx) + 'px'; cv.style.top = Math.round(hp.y - cy) + 'px'; cv.style.display = 'block'; cv.style.opacity = cfg.op;
+      if (cv.parentElement !== document.body) document.body.append(cv);
+      const [c1, c2, c3] = palette(hue), fx = cfg.fx, RY = R * .4;
+      ctx.clearRect(0, 0, W, H); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      const rate = cfg.dens;
+      const spawn = (type, perSec, mk) => { let n = perSec * rate * dt / cfg.spd; while (n > 0) { if (n >= 1 || Math.random() < n) { if (P.length < 900) P.push(Object.assign({ type, age: 0 }, mk())); } n -= 1; } };
+      const onRing = (k = 1) => { const a = Math.random() * 6.283; return { x: cx + Math.cos(a) * R * k, y: cy + Math.sin(a) * RY * k }; };
+      if (fx.flames) spawn('flame', 70, () => Object.assign(onRing(.9), { vy: -(40 + Math.random() * 50) * S, vx: 0, life: .7 + Math.random() * .5, sz: (6 + Math.random() * 7) * S, ph: Math.random() * 6.28 }));
+      if (fx.sparks) spawn('spark', 18, () => Object.assign(onRing(.9), { vy: -(60 + Math.random() * 110) * S, vx: (Math.random() - .5) * 40 * S, life: .8 + Math.random() * .9, sz: 1.4 }));
+      if (fx.frost) spawn('frost', 9, () => Object.assign(onRing(1), { vy: -(14 + Math.random() * 22) * S, vx: 0, life: 1.8 + Math.random() * 1.5, sz: (3 + Math.random() * 4) * S, ph: Math.random() * 6.28, rot: Math.random() * 6.28 }));
+      if (fx.smoke) spawn('smoke', 8, () => Object.assign(onRing(.8), { vy: -(14 + Math.random() * 14) * S, vx: (Math.random() - .5) * 10, life: 2 + Math.random() * 1.4, sz: (14 + Math.random() * 12) * S, ph: Math.random() * 6.28 }));
+      if (fx.bubbles) spawn('bubble', 7, () => Object.assign(onRing(.95), { vy: -(24 + Math.random() * 30) * S, vx: 0, life: 1.8 + Math.random() * 1.4, sz: (2.5 + Math.random() * 4) * S, ph: Math.random() * 6.28 }));
+      if (fx.stars) spawn('star', 7, () => Object.assign(onRing(.9), { vy: -(20 + Math.random() * 30) * S, vx: 0, life: 1.6 + Math.random() * 1.4, sz: (3 + Math.random() * 4) * S, ph: Math.random() * 6.28 }));
+      if (fx.leaves) spawn('leaf', 6, () => ({ x: cx + (Math.random() - .5) * R * 2.2, y: cy - R * 1.6 - Math.random() * R * .6, vy: (14 + Math.random() * 22) * S, vx: 0, life: 4 + Math.random() * 2, sz: (3.5 + Math.random() * 3) * S, ph: Math.random() * 6.28, rot: Math.random() * 6.28 }));
+      if (fx.lightning) { boltT -= dt; if (boltT <= 0) { boltT = (.12 + Math.random() * .45) / Math.max(.4, rate); const a = Math.random() * 6.283, x0 = cx + Math.cos(a) * R * .9, y0 = cy + Math.sin(a) * RY * .9, pts = [[x0, y0]]; let x = x0, y = y0; const len = (60 + Math.random() * 90) * S; for (let d = 0; d < len; d += 9 * S) { x += (Math.random() - .5) * 15 * S; y -= 9 * S; pts.push([x, y]); } bolts.push({ pts, age: 0, life: .14 + Math.random() * .1 }); } }
+      const mask = () => { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.rect(cx - 15 * S, cy - 48 * S, 30 * S, 52 * S); ctx.clip('evenodd'); };
+      const ground = f => { mask(); ctx.translate(cx, cy); ctx.scale(1, .4); f(); ctx.restore(); };
+      if (fx.glow) { mask(); ctx.translate(cx, cy); ctx.scale(1, .4); const k = .75 + .25 * Math.sin(T * 2.4), gr = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.35 * k); const [r, g, b] = haRgb(c1); gr.addColorStop(0, `rgba(${r},${g},${b},.6)`); gr.addColorStop(.6, `rgba(${r},${g},${b},.25)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, R * 1.35, 0, 6.283); ctx.fill(); ctx.restore(); }
+      if (fx.ring) ground(() => { const k = 1 + .05 * Math.sin(T * 3); ctx.shadowColor = c1; ctx.shadowBlur = 12 * S; ctx.strokeStyle = c2; ctx.globalAlpha = .9; ctx.lineWidth = 3 * S; ctx.beginPath(); ctx.arc(0, 0, R * k, 0, 6.283); ctx.stroke(); ctx.strokeStyle = c3; ctx.lineWidth = 1.2 * S; ctx.beginPath(); ctx.arc(0, 0, R * k * .93, 0, 6.283); ctx.stroke(); });
+      if (fx.waves) ground(() => { for (let i = 0; i < 3; i++) { const k = ((T * .55 + i / 3) % 1); ctx.strokeStyle = c2; ctx.globalAlpha = (1 - k) * .8; ctx.lineWidth = (3 - k * 2) * S; ctx.beginPath(); ctx.arc(0, 0, R * (.25 + k * 1.1), 0, 6.283); ctx.stroke(); } });
+      if (fx.runes) ground(() => {
+        ctx.strokeStyle = c2; ctx.fillStyle = c3; ctx.shadowColor = c1; ctx.shadowBlur = 8 * S; ctx.globalAlpha = .85;
+        ctx.lineWidth = 2 * S; ctx.beginPath(); ctx.arc(0, 0, R * 1.05, 0, 6.283); ctx.stroke(); ctx.lineWidth = 1.1 * S; ctx.beginPath(); ctx.arc(0, 0, R * .78, 0, 6.283); ctx.stroke();
+        ctx.save(); ctx.rotate(T * .45); ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = i * 2 * Math.PI * 2 / 5 - Math.PI / 2; const px = Math.cos(a) * R * .78, py = Math.sin(a) * R * .78; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); } ctx.closePath(); ctx.stroke(); ctx.restore();
+        ctx.font = (13 * S) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        for (let i = 0; i < 12; i++) { const a = T * -.35 + i * Math.PI / 6; ctx.save(); ctx.translate(Math.cos(a) * R * .92, Math.sin(a) * R * .92); ctx.rotate(a + Math.PI / 2); ctx.fillText(RUNES[i % RUNES.length], 0, 0); ctx.restore(); }
+      });
+      if (fx.scan) ground(() => { const a = T * 1.8; if (ctx.createConicGradient) { const gr = ctx.createConicGradient(a, 0, 0), [r, g, b] = haRgb(c2); gr.addColorStop(0, `rgba(${r},${g},${b},.0)`); gr.addColorStop(.72, `rgba(${r},${g},${b},0)`); gr.addColorStop(1, `rgba(${r},${g},${b},.75)`); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, R * 1.05, 0, 6.283); ctx.fill(); } ctx.strokeStyle = c3; ctx.globalAlpha = .8; ctx.lineWidth = 1.5 * S; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * R * 1.05, Math.sin(a) * R * 1.05); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, R * 1.05, 0, 6.283); ctx.stroke(); for (let i = 0; i < 24; i++) { const t = i * Math.PI / 12; ctx.beginPath(); ctx.moveTo(Math.cos(t) * R * 1.05, Math.sin(t) * R * 1.05); ctx.lineTo(Math.cos(t) * R * 1.15, Math.sin(t) * R * 1.15); ctx.stroke(); } });
+      if (fx.pillar) { const k = .55 + .45 * Math.sin(T * 2); ctx.globalAlpha = .5 * k; ctx.drawImage(sprite(c2, 1), cx - R * .7, cy - R * 2.7, R * 1.4, R * 2.9); ctx.globalAlpha = .55 * k; ctx.drawImage(sprite(c3, 1), cx - R * .28, cy - R * 2.5, R * .56, R * 2.6); }
+      if (fx.orbit) for (let i = 0; i < 5; i++) { const a = T * 1.6 + i * 1.2566, ex = cx + Math.cos(a) * R * 1.1, ey = cy - 10 * S - 20 * S * (1 + Math.sin(T * 1.3 + i)) + Math.sin(a) * RY * 1.1, sz = (3.2 + 1.6 * Math.sin(a)) * S, sp = sprite(i % 2 ? c1 : c2, 1); ctx.globalAlpha = .6 + .4 * Math.sin(a); ctx.drawImage(sp, ex - sz * 2, ey - sz * 2, sz * 4, sz * 4); for (let t = 1; t < 5; t++) { const a2 = a - t * .12; ctx.globalAlpha = (.5 - t * .1) * (.6 + .4 * Math.sin(a2)); ctx.drawImage(sp, cx + Math.cos(a2) * R * 1.1 - sz, cy - 10 * S - 20 * S * (1 + Math.sin(T * 1.3 + i)) + Math.sin(a2) * RY * 1.1 - sz, sz * 2, sz * 2); } }
+      if (fx.spiral) for (let i = 0; i < 28; i++) { const t = i / 28, h = ((T * .35 + t) % 1), a = T * 3 + t * 12, rr = R * .7 * (1 - h * .5), sz = (5 - 3 * h) * S; ctx.globalAlpha = Math.sin(Math.PI * h); ctx.drawImage(sprite(i % 2 ? c2 : c3, 1), cx + Math.cos(a) * rr - sz * 1.5, cy - h * R * 2.4 + Math.sin(a) * rr * .4 - sz * 1.5, sz * 3, sz * 3); }
+      for (let i = P.length - 1; i >= 0; i--) {
+        const p = P[i]; p.age += dt; const k = p.age / p.life;
+        if (k >= 1) { P[i] = P[P.length - 1]; P.pop(); continue; }
+        p.x += (p.vx || 0) * dt; p.y += (p.vy || 0) * dt;
+        if (p.type === 'flame') { p.x += Math.sin(p.age * 7 + p.ph) * 14 * dt; const sz = p.sz * (1 - k * .65), col = k < .3 ? c3 : k < .65 ? c2 : c1; ctx.globalAlpha = Math.pow(1 - k, 1.1) * .55; ctx.drawImage(sprite(col, 1), p.x - sz, p.y - sz * 1.9, sz * 2, sz * 3.4); }
+        else if (p.type === 'spark') { p.vy += 90 * dt; ctx.globalAlpha = 1 - k; ctx.strokeStyle = k < .4 ? c3 : c2; ctx.lineWidth = p.sz * S; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .03, p.y - p.vy * .03); ctx.stroke(); }
+        else if (p.type === 'frost') { p.x += Math.sin(p.age * 2 + p.ph) * 10 * dt; const a = Math.sin(Math.PI * k) * (.6 + .4 * Math.sin(p.age * 8 + p.ph)); ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + p.age); ctx.globalAlpha = a; ctx.fillStyle = c3; ctx.strokeStyle = c2; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, -p.sz * 1.4); ctx.lineTo(p.sz * .8, 0); ctx.lineTo(0, p.sz * 1.4); ctx.lineTo(-p.sz * .8, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+        else if (p.type === 'smoke') { const sz = p.sz * (.6 + k * 1.2); ctx.globalAlpha = Math.sin(Math.PI * k) * .22; ctx.drawImage(sprite(c1, 1), p.x - sz, p.y - sz, sz * 2, sz * 2); }
+        else if (p.type === 'bubble') { p.x += Math.sin(p.age * 3 + p.ph) * 10 * dt; ctx.globalAlpha = Math.sin(Math.PI * k) * .8; ctx.strokeStyle = c2; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, 6.283); ctx.stroke(); ctx.fillStyle = c3; ctx.globalAlpha *= .8; ctx.beginPath(); ctx.arc(p.x - p.sz * .3, p.y - p.sz * .3, p.sz * .25, 0, 6.283); ctx.fill(); }
+        else if (p.type === 'star') { const a = Math.sin(Math.PI * k) * (.5 + .5 * Math.sin(p.age * 9 + p.ph)); ctx.globalAlpha = a; ctx.strokeStyle = c3; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(p.x - p.sz, p.y); ctx.lineTo(p.x + p.sz, p.y); ctx.moveTo(p.x, p.y - p.sz); ctx.lineTo(p.x, p.y + p.sz); ctx.stroke(); ctx.drawImage(sprite(c2, 1), p.x - p.sz, p.y - p.sz, p.sz * 2, p.sz * 2); }
+        else if (p.type === 'leaf') { p.x += Math.sin(p.age * 1.7 + p.ph) * 26 * dt; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + p.age * 2); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = Math.sin(Math.PI * k) * .9; ctx.fillStyle = i % 2 ? c1 : c2; ctx.beginPath(); ctx.ellipse(0, 0, p.sz * 1.6, p.sz * .8, 0, 0, 6.283); ctx.fill(); ctx.restore(); ctx.globalCompositeOperation = 'lighter'; }
+      }
+      for (let i = bolts.length - 1; i >= 0; i--) {
+        const b = bolts[i]; b.age += dt; if (b.age >= b.life) { bolts.splice(i, 1); continue; }
+        const a = (1 - b.age / b.life) * (.6 + .4 * Math.random());
+        [[7, .18, c1], [3, .55, c2], [1.3, 1, c3]].forEach(([w, al, col]) => { ctx.globalAlpha = a * al; ctx.strokeStyle = col; ctx.lineWidth = w * S; ctx.beginPath(); b.pts.forEach((q, j) => j ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke(); });
+      }
+      ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over';
+      raf = requestAnimationFrame(frame);
+    }
+    const start = () => { if (!raf) { last = 0; raf = requestAnimationFrame(frame); } };
+    setInterval(() => { try { if (haEnabled) start(); else if (cv.style.display !== 'none') cv.style.display = 'none'; } catch (e) { log('aura postaci – błąd', e); } }, 500);
+    const fxBoxes = {};
+    const mkFx = (k, label) => { const cb = isolate(el('input', { type: 'checkbox', checked: !!cfg.fx[k] })); fxBoxes[k] = cb; cb.addEventListener('change', () => { cfg.fx[k] = cb.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer' }, cb, ' ' + label); };
+    const colorSel = isolate(el('select', {}));
+    Object.keys(AURA_COLORS).forEach(k => colorSel.append(el('option', { value: k, textContent: AURA_COLORS[k][0], selected: cfg.color === k })));
+    colorSel.append(el('option', { value: 'custom', textContent: 'Własny…', selected: cfg.color === 'custom' }));
+    const customIn = isolate(el('input', { type: 'color', value: haHex(cfg.custom) })); customIn.addEventListener('input', () => { cfg.custom = customIn.value; save(); });
+    const customRow = el('div', { style: 'margin:3px 0;display:' + (cfg.color === 'custom' ? '' : 'none') }, 'Własny kolor: ', customIn);
+    colorSel.addEventListener('change', () => { cfg.color = colorSel.value; customRow.style.display = cfg.color === 'custom' ? '' : 'none'; save(); });
+    const syncCb = isolate(el('input', { type: 'checkbox', checked: !!cfg.sync }));
+    const syncLock = () => { colorSel.disabled = !!cfg.sync; colorSel.style.opacity = cfg.sync ? .5 : 1; };
+    syncCb.addEventListener('change', () => { cfg.sync = syncCb.checked; syncLock(); save(); }); syncLock();
+    const mkRange = (key, label, min, max, step, fmt) => {
+      const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' });
+      const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:90px';
+      const show = () => { val.textContent = fmt ? fmt(Number(r.value)) : r.value; };
+      r.addEventListener('input', () => { cfg[key] = Number(r.value); show(); save(); }); show();
+      return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val);
+    };
+    const presetBox = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;margin:4px 0' });
+    Object.keys(HA_PRESETS).forEach(name => {
+      const b = el('button', { textContent: name });
+      b.addEventListener('click', () => { const pr = HA_PRESETS[name]; cfg.fx = Object.assign({}, pr.fx); if (!cfg.sync) { cfg.color = pr.color; colorSel.value = pr.color; customRow.style.display = 'none'; } Object.keys(fxBoxes).forEach(k => { fxBoxes[k].checked = !!cfg.fx[k]; }); save(); });
+      presetBox.append(b);
+    });
+    const posSel = isolate(el('select', {}));
+    [['auto', 'Automatycznie (podąża za postacią)'], ['center', 'Środek mapy']].forEach(([v, l]) => posSel.append(el('option', { value: v, textContent: l, selected: cfg.pos === v })));
+    posSel.addEventListener('change', () => { cfg.pos = posSel.value; save(); });
+    const dbg = isolate(el('textarea', { rows: 6, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
+    const dbgBtn = el('button', { textContent: 'Pokaż dane o pozycji postaci' });
+    dbgBtn.addEventListener('click', () => { const E = window.Engine, h = E && E.hero, m = E && E.map, gc = document.querySelector('#GAME_CANVAS'); dbg.value = JSON.stringify({ pozycja: info, heroKeys: h ? Object.keys(h).filter(k => /^(x|y|rx|ry|px|py|offset|d)$/i.test(k)) : null, rx: h && h.rx, ry: h && h.ry, dx: h && h.d && h.d.x, dy: h && h.d && h.d.y, offset: m && (m.offset || m.cameraOffset), mapKeys: m ? Object.keys(m).filter(k => /off|size|scale|zoom/i.test(k)) : null, canvas: gc ? [gc.width, gc.height, Math.round(gc.getBoundingClientRect().width)] : null }, null, 1); });
+    const root = el('div');
+    root.settingsBox = setTabs([
+      ['Efekty', [el('div', { style: 'font-weight:bold' }, 'Gotowe zestawy'), presetBox, el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Warstwy (łącz dowolnie)'), ...HA_FX.map(([k, l]) => mkFx(k, l))]],
+      ['Wygląd', [
+        el('label', { style: 'display:block;cursor:pointer;margin:2px 0 6px' }, syncCb, ' Synchronizuj z motywem (te same kolory co ramki motywu gry)'),
+        el('div', {}, 'Kolor: ', colorSel), customRow,
+        mkRange('size', 'Rozmiar', .4, 3, .05, v => '×' + v.toFixed(2)), mkRange('spd', 'Prędkość', .2, 3, .05, v => '×' + v.toFixed(2)), mkRange('dens', 'Ilość cząsteczek', .2, 3, .1, v => '×' + v.toFixed(1)), mkRange('op', 'Przezroczystość', .2, 1, .05, v => Math.round(v * 100) + '%')
+      ]],
+      ['Pozycja', [el('div', {}, 'Pozycja aury: ', posSel), mkRange('ox', 'Przesuń w prawo', -80, 80, 1, v => v + ' px'), mkRange('oy', 'Przesuń w dół', -80, 80, 1, v => v + ' px'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0' }, 'Jeśli aura nie trafia w postać, ustaw suwakami albo wybierz „Środek mapy” (postać zwykle jest w środku ekranu). Przy diagnostyce wyślij mi dane z przycisku poniżej.'), dbgBtn, dbg]]
+    ]);
+    root.test = () => start();
+    root.stop = () => { cv.style.display = 'none'; };
     return root;
   }
 
@@ -3677,6 +3888,7 @@
     })();
     const flameView = safeView('Efekt przy unikacie/heroiku', buildFlameView);
     const auraView = safeView('Aura ekwipunku', buildAuraView);
+    const haView = safeView('Aura postaci', buildHeroAuraView);
     const relogView = safeView('Przelogowanie', buildRelogView);
     const relogWin = (() => {
       try {
@@ -3706,6 +3918,7 @@
     const gtView = safeView('Motyw gry', buildGameThemeView);
     const gtSetWin = mkSetWin('gi-gt-set', 'Ustawienia – Motyw gry', 'gi_win_gtset_v1', gtView.settingsBox || el('div'), 360);
     const auraSetWin = mkSetWin('gi-aura-set', 'Ustawienia – Aura ekwipunku', 'gi_win_auraset_v1', auraView.settingsBox || el('div'), 340);
+    const haSetWin = mkSetWin('gi-ha-set', 'Ustawienia – Aura postaci', 'gi_win_haset_v1', haView.settingsBox || el('div'), 340);
     const flameSetWin = mkSetWin('gi-flame-set', 'Ustawienia – Efekt przy unikacie/heroiku', 'gi_win_flameset_v1', flameView.settingsBox || el('div'), 330);
     relogView.openSettings = () => relogSetWin.toggle();
     respView.openSettings = () => respSetWin.toggle();
@@ -3729,6 +3942,10 @@
         settings: () => flameSetWin.toggle(),
         isOn: () => flameEnabled,
         setOn: v => { flameEnabled = v; try { localStorage.setItem(FLAME_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (flameView.stop) flameView.stop(); flameSetWin.setOpen(false); } } },
+      { id: 'haura', icon: '🌀', title: 'Aura postaci', desc: 'Animowana aura pod i wokół Twojej postaci: runiczny krąg, płomienie, lód, błyskawice, spirala energii i inne, do łączenia w warstwy. Kolory mogą iść za motywem gry. Rozmiar i pozycję ustawisz w ustawieniach.', view: el('div'), action: () => { if (haEnabled && haSetWin) haSetWin.toggle(); },
+        settings: () => haSetWin.toggle(),
+        isOn: () => haEnabled,
+        setOn: v => { haEnabled = v; try { localStorage.setItem(HA_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (haView.stop) haView.stop(); haSetWin.setOpen(false); } else if (haView.test) haView.test(); } },
       { id: 'aura', icon: '✨', title: 'Aura ekwipunku', desc: 'Animowana aura (płomienie, obracająca się ramka lub poświata) dookoła całego miejsca, w którym leżą Twoje założone przedmioty. Styl, kolor i siłę ustawisz w ustawieniach.', view: el('div'), action: () => { if (auraEnabled && auraSetWin) auraSetWin.toggle(); },
         settings: () => auraSetWin.toggle(),
         isOn: () => auraEnabled,
@@ -3919,7 +4136,7 @@
       if (panel.style.display === 'block' && typeof win.x === 'number') placePanel(win.x, win.y);
     });
 
-    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, flameSetWin.el, gtSetWin.el);
+    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, flameSetWin.el, gtSetWin.el);
     respWin.restore();
     applyResp();
     dropsWin.restore();
@@ -3929,7 +4146,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.86.0');
+    log('Załadowano v2.90.0');
   }
 
   let tries = 0;
