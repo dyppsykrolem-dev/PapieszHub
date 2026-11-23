@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.76.0
+// @version      2.77.1
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2349,6 +2349,29 @@
       const r = n.getBoundingClientRect(); if (r.width < 20) return null;
       return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: Math.max(r.width, r.height) / 2 + cfg.gcut };
     };
+    const otherCache = { t: 0, l: [] };
+    function otherWins(why) {
+      const out = [], skip = (n, r) => { if (why) why.push({ sel: (n.tagName + '#' + n.id + '.' + String(n.className && n.className.baseVal === undefined ? n.className : '').slice(0, 50)), r, rect: Math.round(n.getBoundingClientRect().width) + 'x' + Math.round(n.getBoundingClientRect().height) }); return false; };
+      const test = n => {
+        if (n.nodeType !== 1 || n.closest(OURS) || n.matches('script,style,canvas,iframe,link,svg,#gi-gtp,.gi-gtf,.border-window')) return false;
+        if (/tip|toast|cursor|loader|context/i.test(n.id + ' ' + String(n.className && n.className.baseVal === undefined ? n.className : ''))) return skip(n, 'nazwa');
+        if (n.querySelector('.interface-layer.layer') || n.matches('.interface-layer,.game-layer') || n.closest('.interface-layer')) return false;
+        const cs = getComputedStyle(n), rr = n.getBoundingClientRect();
+        if (!/fixed|absolute/.test(cs.position)) return false;
+        if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < .3) return false;
+        if (rr.width < 110 || rr.height < 50 || rr.width > innerWidth * .6 || rr.height > innerHeight * .9) return skip(n, 'rozmiar');
+        if (rr.right < 0 || rr.bottom < 0 || rr.left > innerWidth || rr.top > innerHeight) return skip(n, 'poza ekranem');
+        if (!(n.textContent || '').trim() && !n.querySelector('img,canvas,svg')) return skip(n, 'pusty');
+        return true;
+      };
+      const walk = (n, d) => {
+        if (n.nodeType !== 1 || n.closest(OURS) || n.matches('script,style,canvas,svg,link,.interface-layer,.game-layer,.border-window,#gi-gtp,.gi-gtf')) return;
+        if (test(n)) { out.push(n); return; }
+        if (d < 4) [...n.children].forEach(c => walk(c, d + 1));
+      };
+      [...document.body.children].forEach(c => walk(c, 0));
+      return out;
+    }
     function frSync(force) {
       const anim = gtEnabled && ANIM_FR.includes(cfg.fst);
       const parts = gtEnabled && Object.keys(cfg.fpt || {}).some(k => cfg.fpt[k]);
@@ -2363,15 +2386,8 @@
         if (cs.display === 'none' || cs.visibility === 'hidden' || rr.width < 90 || rr.height < 60 || rr.width * rr.height > innerWidth * innerHeight * 0.7 || !/absolute|fixed/.test(cs.position)) return;
         tmap['g_' + (n.id || i)] = () => n;
       });
-      if (cfg.fT.other) [...document.body.children].forEach((n, i) => {
-        if (n.closest(OURS) || n.matches('script,style,canvas,iframe,link,svg,#gi-gtp,.gi-gtf') || /tip|toast|cursor|loader|context/i.test(n.id + ' ' + String(n.className && n.className.baseVal === undefined ? n.className : ''))) return;
-        if (n.querySelector('.interface-layer.layer') || n.matches('.interface-layer,.game-layer')) return;
-        const cs = getComputedStyle(n), rr = n.getBoundingClientRect();
-        if (!/fixed|absolute/.test(cs.position) || cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < .3 || cs.pointerEvents === 'none') return;
-        if (rr.width < 110 || rr.height < 50 || rr.width > innerWidth * .6 || rr.height > innerHeight * .9 || rr.right < 0 || rr.bottom < 0 || rr.left > innerWidth || rr.top > innerHeight) return;
-        if (!(n.textContent || '').trim() && !n.querySelector('img,canvas')) return;
-        tmap['x_' + (n.id || i)] = () => n;
-      });
+      if (cfg.fT.other) { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherCache.l = otherWins(); } }
+      if (cfg.fT.other) otherCache.l.filter(n => n.isConnected).forEach((n, i) => { tmap['x_' + (n.id || i)] = () => n; });
       Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } });
       for (const key of Object.keys(tmap)) {
         const want = (anim || parts) && cfg.fT[key.startsWith('a_') ? 'addons' : key.startsWith('g_') ? 'gwins' : key.startsWith('x_') ? 'other' : key];
@@ -2737,6 +2753,7 @@
       });
       R.thin = all.filter(n => { const r = n.getBoundingClientRect(); return (r.width > 0 && r.width <= 14 && r.height >= 80) || (r.height > 0 && r.height <= 14 && r.width >= 80); }).slice(0, 80).map(n => { const r = n.getBoundingClientRect(), cs = getComputedStyle(n); return { sel: sig(n), parent: n.parentElement ? sig(n.parentElement) : '', w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.left), y: Math.round(r.top), bgImage: cs.backgroundImage !== 'none' ? short(cs.backgroundImage) : null, bgColor: cs.backgroundColor, borderImage: cs.borderImageSource !== 'none' ? short(cs.borderImageSource) : null, vis: cs.visibility + '/' + cs.display }; });
       R.gameWindows = [...document.querySelectorAll('.border-window')].filter(w => w.offsetParent !== null).slice(0, 6).map(w => ({ sel: sig(w), z: getComputedStyle(w).zIndex, tree: [w, ...w.querySelectorAll('*')].slice(0, 60).map(n => { const r = n.getBoundingClientRect(), cs = getComputedStyle(n); return { sel: sig(n), w: Math.round(r.width), h: Math.round(r.height), bg: cs.backgroundImage !== 'none' ? short(cs.backgroundImage) : null, bgc: cs.backgroundColor, bi: cs.borderImageSource !== 'none' ? short(cs.borderImageSource) : null }; }) }));
+      { const why = []; const found = otherWins(why); R.otherWindows = { found: found.map(n => n.tagName + '#' + n.id + '.' + String(n.className).slice(0, 60)), rejected: why.slice(0, 25), bodyChildren: [...document.body.children].slice(0, 40).map(n => { const cs = getComputedStyle(n), r = n.getBoundingClientRect(); return n.tagName + '#' + n.id + '.' + String(n.className && n.className.baseVal === undefined ? n.className : '').slice(0, 40) + ' ' + cs.position + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) + ' @' + Math.round(r.left) + ',' + Math.round(r.top); }) }; }
       R.pseudo = ['.game-layer', '.left-column', '.right-column', '.interface-layer', '.main-column'].map(q => { const n = document.querySelector(q); if (!n) return { q, n: 0 }; return { q, ps: ['::before', '::after'].map(ps => { const cs = getComputedStyle(n, ps); return cs.content !== 'none' ? { ps, w: cs.width, h: cs.height, pos: cs.position, bg: short(cs.backgroundImage) + ' ' + cs.backgroundColor, border: cs.borderLeftWidth + ' ' + cs.borderLeftStyle + ' ' + cs.borderLeftColor } : null; }), border: getComputedStyle(n).borderRightWidth + ' ' + getComputedStyle(n).borderRightStyle + ' ' + getComputedStyle(n).borderRightColor + ' | L ' + getComputedStyle(n).borderLeftWidth + ' ' + getComputedStyle(n).borderLeftColor, shadow: getComputedStyle(n).boxShadow.slice(0, 80), outline: getComputedStyle(n).outlineStyle }; });
       R.elements = [...seen.values()].sort((a, b) => b.w * b.h - a.w * a.h).slice(0, 120);
       R.topLevel = [...document.body.children].filter(n => !own(n)).slice(0, 25).map(n => ({ sel: sig(n), kids: n.children.length, w: Math.round(n.getBoundingClientRect().width), h: Math.round(n.getBoundingClientRect().height) }));
@@ -3746,7 +3763,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.76.0');
+    log('Załadowano v2.77.1');
   }
 
   let tries = 0;
