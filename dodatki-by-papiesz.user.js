@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.56.0
+// @version      2.57.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2135,12 +2135,14 @@
 
   const GT_ON_KEY = 'gi_gt_on_v1', GT_CFG_KEY = 'gi_gt_cfg_v1';
   let gtEnabled = (() => { try { return localStorage.getItem(GT_ON_KEY) === '1'; } catch (e) { return false; } })();
+  const STATIC_FR = ['gold', 'silver', 'stone', 'neon', 'fantasy', 'custom'];
+  const ANIM_FR = ['ring', 'pulse', 'fire', 'chase', 'comet', 'rainbow', 'sweep', 'corners', 'energy', 'aurora', 'royal'];
   function buildGameThemeView() {
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false }, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
-    cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false }, cfg.fT);
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, cfg.fT);
     const save = () => writeLS(GT_CFG_KEY, cfg);
     let styleEl = null;
     function css() {
@@ -2149,8 +2151,10 @@
       const tint = `hsl(${H} ${Math.round(S)}% 50%)`;
       const fil = (S ? `grayscale(1) sepia(1) hue-rotate(${H - 38}deg) saturate(${(1 + S / 35).toFixed(2)})` : 'grayscale(1)') + ` brightness(${(0.55 + 0.45 * L).toFixed(2)})`;
       let o = '';
-      if (cfg.frame) o += `html .top.positioner>.bg,html .bottom-panel-graphic,html .hud-container{filter:${fil} !important}\n`;
-      if (cfg.panels) o += `
+      const rc = cfg.theme !== 'none';
+      if (cfg.hideOrig) o += `html .interface-layer.layer{border-image:none !important;border-color:transparent !important}\n`;
+      if (rc && cfg.frame) o += `html .top.positioner>.bg,html .bottom-panel-graphic,html .hud-container{filter:${fil} !important}\n`;
+      if (rc && cfg.panels) o += `
         html .left-column.main-column,html .new-chat-window,html .chat-input-wrapper{background-color:${c(.35, 12)} !important}
         html .left-column.main-column,html .scroll-wrapper.chat-message-wrapper{border-color:${c(.45, 40)} !important}
         html .right-column.main-column,html .interface-element-item-slot-grid-stretch,html .eq-slot.interface-element-one-item-slot-background-to-repeat{background-color:${tint} !important;background-blend-mode:luminosity !important}
@@ -2161,7 +2165,7 @@
         html .inventory-grid-bg.interface-element-grid-border{border-color:${c(.4, 24)} !important}
         html .interface-element-one-black-tile.bag-slot-wrapper,html .chat-channel-card{background-image:linear-gradient(${c(.3, 17)},${c(.3, 12)}) !important}
         html .chat-channel-card.active{background-image:linear-gradient(${c(.35, 42)},${c(.35, 25)}) !important}\n`;
-      if (cfg.btns) o += `html .widget-button.green,html .button.green{background-image:linear-gradient(${c(1, 40)},${c(1, 13)}) !important}\n`;
+      if (rc && cfg.btns) o += `html .widget-button.green,html .button.green{background-image:linear-gradient(${c(1, 40)},${c(1, 13)}) !important}\n`;
       const bgu = u => { const x = cleanUrl(u || ''); return x ? x.replace(/["\\()\s]/g, encodeURIComponent) : ''; };
       const uc = bgu(cfg.bgChat), ur = bgu(cfg.bgRight), ut = bgu(cfg.bgTop);
       if (uc) o += `html .left-column.main-column,html .new-chat-window,html .chat-input-wrapper{background-image:url("${uc}") !important;background-size:cover !important;background-blend-mode:normal !important}\n`;
@@ -2169,7 +2173,7 @@
       if (ut) o += `html .top.positioner>.bg{background-image:url("${ut}") !important;background-size:100% 100% !important;filter:none !important}\n`;
       const T = { chat: '.left-column.main-column', right: '.right-column.main-column', grid: '.inventory-grid-bg.interface-element-grid-border', stats: '.stats-wrapper' };
       const sels = Object.keys(T).filter(k => cfg.fT[k]).map(k => 'html ' + T[k]);
-      if (cfg.fst !== 'none' && sels.length) {
+      if (STATIC_FR.includes(cfg.fst) && sels.length) {
         const W = cfg.fw, fc = cfg.fcol === 'theme' ? c(1, 50) : '#d4af37', fcd = cfg.fcol === 'theme' ? c(1, 22) : '#6e5a1e';
         const base = 'content:"";position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:60;box-sizing:border-box;';
         let rule = '';
@@ -2187,21 +2191,142 @@
     const FRAME_SEL = ['.left-column.main-column', '.right-column.main-column', '.inventory-grid-bg.interface-element-grid-border', '.stats-wrapper'];
     function fixPos() {
       posFix.splice(0).forEach(n => { n.style.removeProperty('position'); });
-      if (!styleEl || cfg.fst === 'none') return;
+      if (!styleEl || !STATIC_FR.includes(cfg.fst)) return;
       FRAME_SEL.forEach(q => document.querySelectorAll(q).forEach(n => { if (getComputedStyle(n).position === 'static') { n.style.position = 'relative'; posFix.push(n); } }));
     }
     let fixTimer = 0;
     function apply() {
       if (styleEl) { styleEl.remove(); styleEl = null; }
       clearInterval(fixTimer);
-      if (!gtEnabled || cfg.theme === 'none') { fixPos(); return; }
-      styleEl = el('style', { id: 'gi-gt-css', textContent: css() });
-      document.head.append(styleEl);
-      fixPos();
-      fixTimer = setInterval(() => { if (posFix.some(n => !n.isConnected) || !posFix.length) fixPos(); }, 3000);
+      if (gtEnabled) {
+        styleEl = el('style', { id: 'gi-gt-css', textContent: css() });
+        document.head.append(styleEl);
+        fixPos();
+        fixTimer = setInterval(() => { if (posFix.some(n => !n.isConnected) || !posFix.length) fixPos(); }, 3000);
+      } else fixPos();
+      frSync(true);
     }
+
+    const PAL = {
+      fire: ['#fff3b0', '#ff9800', '#c62828'], ice: ['#e1f5fe', '#4fc3f7', '#1565c0'], storm: ['#ffffff', '#b39ddb', '#448aff'],
+      magic: ['#f8bbd0', '#b388ff', '#7c4dff'], gold: ['#fff3b0', '#ffd54f', '#b8860b'], blood: ['#ff8a80', '#e53935', '#7f0000'], green: ['#ccff90', '#76ff03', '#1b5e20']
+    };
+    const frTargets = {
+      game: () => document.querySelector('.interface-layer.layer'),
+      top: () => document.querySelector('.top.positioner>.bg'),
+      chat: () => document.querySelector('.left-column.main-column'),
+      right: () => document.querySelector('.right-column.main-column'),
+      map: () => document.querySelector('.game-layer'),
+      grid: () => document.querySelector('.inventory-grid-bg.interface-element-grid-border'),
+      stats: () => document.querySelector('.stats-wrapper'),
+      bottom: () => { const g = document.querySelector('.interface-layer.layer'), b = document.querySelector('.bottom-panel-graphic'); if (!g || !b) return null; const gr = g.getBoundingClientRect(), br = b.getBoundingClientRect(); return { getBoundingClientRect: () => ({ left: gr.left, right: gr.right, top: br.top, bottom: gr.bottom, width: gr.width, height: Math.max(0, gr.bottom - br.top) }) }; }
+    };
+    const frs = {};
+    let frTimer = 0, frSvg = null;
+    const frColors = () => {
+      if (cfg.fpal === 'custom') return [cfg.fc1, cfg.fc2, cfg.fc3];
+      if (PAL[cfg.fpal]) return PAL[cfg.fpal];
+      const H = cfg.h, S = Math.max(25, cfg.s); return [`hsl(${H} ${S}% 82%)`, `hsl(${H} ${S}% 58%)`, `hsl(${H} ${S}% 32%)`];
+    };
+    function frEnsureSvg() {
+      if (frSvg && frSvg.isConnected) return;
+      const NS = 'http://www.w3.org/2000/svg';
+      frSvg = document.createElementNS(NS, 'svg'); frSvg.setAttribute('width', '0'); frSvg.setAttribute('height', '0'); frSvg.style.cssText = 'position:absolute;left:-9px;top:-9px;pointer-events:none';
+      frSvg.innerHTML = `<defs>
+        <filter id="gi-gt-fire" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.05" numOctaves="2" seed="4" result="n"><animate attributeName="baseFrequency" dur="3.2s" values="0.012 0.05;0.018 0.065;0.012 0.05" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="16"/></filter>
+        <filter id="gi-gt-elec" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="1" result="n"><animate attributeName="seed" dur="0.5s" values="1;2;3;4;5;6" calcMode="discrete" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="9"/></filter></defs>`;
+      document.body.append(frSvg);
+    }
+    const SVG_FR = ['chase', 'comet'];
+    function frBuild(o, key) {
+      const NS = 'http://www.w3.org/2000/svg';
+      o.node.textContent = '';
+      if (SVG_FR.includes(cfg.fst)) {
+        const sv = document.createElementNS(NS, 'svg'); sv.setAttribute('style', 'position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible');
+        const mk = () => { const r = document.createElementNS(NS, 'rect'); r.setAttribute('fill', 'none'); r.setAttribute('class', 'gi-fa-sv'); sv.append(r); return r; };
+        o.rects = cfg.fst === 'chase' ? [mk()] : [mk(), mk(), mk(), mk(), mk(), mk()];
+        o.node.append(sv); o.sv = sv;
+      } else { o.rects = null; o.node.innerHTML = '<i class="g"></i><i class="r"></i><i class="in"></i>'; }
+      o.built = cfg.fst; o.geo = '';
+    }
+    function frGeo(o, w, h) {
+      const g = w + 'x' + h + '|' + cfg.fw + '|' + cfg.fst; if (!o.rects || o.geo === g) return; o.geo = g;
+      const W = Math.min(14, Math.max(2, cfg.fw)), P = 2 * (w - W) + 2 * (h - W);
+      o.node.style.setProperty('--P', String(Math.round(P)));
+      o.rects.forEach(r => { r.setAttribute('x', W / 2); r.setAttribute('y', W / 2); r.setAttribute('width', Math.max(1, w - W)); r.setAttribute('height', Math.max(1, h - W)); r.setAttribute('stroke-width', W); });
+      if (cfg.fst === 'chase') {
+        const dash = Math.max(5, W * 2.2), n = Math.max(6, Math.round(P / (dash * 2.6))), gap = P / n - dash;
+        o.rects[0].setAttribute('stroke-dasharray', dash.toFixed(2) + ' ' + gap.toFixed(2)); o.rects[0].style.setProperty('--s', '0');
+      } else {
+        const L = [0.05, 0.1, 0.16, 0.24, 0.33, 0.43].map(x => x * Math.min(P, 1800) / (P > 1800 ? P / 1800 : 1));
+        const lens = [0.03, 0.07, 0.12, 0.18, 0.25, 0.33].map(x => x * Math.min(P, 2400));
+        o.rects.forEach((r, i) => { const l = lens[5 - i]; r.setAttribute('stroke-dasharray', l.toFixed(1) + ' ' + (P - l + 4).toFixed(1)); r.style.setProperty('--s', l.toFixed(1)); r.style.opacity = String(0.2 + 0.16 * i); });
+        void L;
+      }
+    }
+    function frSync(force) {
+      const anim = gtEnabled && ANIM_FR.includes(cfg.fst);
+      for (const key of Object.keys(frTargets)) {
+        const want = anim && cfg.fT[key];
+        let o = frs[key];
+        if (!want) { if (o) { o.node.remove(); delete frs[key]; } continue; }
+        const t = frTargets[key](); const r = t && t.getBoundingClientRect();
+        if (!o) { o = frs[key] = { node: el('div', { className: 'gi-gtf' }) }; document.body.append(o.node); }
+        if (!r || r.width < 30 || r.height < 14) { o.node.style.display = 'none'; continue; }
+        if (o.built !== cfg.fst || force) { frEnsureSvg(); frBuild(o, key); const [c1, c2, c3] = frColors(); const st = o.node.style; st.setProperty('--c1', c1); st.setProperty('--c2', c2); st.setProperty('--c3', c3); st.setProperty('--w', Math.min(14, Math.max(2, cfg.fw)) + 'px'); st.setProperty('--spd', String(cfg.fspd)); st.setProperty('--glow', String(cfg.fglow)); o.node.className = 'gi-gtf s-' + cfg.fst; }
+        const st = o.node.style; st.display = ''; st.left = Math.round(r.left) + 'px'; st.top = Math.round(r.top) + 'px'; st.width = Math.round(r.width) + 'px'; st.height = Math.round(r.height) + 'px';
+        frGeo(o, Math.round(r.width), Math.round(r.height));
+      }
+      if (!anim) { clearInterval(frTimer); frTimer = 0; }
+      else if (!frTimer) frTimer = setInterval(() => frSync(false), 400);
+    }
+    window.addEventListener('resize', () => frSync(false));
     const chg = () => { save(); apply(); };
 
+    document.head.append(el('style', { textContent: `
+      @property --gi-fa{syntax:'<angle>';inherits:false;initial-value:0deg}
+      @keyframes gi-fa-rot{to{--gi-fa:360deg}}
+      @keyframes gi-fa-rotr{from{--gi-fa:360deg}to{--gi-fa:0deg}}
+      @keyframes gi-fa-pulse{0%,100%{opacity:.45}50%{opacity:1}}
+      @keyframes gi-fa-flick{0%{opacity:.85}20%{opacity:1}40%{opacity:.7}60%{opacity:.95}80%{opacity:.75}100%{opacity:.9}}
+      @keyframes gi-fa-hue{to{filter:hue-rotate(360deg)}}
+      @keyframes gi-fa-dash{from{stroke-dashoffset:calc(var(--s) * 1px)}to{stroke-dashoffset:calc((var(--s) - var(--P)) * 1px)}}
+      .gi-gtf{position:fixed;z-index:99000;pointer-events:none;box-sizing:border-box;--w:4px;--spd:1;--glow:.8;--c1:#fff;--c2:#4fc3f7;--c3:#1565c0}
+      .gi-gtf>i{position:absolute;display:block;inset:0;animation:gi-fa-rot calc(5s / var(--spd)) linear infinite}
+      .gi-gtf .r{padding:var(--w);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
+      .gi-gtf .g{inset:calc(var(--w) * -1);padding:calc(var(--w) * 2);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);filter:blur(calc(var(--w) * 1.6));opacity:var(--glow)}
+      .gi-gtf .in{display:none}
+      .gi-fa-sv{stroke:var(--c2);animation:gi-fa-dash calc(var(--P) / (110 * var(--spd)) * 1s) linear infinite}
+      .gi-gtf.s-chase .gi-fa-sv{stroke:var(--c1);filter:drop-shadow(0 0 calc(var(--w) * 1.2) var(--c2))}
+      .gi-gtf.s-chase .gi-fa-sv{animation-duration:calc(var(--P) / (60 * var(--spd)) * 1s)}
+      .gi-gtf.s-comet .gi-fa-sv{stroke:var(--c1);stroke-linecap:round;filter:drop-shadow(0 0 calc(var(--w) * 1.5) var(--c2))}
+      .gi-gtf.s-comet .gi-fa-sv:nth-child(1){stroke:var(--c3)}.gi-gtf.s-comet .gi-fa-sv:nth-child(2){stroke:var(--c3)}.gi-gtf.s-comet .gi-fa-sv:nth-child(3){stroke:var(--c2)}.gi-gtf.s-comet .gi-fa-sv:nth-child(4){stroke:var(--c2)}
+      .gi-gtf.s-ring>i{background:conic-gradient(from var(--gi-fa),transparent 0,var(--c3) 12%,var(--c2) 24%,var(--c1) 30%,transparent 50%,var(--c3) 62%,var(--c2) 76%,var(--c1) 80%,transparent 100%)}
+      .gi-gtf.s-pulse .r,.gi-gtf.s-pulse .g{background:var(--c2);animation:gi-fa-pulse calc(2.6s / var(--spd)) ease-in-out infinite}
+      .gi-gtf.s-pulse .in{display:block;box-shadow:inset 0 0 calc(var(--w) * 7) var(--c2);opacity:.45;animation:gi-fa-pulse calc(2.6s / var(--spd)) ease-in-out infinite}
+      .gi-gtf.s-fire .r,.gi-gtf.s-fire .g{background:conic-gradient(from var(--gi-fa),var(--c3),var(--c2) 14%,var(--c1) 24%,var(--c2) 36%,var(--c3) 50%,var(--c2) 64%,var(--c1) 76%,var(--c2) 88%,var(--c3));animation-duration:calc(3s / var(--spd))}
+      .gi-gtf.s-fire .r{filter:url(#gi-gt-fire)}
+      .gi-gtf.s-fire .g{filter:url(#gi-gt-fire) blur(calc(var(--w) * 1.8));animation:gi-fa-rot calc(3s / var(--spd)) linear infinite,gi-fa-flick .45s ease-in-out infinite}
+      .gi-gtf.s-fire .in{display:block;box-shadow:inset 0 0 calc(var(--w) * 8) var(--c3);opacity:.7;animation:gi-fa-flick .5s ease-in-out infinite}
+      .gi-gtf.s-rainbow>i{background:conic-gradient(from var(--gi-fa),#ff1744,#ffea00,#00e676,#00e5ff,#2979ff,#d500f9,#ff1744)}
+      .gi-gtf.s-sweep .r,.gi-gtf.s-sweep .g{background:conic-gradient(from var(--gi-fa),transparent 0 78%,var(--c1) 93%,transparent 100%),linear-gradient(135deg,var(--c3),var(--c2) 50%,var(--c3))}
+      .gi-gtf.s-sweep .g{animation:gi-fa-rot calc(5s / var(--spd)) linear infinite,gi-fa-pulse 3s ease-in-out infinite}
+      .gi-gtf.s-corners .r,.gi-gtf.s-corners .g{padding:0;-webkit-mask:none;mask:none;animation:gi-fa-pulse calc(2.4s / var(--spd)) ease-in-out infinite;
+        background:linear-gradient(var(--c1),var(--c1)) 0 0/min(46px,22%) var(--w) no-repeat,linear-gradient(var(--c1),var(--c1)) 0 0/var(--w) min(46px,22%) no-repeat,
+        linear-gradient(var(--c1),var(--c1)) 100% 0/min(46px,22%) var(--w) no-repeat,linear-gradient(var(--c1),var(--c1)) 100% 0/var(--w) min(46px,22%) no-repeat,
+        linear-gradient(var(--c1),var(--c1)) 0 100%/min(46px,22%) var(--w) no-repeat,linear-gradient(var(--c1),var(--c1)) 0 100%/var(--w) min(46px,22%) no-repeat,
+        linear-gradient(var(--c1),var(--c1)) 100% 100%/min(46px,22%) var(--w) no-repeat,linear-gradient(var(--c1),var(--c1)) 100% 100%/var(--w) min(46px,22%) no-repeat}
+      .gi-gtf.s-corners .g{inset:0;filter:blur(calc(var(--w) * 1.2))}
+      .gi-gtf.s-corners .in{display:block;border:1px solid var(--c2);opacity:.55;animation:none}
+      .gi-gtf.s-energy .r{filter:url(#gi-gt-elec);background:conic-gradient(from var(--gi-fa),transparent 0,var(--c1) 6%,transparent 14%,var(--c2) 30%,transparent 38%,var(--c1) 55%,transparent 63%,var(--c3) 80%,transparent 88%);animation:gi-fa-rot calc(2.2s / var(--spd)) linear infinite,gi-fa-flick .3s steps(2) infinite}
+      .gi-gtf.s-energy .g{background:conic-gradient(from var(--gi-fa),transparent 0,var(--c2) 10%,transparent 22%,var(--c3) 45%,transparent 58%,var(--c2) 80%,transparent 92%);animation:gi-fa-rotr calc(3s / var(--spd)) linear infinite}
+      .gi-gtf.s-aurora{animation:gi-fa-hue calc(14s / var(--spd)) linear infinite}
+      .gi-gtf.s-aurora .r,.gi-gtf.s-aurora .g{background:conic-gradient(from var(--gi-fa),#00e5a0,#2979ff,#b388ff,#ff4081,#00e5a0);animation-duration:calc(9s / var(--spd))}
+      .gi-gtf.s-aurora .in{display:block;box-shadow:inset 0 0 calc(var(--w) * 10) #2979ff;opacity:.35;animation:gi-fa-pulse 5s ease-in-out infinite}
+      .gi-gtf.s-royal .r,.gi-gtf.s-royal .g{background:linear-gradient(135deg,var(--c1),var(--c2) 45%,var(--c3) 55%,var(--c2));animation:gi-fa-pulse calc(4s / var(--spd)) ease-in-out infinite}
+      .gi-gtf.s-royal .r{animation:none}
+      .gi-gtf.s-royal .in{display:block;inset:calc(var(--w) * 1.7);border:1px solid var(--c1);box-shadow:0 0 6px var(--c2),inset 0 0 6px var(--c2);animation:none}
+    ` }));
     const info = el('div', { style: 'font-size:11px;color:#90a4ae;margin-bottom:6px' }, 'Przefarbowuje wygląd samej gry: ramki, tła czatu i ekwipunku, przyciski. Działa tylko u Ciebie. Włącz dodatek przełącznikiem w menu.');
     const sel = isolate(el('select', {}));
     sel.append(el('option', { value: 'none', textContent: 'Oryginalny wygląd gry (bez zmian)', selected: cfg.theme === 'none' }));
@@ -2259,22 +2384,32 @@
       btn.textContent = 'Gotowe – skopiowane do schowka (kliknij, aby powtórzyć)';
     });
     const fSel = isolate(el('select', {}));
-    [['none', 'Bez ramki (oryginał)'], ['gold', 'Złota podwójna'], ['silver', 'Srebrna (rowek)'], ['stone', 'Kamienna'], ['neon', 'Neon (kolor motywu)'], ['fantasy', 'Fantasy (zielone grafiki)'], ['custom', 'Własna grafika (link)']].forEach(([v, l]) => fSel.append(el('option', { value: v, textContent: l, selected: cfg.fst === v })));
+    const og = (lab, arr) => { const g = el('optgroup', { label: lab }); arr.forEach(([v, l]) => g.append(el('option', { value: v, textContent: l, selected: cfg.fst === v }))); return g; };
+    fSel.append(el('option', { value: 'none', textContent: 'Bez ramki (oryginał)', selected: cfg.fst === 'none' }),
+      og('Animowane', [['ring', 'Obracający się promień'], ['pulse', 'Neon pulsujący'], ['fire', 'Ogień (falujący)'], ['energy', 'Energia (iskrzenie)'], ['chase', 'Biegnące światełka'], ['comet', 'Kometa dookoła'], ['sweep', 'Złoto z błyskiem'], ['royal', 'Królewska podwójna'], ['corners', 'Świecące rogi'], ['rainbow', 'Tęcza'], ['aurora', 'Zorza polarna']]),
+      og('Proste (statyczne)', [['gold', 'Złota podwójna'], ['silver', 'Srebrna (rowek)'], ['stone', 'Kamienna'], ['neon', 'Neon (statyczny)'], ['fantasy', 'Fantasy (zielone grafiki)'], ['custom', 'Własna grafika (link)']]));
     fSel.addEventListener('change', () => { cfg.fst = fSel.value; chg(); });
-    const fW = slide('Grubość ramki / skala grafik', 2, 20, 1, 'fw', x => x + ' px');
+    const fW = slide('Grubość ramki', 2, 20, 1, 'fw', x => x + ' px');
+    const fSp = slide('Prędkość animacji', 0.3, 3, 0.1, 'fspd', x => x.toFixed(1) + '×');
+    const fGl = slide('Blask', 0, 1, 0.05, 'fglow', x => Math.round(x * 100) + '%');
     const fCol = isolate(el('select', {}));
-    [['theme', 'Kolor ramki: z motywu'], ['gold', 'Kolor ramki: złoty']].forEach(([v, l]) => fCol.append(el('option', { value: v, textContent: l, selected: cfg.fcol === v })));
-    fCol.addEventListener('change', () => { cfg.fcol = fCol.value; chg(); });
-    const tgt = (label, k) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg.fT[k] })); c.addEventListener('change', () => { cfg.fT[k] = c.checked; chg(); }); return el('label', { style: 'display:inline-block;margin:2px 10px 2px 0;cursor:pointer' }, c, ' ' + label); };
-    const urlIn2 = (key, ph, w) => { const i = isolate(el('input', { type: 'text', placeholder: ph, value: cfg[key] || '' })); i.style.cssText = 'width:100%;box-sizing:border-box;margin:2px 0'; i.addEventListener('change', () => { cfg[key] = i.value.trim(); chg(); }); return i; };
+    [['theme', 'Kolory: z motywu'], ['fire', 'Ogień'], ['ice', 'Lód'], ['storm', 'Burza'], ['magic', 'Magia'], ['gold', 'Złoto'], ['blood', 'Krew'], ['green', 'Toksyczna zieleń'], ['custom', 'Własne (3 kolory)…']].forEach(([v, l]) => fCol.append(el('option', { value: v, textContent: l, selected: cfg.fpal === v })));
+    const cc = k => { const i = isolate(el('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(cfg[k]) ? cfg[k] : '#ffffff' })); i.style.cssText = 'width:40px;height:22px;padding:0;border:0;background:none;vertical-align:middle;margin-right:6px'; i.addEventListener('input', () => { cfg[k] = i.value; chg(); }); return i; };
+    const ccRow = el('div', { style: 'margin:4px 0;display:none' }, 'Jasny ', cc('fc1'), 'główny ', cc('fc2'), 'ciemny ', cc('fc3'));
+    const showCC = () => { ccRow.style.display = cfg.fpal === 'custom' ? '' : 'none'; }; showCC();
+    fCol.addEventListener('change', () => { cfg.fpal = fCol.value; showCC(); chg(); });
+    const tgt = (label, k) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg.fT[k] })); c.addEventListener('change', () => { cfg.fT[k] = c.checked; chg(); }); return el('label', { style: 'display:inline-block;margin:2px 10px 2px 0;cursor:pointer;white-space:nowrap' }, c, ' ' + label); };
+    const urlIn2 = (key, ph) => { const i = isolate(el('input', { type: 'text', placeholder: ph, value: cfg[key] || '' })); i.style.cssText = 'width:100%;box-sizing:border-box;margin:2px 0'; i.addEventListener('change', () => { cfg[key] = i.value.trim(); chg(); }); return i; };
     const fSl = slide('Własna ramka: obszar rogów (slice)', 5, 120, 1, 'fSlice', x => x + ' px');
-    const framesBox = el('div', {}, el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0' }, 'Ramka rysowana na brzegach wybranych paneli gry.'), fSel, fCol, fW.row,
-      el('div', {}, tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats')),
-      el('div', { style: 'font-size:11px;color:#90a4ae;margin-top:6px' }, 'Własna ramka: link do obrazka z ramką (rogi + krawędzie, np. PNG 3×3). Ustaw „slice” na wielkość rogu w obrazku.'), urlIn2('fUrl', 'https://…/ramka.png'), fSl.row);
+    const framesBox = el('div', {}, el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0' }, 'Ramka rysowana na brzegach wybranych elementów gry (nakładka, nie zmienia układu). Ogień i Energia mocniej obciążają kartę graficzną.'), fSel, fCol, ccRow, fW.row, fSp.row, fGl.row,
+      el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować:'),
+      el('div', {}, tgt('Cały ekran gry', 'game'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Mapa', 'map'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats')),
+      chk('Ukryj oryginalną ramkę dookoła okna gry', 'hideOrig'),
+      el('div', { style: 'font-size:11px;color:#90a4ae;margin-top:6px' }, 'Styl „Własna grafika”: link do obrazka z ramką (rogi + krawędzie, np. PNG 3×3). Ustaw „slice” na wielkość rogu w obrazku.'), urlIn2('fUrl', 'https://…/ramka.png'), fSl.row);
     const imgBox = el('div', {}, el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0' }, 'Wklej linki do własnych obrazków (puste = oryginał). Muszą być dostępne publicznie.'),
       el('div', {}, 'Tło czatu'), urlIn2('bgChat', 'https://…/tlo-czatu.jpg'), el('div', {}, 'Tło prawej kolumny'), urlIn2('bgRight', 'https://…/tlo-prawej.jpg'), el('div', {}, 'Górny pasek'), urlIn2('bgTop', 'https://…/gorny-pasek.png'));
     box.append(info, sel, colRow, sS.row, sL.row, chk('Przefarbuj ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Przefarbuj tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Przefarbuj zielone przyciski interfejsu', 'btns'),
-      el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Style ramek dookoła paneli' }), framesBox),
+      el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Ramki (animowane i proste)' }), framesBox),
       el('details', { style: 'margin-top:4px' }, el('summary', { textContent: 'Własne grafiki (tła, górny pasek)' }), imgBox),
       el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Diagnostyka interfejsu' }), dinfo, btn, out));
     root.settingsBox = box;
@@ -3146,7 +3281,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.56.0');
+    log('Załadowano v2.57.0');
   }
 
   let tries = 0;
