@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.58.0
+// @version      2.59.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2136,13 +2136,14 @@
   const GT_ON_KEY = 'gi_gt_on_v1', GT_CFG_KEY = 'gi_gt_cfg_v1';
   let gtEnabled = (() => { try { return localStorage.getItem(GT_ON_KEY) === '1'; } catch (e) { return false; } })();
   const STATIC_FR = ['gold', 'silver', 'stone', 'neon', 'fantasy', 'custom'];
-  const ANIM_FR = ['plasma', 'ripple', 'ring', 'pulse', 'fire', 'chase', 'comet', 'rainbow', 'sweep', 'corners', 'energy', 'aurora', 'royal'];
+  const ANIM_FR = ['plasma', 'vortex', 'glitch', 'flicker', 'heartbeat', 'frost', 'prism', 'circuit', 'twin', 'ring', 'pulse', 'fire', 'chase', 'comet', 'rainbow', 'sweep', 'corners', 'energy', 'aurora', 'royal'];
   function buildGameThemeView() {
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
     const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fout: 0, gAvoid: true, gcut: 16, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
     cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, cfg.fT);
+    if (cfg.fst === 'ripple') cfg.fst = 'ring';
     const save = () => writeLS(GT_CFG_KEY, cfg);
     let styleEl = null;
     const SYNC = { game: [0, 0], fantasy: [130, 45], classic: [205, 55], crimson: [2, 60], violet: [272, 45], gold: [42, 70], mono: [0, 0] };
@@ -2242,14 +2243,14 @@
         <filter id="gi-gt-elec" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="1" result="n"><animate attributeName="seed" dur="0.5s" values="1;2;3;4;5;6" calcMode="discrete" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="9"/></filter></defs>`;
       document.body.append(frSvg);
     }
-    const SVG_FR = ['chase', 'comet'];
+    const SVG_FR = ['chase', 'comet', 'twin'];
     function frBuild(o, key) {
       const NS = 'http://www.w3.org/2000/svg';
       o.node.textContent = '';
       if (SVG_FR.includes(cfg.fst)) {
         const sv = document.createElementNS(NS, 'svg'); sv.setAttribute('style', 'position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible');
         const mk = () => { const r = document.createElementNS(NS, 'rect'); r.setAttribute('fill', 'none'); r.setAttribute('class', 'gi-fa-sv'); sv.append(r); return r; };
-        o.rects = cfg.fst === 'chase' ? [mk()] : [mk(), mk(), mk(), mk(), mk(), mk()];
+        o.rects = cfg.fst === 'chase' ? [mk()] : Array.from({ length: cfg.fst === 'twin' ? 12 : 6 }, mk);
         o.node.append(sv); o.sv = sv;
       } else { o.rects = null; o.node.innerHTML = '<i class="g"></i><i class="r"></i><i class="in"></i>'; }
       o.built = cfg.fst; o.geo = '';
@@ -2265,7 +2266,7 @@
       } else {
         const L = [0.05, 0.1, 0.16, 0.24, 0.33, 0.43].map(x => x * Math.min(P, 1800) / (P > 1800 ? P / 1800 : 1));
         const lens = [0.03, 0.07, 0.12, 0.18, 0.25, 0.33].map(x => x * Math.min(P, 2400));
-        o.rects.forEach((r, i) => { const l = lens[5 - i]; r.setAttribute('stroke-dasharray', l.toFixed(1) + ' ' + (P - l + 4).toFixed(1)); r.style.setProperty('--s', l.toFixed(1)); r.style.opacity = String(0.2 + 0.16 * i); });
+        o.rects.forEach((r, i) => { r.style.animationDelay = (cfg.fst === 'twin' && i >= 6) ? 'calc(var(--P) / (110 * var(--spd)) * -0.5s)' : ''; const ii = i % 6; const l = lens[5 - ii]; r.setAttribute('stroke-dasharray', l.toFixed(1) + ' ' + (P - l + 4).toFixed(1)); r.style.setProperty('--s', l.toFixed(1)); r.style.opacity = String(0.2 + 0.16 * ii); });
         void L;
       }
     }
@@ -2302,7 +2303,7 @@
       else { if (!frTimer) frTimer = setInterval(() => frSync(false), 400); if (parts) pStart(); else pStop(); }
     }
     let frGlobe = null, pcv = null, pctx = null, pRaf = 0, pLast = 0, pArr = [], pBolts = [], pOrb = {}, pBoltT = 0;
-    const PT = [['sparks', 'Iskry'], ['embers', 'Żar unoszący się'], ['snow', 'Śnieg / lodowy pył'], ['stars', 'Gwiazdki'], ['magic', 'Magiczny pył'], ['lightning', 'Błyskawice'], ['orbit', 'Świetliki okrążające']];
+    const PT = [['sparks', 'Iskry'], ['embers', 'Żar unoszący się'], ['snow', 'Śnieg / lodowy pył'], ['stars', 'Gwiazdki'], ['magic', 'Magiczny pył'], ['lightning', 'Błyskawice'], ['orbit', 'Świetliki okrążające'], ['fireflies', 'Świetliki (błądzące)'], ['bubbles', 'Bąbelki'], ['leaves', 'Opadające liście'], ['rain', 'Deszcz'], ['confetti', 'Konfetti'], ['runes', 'Runy'], ['smoke', 'Dym / mgła'], ['meteors', 'Spadające gwiazdy']];
     const perim = r => 2 * (r.w + r.h);
     const pAt = (r, u) => { u = ((u % perim(r)) + perim(r)) % perim(r); if (u < r.w) return { x: r.l + u, y: r.t, nx: 0, ny: -1, tx: 1, ty: 0 }; u -= r.w; if (u < r.h) return { x: r.l + r.w, y: r.t + u, nx: 1, ny: 0, tx: 0, ty: 1 }; u -= r.h; if (u < r.w) return { x: r.l + r.w - u, y: r.t + r.h, nx: 0, ny: 1, tx: -1, ty: 0 }; u -= r.w; return { x: r.l, y: r.t + r.h - u, nx: -1, ny: 0, tx: 0, ty: -1 }; };
     const inGlobe = (x, y) => frGlobe && (x - frGlobe.x) * (x - frGlobe.x) + (y - frGlobe.y) * (y - frGlobe.y) < frGlobe.r * frGlobe.r;
@@ -2325,6 +2326,8 @@
         const r = frRects[k], P = perim(r);
         const emit = (type, perSec) => { let n = perSec * dens * dt * (P / 1000); n = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0); for (let i = 0; i < n && pArr.length < 900; i++) { const q = pAt(r, Math.random() * P); if (inGlobe(q.x, q.y)) continue; pArr.push(mkP(type, q)); } };
         if (on.sparks) emit('sparks', 14); if (on.embers) emit('embers', 9); if (on.snow) emit('snow', 8); if (on.stars) emit('stars', 6); if (on.magic) emit('magic', 8);
+        if (on.fireflies) emit('fireflies', 3); if (on.bubbles) emit('bubbles', 6); if (on.leaves) emit('leaves', 4); if (on.rain) emit('rain', 28); if (on.confetti) emit('confetti', 9); if (on.runes) emit('runes', 3); if (on.smoke) emit('smoke', 5);
+        if (on.meteors && Math.random() < 0.9 * dens * dt) { const x = r.l + Math.random() * r.w, p0 = { type: 'meteors', x, y: r.t - 10, vx: 230 + Math.random() * 120, vy: 150 + Math.random() * 90, age: 0, life: .7 + Math.random() * .5, s: 1.6, g: 0, sw: 0, ph: 0, a: 1, hi: true }; if (!inGlobe(p0.x, p0.y)) pArr.push(p0); }
         if (on.lightning && now > pBoltT) { pBoltT = now + (500 + Math.random() * 900) / dens / spd; const u0 = Math.random() * P, len = 90 + Math.random() * 260, pts = []; for (let d = 0; d <= len; d += 11) { const q = pAt(r, u0 + d), j = (Math.random() - .5) * 18; pts.push([q.x + q.nx * (j + 4) , q.y + q.ny * (j + 4), q]); } const forks = []; for (let i = 3; i < pts.length - 2; i += 3 + Math.floor(Math.random() * 3)) { const q = pts[i][2], f = [[pts[i][0], pts[i][1]]]; let x = pts[i][0], y = pts[i][1]; for (let s = 0; s < 4; s++) { x += q.nx * (6 + Math.random() * 8) + (Math.random() - .5) * 10 * Math.abs(q.ty) + q.tx * (Math.random() - .3) * 8; y += q.ny * (6 + Math.random() * 8) + (Math.random() - .5) * 10 * Math.abs(q.tx) + q.ty * (Math.random() - .3) * 8; f.push([x, y]); } forks.push(f); } pBolts.push({ pts: pts.map(a => [a[0], a[1]]), forks, life: 0.16 + Math.random() * 0.12, age: 0 }); }
         if (on.orbit) { const n = Math.max(1, Math.round(2 + dens * 2)); let a = pOrb[k]; if (!a || a.length !== n) a = pOrb[k] = Array.from({ length: n }, (_, i) => ({ u: i * P / n, trail: [] })); a.forEach((o, i) => { o.u += (90 + 50 * Math.sin(now / 900 + i)) * spd * dt * (i % 2 ? -1 : 1); const q = pAt(r, o.u); if (!inGlobe(q.x, q.y)) { o.trail.push([q.x, q.y]); if (o.trail.length > 16) o.trail.shift(); } else o.trail.length = 0; o.trail.forEach((p, j) => { const f = (j + 1) / o.trail.length; c.globalAlpha = f * .7; c.fillStyle = i % 2 ? c2 : c1; c.beginPath(); c.arc(p[0], p[1], 1 + f * 3.2, 0, 6.283); c.fill(); }); }); }
       });
@@ -2332,11 +2335,20 @@
       for (let i = pArr.length - 1; i >= 0; i--) {
         const p = pArr[i]; p.age += dt; if (p.age >= p.life) { pArr.splice(i, 1); continue; }
         const f = p.age / p.life;
-        if (p.type === 'stars') { p.a = Math.sin(Math.PI * f); } else { p.x += p.vx * dt * spd; p.y += p.vy * dt * spd; if (p.g) p.vy += p.g * dt; if (p.sw) p.x += Math.sin(p.age * 3 + p.ph) * p.sw * dt; p.a = (1 - f); }
+        if (p.type === 'fireflies') { p.vx += (Math.random() - .5) * 90 * dt; p.vy += (Math.random() - .5) * 90 * dt; p.vx *= 1 - dt; p.vy *= 1 - dt; }
+        if (p.rs) p.rot += p.rs * dt;
+        if (p.type === 'stars' || p.type === 'runes' || p.type === 'fireflies') { p.a = Math.sin(Math.PI * f); if (p.type !== 'stars') { p.x += p.vx * dt * spd; p.y += p.vy * dt * spd; } } else { p.x += p.vx * dt * spd; p.y += p.vy * dt * spd; if (p.g) p.vy += p.g * dt; if (p.sw) p.x += Math.sin(p.age * 3 + p.ph) * p.sw * dt; p.a = (1 - f); }
         if (inGlobe(p.x, p.y)) continue;
         c.globalAlpha = Math.max(0, Math.min(1, p.a));
         if (p.type === 'sparks') { c.strokeStyle = f < .4 ? c1 : c2; c.lineWidth = p.s; c.lineCap = 'round'; c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * .035, p.y - p.vy * .035); c.stroke(); }
         else if (p.type === 'stars') { c.fillStyle = p.hi ? c1 : c2; const s = p.s * (0.4 + p.a); c.beginPath(); c.moveTo(p.x, p.y - s); c.lineTo(p.x + s * .22, p.y - s * .22); c.lineTo(p.x + s, p.y); c.lineTo(p.x + s * .22, p.y + s * .22); c.lineTo(p.x, p.y + s); c.lineTo(p.x - s * .22, p.y + s * .22); c.lineTo(p.x - s, p.y); c.lineTo(p.x - s * .22, p.y - s * .22); c.closePath(); c.fill(); }
+        else if (p.type === 'fireflies') { const k = 0.55 + 0.45 * Math.sin(p.age * 5 + p.ph); c.fillStyle = c1; c.globalAlpha = p.a * k * .18; c.beginPath(); c.arc(p.x, p.y, p.s * 4, 0, 6.283); c.fill(); c.globalAlpha = p.a * k; c.fillStyle = c2; c.beginPath(); c.arc(p.x, p.y, p.s, 0, 6.283); c.fill(); }
+        else if (p.type === 'bubbles') { c.strokeStyle = c1; c.lineWidth = 1; c.beginPath(); c.arc(p.x, p.y, p.s, 0, 6.283); c.stroke(); c.globalAlpha *= .15; c.fillStyle = c2; c.fill(); }
+        else if (p.type === 'leaves' || p.type === 'confetti') { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.type === 'confetti' ? `hsl(${(p.ph * 57 + p.age * 90) % 360} 90% 62%)` : (p.hi ? c2 : c3); c.beginPath(); if (p.type === 'leaves') c.ellipse(0, 0, p.s * 1.8, p.s * .8, 0, 0, 6.283); else c.rect(-p.s, -p.s * .5, p.s * 2, p.s); c.fill(); c.restore(); }
+        else if (p.type === 'rain') { c.strokeStyle = c1; c.lineWidth = 1; c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * .035, p.y - p.vy * .035); c.stroke(); }
+        else if (p.type === 'runes') { c.fillStyle = p.hi ? c1 : c2; c.font = `${p.s}px serif`; c.textAlign = 'center'; c.fillText(p.ch, p.x, p.y); }
+        else if (p.type === 'smoke') { c.globalAlpha = Math.max(0, p.a) * .1; c.fillStyle = c3; c.beginPath(); c.arc(p.x, p.y, p.s * (1 + f * 1.4), 0, 6.283); c.fill(); }
+        else if (p.type === 'meteors') { const g = c.createLinearGradient(p.x, p.y, p.x - p.vx * .22, p.y - p.vy * .22); g.addColorStop(0, c1); g.addColorStop(1, 'rgba(0,0,0,0)'); c.strokeStyle = g; c.lineWidth = 2; c.lineCap = 'round'; c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x - p.vx * .22, p.y - p.vy * .22); c.stroke(); }
         else { c.fillStyle = p.type === 'magic' ? `hsl(${(now / 12 + p.ph * 57) % 360} 90% 70%)` : p.type === 'snow' ? c1 : (f < .5 ? c2 : c3); c.beginPath(); c.arc(p.x, p.y, p.s * (p.type === 'embers' ? 1 - f * .5 : 1), 0, 6.283); c.fill(); }
       }
       for (let i = pBolts.length - 1; i >= 0; i--) {
@@ -2353,8 +2365,16 @@
       else if (type === 'snow') { o.vx = (R() - .5) * 14; o.vy = 18 + R() * 34; o.sw = 12 + R() * 16; o.life = 2.2 + R() * 2.6; o.s = 1.2 + R() * 2.2; }
       else if (type === 'stars') { o.x += q.nx * R() * 16; o.y += q.ny * R() * 16; o.life = 1 + R() * 1.4; o.s = 3 + R() * 5; }
       else if (type === 'magic') { const v = 8 + R() * 22, t = (R() - .5) * 40; o.vx = q.nx * v + q.tx * t; o.vy = q.ny * v + q.ty * t - 8; o.sw = 10; o.life = 1.4 + R() * 1.8; o.s = 1 + R() * 2.2; }
+      else if (type === 'fireflies') { o.x += q.nx * R() * 20; o.y += q.ny * R() * 20; o.vx = (R() - .5) * 20; o.vy = (R() - .5) * 20; o.life = 3 + R() * 3; o.s = 1.6 + R() * 1.6; }
+      else if (type === 'bubbles') { o.vx = (R() - .5) * 8; o.vy = -(14 + R() * 26); o.sw = 10 + R() * 10; o.life = 2.5 + R() * 2; o.s = 2 + R() * 4.5; }
+      else if (type === 'leaves') { o.vx = (R() - .5) * 20; o.vy = 18 + R() * 30; o.sw = 24 + R() * 22; o.life = 3 + R() * 2.5; o.s = 2.2 + R() * 2.4; o.rot = R() * 6.28; o.rs = (R() - .5) * 4; }
+      else if (type === 'rain') { o.vx = -26; o.vy = 270 + R() * 120; o.life = .35 + R() * .35; o.s = 1; }
+      else if (type === 'confetti') { const v = 40 + R() * 90, t = (R() - .5) * 60; o.vx = q.nx * v + q.tx * t; o.vy = q.ny * v + q.ty * t - 20; o.g = 130; o.life = 1 + R() * 1.1; o.s = 2.5 + R() * 2.5; o.rot = R() * 6.28; o.rs = (R() - .5) * 14; }
+      else if (type === 'runes') { o.x += q.nx * R() * 14; o.y += q.ny * R() * 14; o.vy = -(8 + R() * 10); o.life = 2 + R() * 1.6; o.s = 10 + R() * 8; o.ch = RUNES[Math.floor(R() * RUNES.length)]; }
+      else if (type === 'smoke') { o.vx = (R() - .5) * 10 + q.nx * 6; o.vy = -(10 + R() * 18); o.life = 2.4 + R() * 2; o.s = 6 + R() * 8; }
       return o;
     }
+    const RUNES = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
     window.addEventListener('resize', () => frSync(false));
     const chg = () => { save(); apply(); };
 
@@ -2374,8 +2394,8 @@
       .gi-fa-sv{stroke:var(--c2);animation:gi-fa-dash calc(var(--P) / (110 * var(--spd)) * 1s) linear infinite}
       .gi-gtf.s-chase .gi-fa-sv{stroke:var(--c1);filter:drop-shadow(0 0 calc(var(--w) * 1.2) var(--c2))}
       .gi-gtf.s-chase .gi-fa-sv{animation-duration:calc(var(--P) / (60 * var(--spd)) * 1s)}
-      .gi-gtf.s-comet .gi-fa-sv{stroke:var(--c1);stroke-linecap:round;filter:drop-shadow(0 0 calc(var(--w) * 1.5) var(--c2))}
-      .gi-gtf.s-comet .gi-fa-sv:nth-child(1){stroke:var(--c3)}.gi-gtf.s-comet .gi-fa-sv:nth-child(2){stroke:var(--c3)}.gi-gtf.s-comet .gi-fa-sv:nth-child(3){stroke:var(--c2)}.gi-gtf.s-comet .gi-fa-sv:nth-child(4){stroke:var(--c2)}
+      .gi-gtf.s-comet .gi-fa-sv,.gi-gtf.s-twin .gi-fa-sv{stroke:var(--c1);stroke-linecap:round;filter:drop-shadow(0 0 calc(var(--w) * 1.5) var(--c2))}
+      .gi-gtf.s-comet .gi-fa-sv:nth-child(1),.gi-gtf.s-comet .gi-fa-sv:nth-child(2),.gi-gtf.s-twin .gi-fa-sv:nth-child(6n+1),.gi-gtf.s-twin .gi-fa-sv:nth-child(6n+2){stroke:var(--c3)}.gi-gtf.s-comet .gi-fa-sv:nth-child(3),.gi-gtf.s-comet .gi-fa-sv:nth-child(4),.gi-gtf.s-twin .gi-fa-sv:nth-child(6n+3),.gi-gtf.s-twin .gi-fa-sv:nth-child(6n+4){stroke:var(--c2)}
       .gi-gtf.s-ring>i{background:conic-gradient(from var(--gi-fa),transparent 0,var(--c3) 12%,var(--c2) 24%,var(--c1) 30%,transparent 50%,var(--c3) 62%,var(--c2) 76%,var(--c1) 80%,transparent 100%)}
       .gi-gtf.s-pulse .r,.gi-gtf.s-pulse .g{background:var(--c2);animation:gi-fa-pulse calc(2.6s / var(--spd)) ease-in-out infinite}
       .gi-gtf.s-pulse .in{display:block;box-shadow:inset 0 0 calc(var(--w) * 7) var(--c2);opacity:.45;animation:gi-fa-pulse calc(2.6s / var(--spd)) ease-in-out infinite}
@@ -2398,18 +2418,66 @@
       .gi-gtf.s-aurora{animation:gi-fa-hue calc(14s / var(--spd)) linear infinite}
       .gi-gtf.s-aurora .r,.gi-gtf.s-aurora .g{background:conic-gradient(from var(--gi-fa),#00e5a0,#2979ff,#b388ff,#ff4081,#00e5a0);animation-duration:calc(9s / var(--spd))}
       .gi-gtf.s-aurora .in{display:block;box-shadow:inset 0 0 calc(var(--w) * 10) #2979ff;opacity:.35;animation:gi-fa-pulse 5s ease-in-out infinite}
-      @keyframes gi-fa-ripple{0%{transform:scale(1);opacity:.95}100%{transform:scale(1.08);opacity:0}}
-      .gi-gtf.s-ripple .r,.gi-gtf.s-ripple .g{background:var(--c2);animation:gi-fa-ripple calc(2.4s / var(--spd)) ease-out infinite}
-      .gi-gtf.s-ripple .g{animation-delay:calc(1.2s / var(--spd))}
-      .gi-gtf.s-ripple .in{display:block;border:1px solid var(--c1);opacity:.75;animation:none}
       .gi-gtf.s-plasma{animation:gi-fa-hue calc(9s / var(--spd)) linear infinite}
       .gi-gtf.s-plasma .r{background:conic-gradient(from var(--gi-fa),var(--c1),var(--c3),var(--c2),var(--c3),var(--c1));animation-duration:calc(3s / var(--spd));filter:saturate(1.5)}
       .gi-gtf.s-plasma .g{background:conic-gradient(from var(--gi-fa),var(--c2),transparent 30%,var(--c1) 55%,transparent 80%,var(--c2));animation:gi-fa-rotr calc(4s / var(--spd)) linear infinite}
       .gi-gtf.s-plasma .in{display:block;box-shadow:inset 0 0 calc(var(--w) * 9) var(--c3);opacity:.6;animation:gi-fa-pulse 3s ease-in-out infinite}
+      @property --gi-fb{syntax:'<angle>';inherits:false;initial-value:0deg}
+      @keyframes gi-fb-rot{to{--gi-fb:360deg}}
+      @keyframes gi-fa-beat{0%,100%{opacity:.5;transform:scale(1)}12%{opacity:1;transform:scale(1.012)}24%{opacity:.6;transform:scale(1)}36%{opacity:1;transform:scale(1.02)}55%{opacity:.5}}
+      @keyframes gi-fa-glitch{0%,84%,100%{transform:translate(0,0)}86%{transform:translate(-4px,1px)}88%{transform:translate(4px,-1px)}90%{transform:translate(-2px,-3px)}93%{transform:translate(3px,2px)}96%{transform:translate(0,0)}}
+      @keyframes gi-fa-neonoff{0%,19%,21%,23%,25%,54%,56%,100%{opacity:1}20%,24%,55%{opacity:.2}}
+      .gi-gtf.s-vortex .r,.gi-gtf.s-vortex .g{background:conic-gradient(from var(--gi-fa),transparent 0,var(--c2) 15%,transparent 30%,transparent 50%,var(--c2) 65%,transparent 80%),conic-gradient(from var(--gi-fb),transparent 0,var(--c1) 10%,transparent 22%,transparent 55%,var(--c3) 70%,transparent 85%);animation:gi-fa-rot calc(5s / var(--spd)) linear infinite,gi-fb-rot calc(8s / var(--spd)) linear infinite reverse}
+      .gi-gtf.s-glitch .r{background:var(--c1);animation:gi-fa-glitch calc(3s / var(--spd)) steps(1) infinite}
+      .gi-gtf.s-glitch .g{background:var(--c2);animation:gi-fa-glitch calc(3s / var(--spd)) steps(1) infinite reverse}
+      .gi-gtf.s-glitch .in{display:block;border:var(--w) solid var(--c3);mix-blend-mode:screen;opacity:.65;animation:gi-fa-glitch calc(3s / var(--spd)) steps(1) infinite;animation-delay:-.25s}
+      .gi-gtf.s-flicker .r,.gi-gtf.s-flicker .g{background:var(--c2);animation:gi-fa-neonoff calc(4.5s / var(--spd)) linear infinite}
+      .gi-gtf.s-flicker .in{display:block;box-shadow:inset 0 0 calc(var(--w) * 5) var(--c2);opacity:.4;animation:gi-fa-neonoff calc(4.5s / var(--spd)) linear infinite}
+      .gi-gtf.s-heartbeat .r,.gi-gtf.s-heartbeat .g{background:var(--c2);animation:gi-fa-beat calc(1.6s / var(--spd)) ease-in-out infinite}
+      .gi-gtf.s-heartbeat .in{display:block;box-shadow:inset 0 0 calc(var(--w) * 6) var(--c3);animation:gi-fa-beat calc(1.6s / var(--spd)) ease-in-out infinite}
+      .gi-gtf.s-frost .r,.gi-gtf.s-frost .g{background:repeating-conic-gradient(from var(--gi-fb),rgba(255,255,255,.6) 0 2deg,transparent 2deg 9deg),conic-gradient(from var(--gi-fa),var(--c3),var(--c1) 8%,var(--c3) 16%,var(--c2) 30%,var(--c1) 40%,var(--c3) 52%,var(--c1) 66%,var(--c2) 80%,var(--c3) 92%,var(--c3));animation:gi-fa-rot calc(14s / var(--spd)) linear infinite,gi-fb-rot calc(6s / var(--spd)) linear infinite reverse}
+      .gi-gtf.s-frost .in{display:block;box-shadow:inset 0 0 calc(var(--w) * 7) var(--c1);opacity:.28;animation:none}
+      .gi-gtf.s-prism .r,.gi-gtf.s-prism .g{background:conic-gradient(from var(--gi-fb),transparent 0 84%,#fff 93%,transparent 100%),conic-gradient(from var(--gi-fa),#ff5252,#ffd740,#69f0ae,#40c4ff,#b388ff,#ff5252);animation:gi-fa-rot calc(9s / var(--spd)) linear infinite,gi-fb-rot calc(3s / var(--spd)) linear infinite}
+      .gi-gtf.s-circuit .r{background:repeating-conic-gradient(from var(--gi-fa),var(--c1) 0 3deg,transparent 3deg 9deg);animation:gi-fa-rot calc(10s / var(--spd)) linear infinite}
+      .gi-gtf.s-circuit .g{background:repeating-conic-gradient(from var(--gi-fb),var(--c2) 0 14deg,transparent 14deg 30deg);animation:gi-fb-rot calc(7s / var(--spd)) linear infinite reverse;filter:blur(calc(var(--w) * .6))}
+      .gi-gtf.s-circuit .in{display:block;border:1px solid var(--c3);opacity:.8;animation:none}
       .gi-gtf.s-royal .r,.gi-gtf.s-royal .g{background:linear-gradient(135deg,var(--c1),var(--c2) 45%,var(--c3) 55%,var(--c2));animation:gi-fa-pulse calc(4s / var(--spd)) ease-in-out infinite}
       .gi-gtf.s-royal .r{animation:none}
       .gi-gtf.s-royal .in{display:block;inset:calc(var(--w) * 1.7);border:1px solid var(--c1);box-shadow:0 0 6px var(--c2),inset 0 0 6px var(--c2);animation:none}
     ` }));
+    const TG = (...k) => { const o = { chat: false, right: false, grid: false, stats: false, game: false, top: false, bottom: false, map: false }; k.forEach(x => { o[x] = true; }); return o; };
+    const PT0 = (...k) => { const o = {}; k.forEach(x => { o[x] = true; }); return o; };
+    const PRESETS = [
+      { n: 'Ognista forteca', d: 'Ogień, iskry i żar', theme: 'szkarlat', h: 2, s: 60, fst: 'fire', fpal: 'fire', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('sparks', 'embers', 'smoke'), fw: 6, fspd: 1.2, fglow: 0.9, fout: 6, fpd: 1 },
+      { n: 'Lodowe królestwo', d: 'Szron, śnieg i gwiazdki', theme: 'lod', h: 205, s: 55, fst: 'frost', fpal: 'ice', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('snow', 'stars', 'orbit'), fw: 5, fspd: 0.9, fglow: 0.85, fout: 4, fpd: 1 },
+      { n: 'Burza', d: 'Błyskawice i deszcz', theme: 'custom', h: 255, s: 35, fst: 'energy', fpal: 'storm', t: TG('game', 'map', 'top', 'bottom'), pt: PT0('lightning', 'rain'), fw: 4, fspd: 1.3, fglow: 0.9, fout: 8, fpd: 1.2 },
+      { n: 'Magiczny las', d: 'Zorza, świetliki i liście', theme: 'las', h: 130, s: 45, fst: 'aurora', fpal: 'green', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('fireflies', 'leaves', 'magic'), fw: 5, fspd: 0.8, fglow: 0.9, fout: 4, fpd: 1 },
+      { n: 'Królewski dwór', d: 'Złoto, runy i gwiazdki', theme: 'zloto', h: 42, s: 70, fst: 'sweep', fpal: 'gold', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('stars', 'runes'), fw: 5, fspd: 0.8, fglow: 0.7, fout: 2, fpd: 0.8 },
+      { n: 'Neonowe miasto', d: 'Migający neon i spadające gwiazdy', theme: 'fiolet', h: 300, s: 60, fst: 'flicker', fpal: 'custom', fc1: '#ffb3f6', fc2: '#ff2bd6', fc3: '#5a00ff', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('meteors', 'stars'), fw: 4, fspd: 1, fglow: 1, fout: 4, fpd: 1 },
+      { n: 'Smocza krew', d: 'Wir, żar i runy', theme: 'szkarlat', h: 355, s: 70, fst: 'vortex', fpal: 'blood', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('embers', 'sparks', 'runes'), fw: 5, fspd: 1, fglow: 0.9, fout: 5, fpd: 1 },
+      { n: 'Toksyczny', d: 'Bicie serca, bąbelki i dym', theme: 'las', h: 105, s: 65, fst: 'heartbeat', fpal: 'green', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('bubbles', 'smoke'), fw: 5, fspd: 1, fglow: 1, fout: 4, fpd: 1 },
+      { n: 'Tęczowa impreza', d: 'Pryzmat i konfetti', theme: 'roz', h: 330, s: 50, fst: 'prism', fpal: 'theme', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('confetti', 'stars'), fw: 5, fspd: 1.3, fglow: 0.9, fout: 5, fpd: 1 },
+      { n: 'Cyber (obwody)', d: 'Obwody, glitch i iskry', theme: 'lod', h: 175, s: 70, fst: 'circuit', fpal: 'custom', fc1: '#b9fff0', fc2: '#00e5c0', fc3: '#006b5a', t: TG('game', 'top', 'bottom', 'chat', 'right'), pt: PT0('sparks', 'orbit'), fw: 4, fspd: 1.2, fglow: 0.8, fout: 3, fpd: 1 },
+      { n: 'Elegancki minimalizm', d: 'Jedna cienka ramka, bez cząsteczek', theme: 'mrok', h: 0, s: 0, fst: 'royal', fpal: 'win', t: TG('game'), pt: {}, fw: 3, fspd: 0.8, fglow: 0.5, fout: 0, fpd: 1 },
+      { n: 'Zgodny z motywem okien', d: 'Kolory jak w oknach dodatków', theme: 'custom', h: 205, s: 55, sync: true, fst: 'ring', fpal: 'win', t: TG('game', 'top', 'bottom'), pt: {}, fw: 4, fspd: 1, fglow: 0.8, fout: 2, fpd: 1 },
+      { n: 'Wyłącz wszystko', d: 'Oryginalny wygląd gry', theme: 'none', fst: 'none', t: TG(), pt: {} }
+    ];
+    function applyPreset(pr) {
+      cfg.theme = pr.theme; if (pr.h !== undefined) { cfg.h = pr.h; cfg.s = pr.s; }
+      cfg.sync = !!pr.sync; cfg.l = 1; cfg.frame = true; cfg.panels = true; cfg.btns = true;
+      cfg.fst = pr.fst; cfg.fpal = pr.fpal || 'theme'; if (pr.fc1) { cfg.fc1 = pr.fc1; cfg.fc2 = pr.fc2; cfg.fc3 = pr.fc3; }
+      cfg.fT = Object.assign({}, pr.t); cfg.fpt = Object.assign({}, pr.pt);
+      if (pr.fw) { cfg.fw = pr.fw; cfg.fspd = pr.fspd; cfg.fglow = pr.fglow; cfg.fout = pr.fout; cfg.fpd = pr.fpd; }
+      cfg.gAvoid = true; cfg.hideOrig = false;
+      chg(); render();
+    }
+    function render() {
+      box.textContent = '';
+      const pSel = isolate(el('select', {}));
+      pSel.append(el('option', { value: '', textContent: '⭐ Gotowe zestawy – wybierz, aby zastosować…' }));
+      PRESETS.forEach((pr, i) => pSel.append(el('option', { value: String(i), textContent: pr.n + ' – ' + pr.d })));
+      pSel.addEventListener('change', () => { if (pSel.value !== '') applyPreset(PRESETS[Number(pSel.value)]); });
+      const offNote = el('div', { style: 'color:#ffd54f;font-size:10px;margin:2px 0 6px;display:' + (gtEnabled ? 'none' : 'block') }, 'Dodatek jest wyłączony – włącz go przełącznikiem w menu, aby zobaczyć zmiany.');
     const info = el('div', { style: 'font-size:11px;color:#90a4ae;margin-bottom:6px' }, 'Przefarbowuje wygląd samej gry: ramki, tła czatu i ekwipunku, przyciski. Działa tylko u Ciebie. Włącz dodatek przełącznikiem w menu.');
     const sel = isolate(el('select', {}));
     sel.append(el('option', { value: 'none', textContent: 'Oryginalny wygląd gry (bez zmian)', selected: cfg.theme === 'none' }));
@@ -2471,7 +2539,7 @@
     const fSel = isolate(el('select', {}));
     const og = (lab, arr) => { const g = el('optgroup', { label: lab }); arr.forEach(([v, l]) => g.append(el('option', { value: v, textContent: l, selected: cfg.fst === v }))); return g; };
     fSel.append(el('option', { value: 'none', textContent: 'Bez ramki (oryginał)', selected: cfg.fst === 'none' }),
-      og('Animowane', [['plasma', 'Plazma (zmieniające się barwy)'], ['ripple', 'Fala rozchodząca się'], ['ring', 'Obracający się promień'], ['pulse', 'Neon pulsujący'], ['fire', 'Ogień (falujący)'], ['energy', 'Energia (iskrzenie)'], ['chase', 'Biegnące światełka'], ['comet', 'Kometa dookoła'], ['sweep', 'Złoto z błyskiem'], ['royal', 'Królewska podwójna'], ['corners', 'Świecące rogi'], ['rainbow', 'Tęcza'], ['aurora', 'Zorza polarna']]),
+      og('Animowane', [['plasma', 'Plazma (zmieniające się barwy)'], ['vortex', 'Wir (dwa obracające się promienie)'], ['glitch', 'Glitch (zakłócenia)'], ['flicker', 'Neon z migotaniem'], ['heartbeat', 'Bicie serca'], ['frost', 'Szron (kryształki lodu)'], ['prism', 'Pryzmat (tęcza z błyskiem)'], ['circuit', 'Obwody (kreskowane pierścienie)'], ['twin', 'Dwie komety'], ['ring', 'Obracający się promień'], ['pulse', 'Neon pulsujący'], ['fire', 'Ogień (falujący)'], ['energy', 'Energia (iskrzenie)'], ['chase', 'Biegnące światełka'], ['comet', 'Kometa dookoła'], ['sweep', 'Złoto z błyskiem'], ['royal', 'Królewska podwójna'], ['corners', 'Świecące rogi'], ['rainbow', 'Tęcza'], ['aurora', 'Zorza polarna']]),
       og('Proste (statyczne)', [['gold', 'Złota podwójna'], ['silver', 'Srebrna (rowek)'], ['stone', 'Kamienna'], ['neon', 'Neon (statyczny)'], ['fantasy', 'Fantasy (zielone grafiki)'], ['custom', 'Własna grafika (link)']]));
     fSel.addEventListener('change', () => { cfg.fst = fSel.value; chg(); });
     const fW = slide('Grubość ramki', 2, 20, 1, 'fw', x => x + ' px');
@@ -2499,10 +2567,12 @@
       el('div', { style: 'font-size:11px;color:#90a4ae;margin-top:6px' }, 'Styl „Własna grafika”: link do obrazka z ramką (rogi + krawędzie, np. PNG 3×3). Ustaw „slice” na wielkość rogu w obrazku.'), urlIn2('fUrl', 'https://…/ramka.png'), fSl.row);
     const imgBox = el('div', {}, el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0' }, 'Wklej linki do własnych obrazków (puste = oryginał). Muszą być dostępne publicznie.'),
       el('div', {}, 'Tło czatu'), urlIn2('bgChat', 'https://…/tlo-czatu.jpg'), el('div', {}, 'Tło prawej kolumny'), urlIn2('bgRight', 'https://…/tlo-prawej.jpg'), el('div', {}, 'Górny pasek'), urlIn2('bgTop', 'https://…/gorny-pasek.png'));
-    box.append(info, sel, colRow, sS.row, sL.row, syncChk, chk('Przefarbuj ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Przefarbuj tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Przefarbuj zielone przyciski interfejsu', 'btns'),
+    box.append(pSel, offNote, info, sel, colRow, sS.row, sL.row, syncChk, chk('Przefarbuj ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Przefarbuj tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Przefarbuj zielone przyciski interfejsu', 'btns'),
       el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Ramki (animowane i proste)' }), framesBox),
       el('details', { style: 'margin-top:4px' }, el('summary', { textContent: 'Własne grafiki (tła, górny pasek)' }), imgBox),
       el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Diagnostyka interfejsu' }), dinfo, btn, out));
+    }
+    render();
     root.settingsBox = box;
     root.apply = apply;
     root.stop = apply;
@@ -3373,7 +3443,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.58.0');
+    log('Załadowano v2.59.0');
   }
 
   let tries = 0;
