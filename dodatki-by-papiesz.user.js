@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.95.3
+// @version      2.95.4
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3724,20 +3724,8 @@
     const box = document.createElement('div'); box.id = 'gi-dmg'; box.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;z-index:99500';
     document.body.append(box);
     const done = new WeakSet(), tcache = new Map(), stack = new Map(), lastEv = [], lastRaw = [], fcap = new Map();
-    const nameOf = o => { const d = o.d && typeof o.d === 'object' ? o.d : o, nm = d.nick || d.name || o.nick || o.name; return typeof nm === 'string' && nm.length > 1 && nm.length < 40 ? nm : ''; };
+    const nameOf0 = o => { const d = o.d && typeof o.d === 'object' ? o.d : o, nm = d.nick || d.name || o.nick || o.name; return typeof nm === 'string' && nm.length > 1 && nm.length < 40 ? nm : ''; };
     let discN = 0;
-    function discover() {
-      const b = PW.Engine && PW.Engine.battle; if (!b || typeof b !== 'object') return;
-      const seenO = new Set(); let n = 0, hooked = 0;
-      (function walk(o, d) {
-        if (!o || typeof o !== 'object' || seenO.has(o) || n > 700 || d > 4) return; seenO.add(o); n++;
-        const nm = nameOf(o); if (nm && typeof o.draw === 'function') { if (hookDraw(o, bx => fcap.set(nm, Object.assign({ t: performance.now() }, bx)))) hooked++; }
-        let keys; try { keys = Object.keys(o); } catch (e) { return; }
-        for (const k of keys) { if (k === 'parent' || k === 'engine' || k === 'Engine') continue; let v; try { v = o[k]; } catch (e) { continue; } if (v && typeof v === 'object') walk(v, d + 1); }
-      })(b, 0);
-      discN = n;
-    }
-    setInterval(() => { try { if (dmEnabled) discover(); } catch (e) {  } }, 600);
     const capPos = name => { const c = fcap.get(name); if (!c || performance.now() - c.t > 1500 || !c.cw) return null; const g = document.querySelector('#GAME_CANVAS') || document.querySelector('.game-layer'); if (!g) return null; const r = g.getBoundingClientRect(), sc = r.width / c.cw; return { x: r.left + c.x * sc, y: r.top + (c.top + (c.bot - c.top) * .1) * sc, found: true }; };
     let maxSeen = 1, pendHit = null;
     const seen = new Map();
@@ -3748,35 +3736,34 @@
     const kcol = k => cfg.colors[k] || DM_KINDS.find(x => x[0] === k)[2];
     const elemOf = t => { if (!cfg.elem) return null; const s = t.replace(/odporno[śs][^\n.]*/gi, ''); for (const k in DM_ELEM) if (DM_ELEM[k][2].test(s)) return k; return null; };
     const RX = {
-      taken1: /(-?\d[\d\s.]*)\s*obra[żz]e[ńn]\s+otrzyma[łl](?:\(a\))?\s+([^\n(]+?)\s*\(/g,
-      taken2: /([^\n(]+?)\s*\(\s*[\d.,]+%\s*\)\s*otrzyma[łl](?:\(a\))?\s+-?(\d[\d\s.]*)\s*obra[żz]e[ńn]/g,
-      dot: /([^\n(]+?)\s*\(\s*[\d.,]+%\s*\)\s*:\s*(\d[\d\s.]*)\s*obra[żz]e[ńn]\s+(?:od|po)\s+([^\n.]+)/g,
-      heal1: /Przywr[óo]cono\s+(\d[\d\s.]*)\s*punkt[óo]w\s+[żz]ycia\s+([^\n(]+?)\s*\(/g,
-      heal2: /([^\n(]+?)\s*\(\s*[\d.,]+%\s*\)\s*:[^\n]*?zregenerowano\s+(\d[\d\s.]*)\s*punkt/gi,
-      hit: /([^\n(]+?)\s*\(\s*[\d.,]+%\s*\)\s*uderzy[łl](?:a)?\s+z\s+si[łl]ą\s*\+?(\d[\d\s.]*)(?:\s*\+\s*(\d[\d\s.]*))?/g,
-      dodge: /([^\n(]+?)\s*(?:\(\s*[\d.,]+%\s*\))?\s*(?:unik(?:n[ąa][łl]|n[ęe][łl]a)|uniknięto)/gi
+      taken1: /(-?\d[\d\s.]*)\s*obra[żz]e[ńn]\s+otrzyma[łl](?:\(a\))?\s+([^\n()%]+?)\s*\(/g,
+      taken2: /([^\n()%]+?)\s*\(\s*[\d.,]+%\s*\)\s*otrzyma[łl](?:\(a\))?\s*((?:[-−–]\s*\d[\d\s.]*?\s*)+)\s*obra[żz]e[ńn]/g,
+      dot: /([^\n()%]+?)\s*\(\s*[\d.,]+%\s*\)\s*:\s*(\d[\d\s.]*)\s*obra[żz]e[ńn]\s+(?:od|po)\s+([^\n.]+)/g,
+      heal1: /Przywr[óo]cono\s+(\d[\d\s.]*)\s*punkt[óo]w\s+[żz]ycia\s+([^\n()%]+?)\s*\(/g,
+      heal2: /([^\n()%]+?)\s*\(\s*[\d.,]+%\s*\)\s*:[^\n]*?zregenerowano\s+(\d[\d\s.]*)\s*punkt/gi,
+      hit: /([^\n()%]+?)\s*\(\s*[\d.,]+%\s*\)\s*uderzy[łl](?:a)?\s+z\s+si[łl]ą\s*\+?(\d[\d\s.]*)(?:\s*\+\s*(\d[\d\s.]*))?/g,
+      dodge: /([^\n()%]+?)\s*(?:\(\s*[\d.,]+%\s*\))?\s*(?:unik(?:n[ąa][łl]|n[ęe][łl]a)|uniknięto)/gi
     };
+    const rowText = r => { const out = [], tw = document.createTreeWalker(r, NodeFilter.SHOW_TEXT); let t; while ((t = tw.nextNode())) { const v = t.nodeValue.replace(/ /g, ' ').trim(); if (v) out.push(v); } return out.join('\n') || (r.innerText || r.textContent || ''); };
     function parse(row) {
-      const raw = (row.innerText || row.textContent || '').replace(/ /g, ' ');
-      if (!/obra[żz]e[ńn]|punkt[óo]w [żz]ycia|zregenerowano|uderzy[łl]|unik/i.test(raw)) return [];
-      const text = raw.replace(/\r/g, '');
-      const crit = /krytyczn(?!a os[łl]ona)/i.test(text), shield = /krytyczna os[łl]ona/i.test(text), comboM = text.match(/Kombinacja\s*x\s*(\d+)/i), skillM = text.match(/wykonuje\s+([^\n.]+)/i);
-      const el0 = elemOf((skillM ? skillM[1] + ' ' : '') + text);
+      const text = rowText(row).replace(/\r/g, '');
+      if (text.length > 700 || !/obra[żz]e[ńn]|punkt[óo]w [żz]ycia|zregenerowano|unik/i.test(text)) return [];
+      const effs = []; text.replace(/(?:^|\n)\s*\+\s*([^\n+]+)/g, (_, t) => { t = t.trim(); if (t && !/^\d/.test(t) && !/kombinacja|niszczenie odporno/i.test(t)) effs.push(t); return ''; });
+      const crit = effs.some(t => /cios krytyczny/i.test(t)) || /Cios krytyczny/i.test(text);
+      const shield = /krytyczna os[łl]ona/i.test(text), comboM = text.match(/Kombinacja\s*x\s*(\d+)/i), skillM = text.match(/wykonuje\s+([^\n.]+)/i);
+      const labels = effs.filter(t => !/cios krytyczny/i.test(t)).map(t => t.replace(/\s+/g, ' ').slice(0, 26)).slice(0, 2);
+      const el0 = elemOf(effs.join(' ') + ' ' + (skillM ? skillM[1] : ''));
       const ev = [];
       let m;
-      for (const re of ['taken1', 'taken2', 'dot', 'heal1', 'heal2', 'hit', 'dodge']) RX[re].lastIndex = 0;
+      for (const re in RX) RX[re].lastIndex = 0;
       while ((m = RX.taken1.exec(text))) ev.push({ kind: crit ? 'crit' : 'dmg', amount: num(m[1]), target: clean(m[2]), elem: el0, shield });
-      while ((m = RX.taken2.exec(text))) ev.push({ kind: crit ? 'crit' : 'dmg', amount: num(m[2]), target: clean(m[1]), elem: el0, shield });
+      while ((m = RX.taken2.exec(text))) { const parts = m[2].replace(/\s+/g, ' ').split(/[-−–]/).map(num).filter(Boolean); if (!parts.length) continue; ev.push({ kind: crit ? 'crit' : 'dmg', amount: parts.reduce((a, b) => a + b, 0), parts: parts.length > 1 ? parts : null, target: clean(m[1].replace(/^[\s\S]*\+\s*\d[\d.]*/, '')), elem: el0, shield }); }
       while ((m = RX.dot.exec(text))) { const w = m[3] || ''; ev.push({ kind: 'dot', amount: num(m[2]), target: clean(m[1]), elem: /krwaw|ran|zranie/i.test(w) ? null : elemOf(w), label: /g[łl]ębok/i.test(w) ? 'głęboka rana' : /zranie/i.test(w) ? 'zranienie' : '' }); }
       while ((m = RX.heal1.exec(text))) ev.push({ kind: 'heal', amount: num(m[1]), target: clean(m[2]) });
       while ((m = RX.heal2.exec(text))) ev.push({ kind: 'heal', amount: num(m[2]), target: clean(m[1]), label: /ostatni ratunek/i.test(text) ? 'ostatni ratunek' : '' });
-      while ((m = RX.hit.exec(text))) { const who = clean(m[1]); ev.push({ kind: 'bonus', amount: num(m[2]), amount2: m[3] ? num(m[3]) : 0, target: who, actor: true }); }
       while ((m = RX.dodge.exec(text))) { const t = clean(m[1]); if (t && t.length < 40 && !/obra/i.test(t)) ev.push({ kind: 'block', amount: 0, target: t, label: 'UNIK' }); }
-      if (ev.length) {
-        const last = ev.filter(e => e.kind === 'dmg' || e.kind === 'crit').pop();
-        if (comboM && last) last.combo = comboM[1];
-        if (skillM && ev[0]) ev[0].skill = clean(skillM[1]).slice(0, 28);
-      }
+      const dm = ev.filter(e => e.kind === 'dmg' || e.kind === 'crit');
+      if (dm.length) { const last = dm[dm.length - 1]; if (comboM) last.combo = comboM[1]; if (labels.length) last.label = labels.join(' · '); if (skillM) dm[0].skill = clean(skillM[1]).slice(0, 28); }
       return ev;
     }
     function anchor(name, row) {
@@ -3830,7 +3817,8 @@
       const main = document.createElement('span'); main.textContent = txt; d.append(main);
       const small = Math.max(10, Math.round(sz * .55));
       const add = (t, c, w) => { const q = document.createElement('span'); q.textContent = t; q.style.cssText = `font-size:${small}px;color:${c};font-weight:${w || 'bold'}`; d.append(q); };
-      if (e.bonusA && cfg.on.bonus) { add('+' + fmtN(e.bonusA), '#4dd0e1'); if (e.bonusB) add('+' + fmtN(e.bonusB), kcol('bonus')); }
+      if (e.parts && cfg.on.bonus) { add(fmtN(e.parts[0]), '#4dd0e1'); for (let i = 1; i < e.parts.length; i++) add('+' + fmtN(e.parts[i]), kcol('bonus')); }
+      else if (e.bonusA && cfg.on.bonus) { add('+' + fmtN(e.bonusA), '#4dd0e1'); if (e.bonusB) add('+' + fmtN(e.bonusB), kcol('bonus')); }
       if (e.combo && cfg.on.combo) add('x' + e.combo, kcol('combo'));
       if (e.shield && cfg.on.block) add('🛡', kcol('block'));
       if (e.label && e.kind !== 'block') add(e.label, e.kind === 'heal' ? kcol('heal') : '#ffab91', 'normal');
@@ -3848,7 +3836,7 @@
       if (!dmEnabled) return;
       for (const m of ms) for (const n of m.addedNodes) {
         if (n.nodeType !== 1 || n.closest(GI_OWN + ',#gi-dmg,.new-chat-window,.chat-message-wrapper')) continue;
-        const t = n.textContent || ''; if (t.length < 8 || !/obra[żz]e[ńn]|punkt[óo]w [żz]ycia|uderzy[łl]|unik/i.test(t)) continue;
+        if (n.childElementCount > 80) continue; const t = n.textContent || ''; if (t.length < 8 || t.length > 4000 || !/obra[żz]e[ńn]|punkt[óo]w [żz]ycia|uderzy[łl]|unik/i.test(t)) continue;
         rowsOf(n).forEach(r => { if (!done.has(r)) { done.add(r); queue.push(r); } });
       }
       if (queue.length && !qt) qt = setTimeout(drain, 40);
@@ -3859,7 +3847,7 @@
       let i = 0; const evs = [], nowT = performance.now();
       rows.forEach(r => {
         if (!r.isConnected) return;
-        const raw = (r.innerText || r.textContent || '').trim().slice(0, 300); let ev = [];
+        const raw = rowText(r).replace(/\n/g, ' | ').slice(0, 300); let ev = [];
         try { ev = parse(r); } catch (e) {  }
         if (!ev.length) { if (/obra[żz]e[ńn]/i.test(raw)) lastRaw.push('NIEROZPOZNANE: ' + raw); return; }
         lastRaw.push(raw);
@@ -4572,7 +4560,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.95.3');
+    log('Załadowano v2.95.4');
   }
 
   let tries = 0;
