@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.83.0
+// @version      2.86.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2042,44 +2042,130 @@
   const FLAME_ON_KEY = 'gi_flame_on_v1', FLAME_CFG_KEY = 'gi_flame_cfg_v1';
   let flameEnabled = (() => { try { return localStorage.getItem(FLAME_ON_KEY) !== '0'; } catch (e) { return true; } })();
   function buildFlameView() {
-    const cfg = Object.assign({ her: true, uni: true, sec: 10 }, readLS(FLAME_CFG_KEY, {}));
+    const cfg = Object.assign({ her: true, uni: true, sec: 10, style: 'fire' }, readLS(FLAME_CFG_KEY, {}));
     const save = () => writeLS(FLAME_CFG_KEY, cfg);
     document.head.append(el('style', { textContent: `
-      #gi-flame{position:fixed;left:0;top:0;right:0;bottom:0;z-index:99990;pointer-events:none;opacity:0;transition:opacity .6s}
+      #gi-flame{position:fixed;left:0;top:0;right:0;bottom:0;z-index:99990;pointer-events:none;opacity:0;transition:opacity .5s}
       #gi-flame.on{opacity:1}
-      #gi-flame .gi-fl-glow{position:absolute;inset:0;box-shadow:inset 0 0 90px 22px rgba(41,121,255,.55),inset 0 0 200px 40px rgba(79,195,247,.25);animation:gi-flglow 1.1s ease-in-out infinite alternate}
-      @keyframes gi-flglow{from{opacity:.65}to{opacity:1}}
-      #gi-flame.gi-fl-y .gi-fl-glow{box-shadow:inset 0 0 90px 22px rgba(255,179,0,.55),inset 0 0 200px 40px rgba(255,213,79,.25)}
-      #gi-flame.gi-fl-y .gi-fl-edge span{background:radial-gradient(ellipse at 50% 100%,#fffbe0 0%,#ffd54f 25%,#ff9800 55%,rgba(255,111,0,0) 75%)}
-      #gi-flame .gi-fl-edge{position:absolute;overflow:hidden}
-      #gi-flame .gi-fl-b{left:0;right:0;bottom:0;height:120px}
-      #gi-flame .gi-fl-t{left:0;right:0;top:0;height:120px;transform:scaleY(-1)}
-      #gi-flame .gi-fl-l{left:0;top:0;width:100vh;height:120px;transform-origin:0 0;transform:translateX(120px) rotate(90deg)}
-      #gi-flame .gi-fl-r{left:0;top:0;width:100vh;height:120px;transform-origin:0 0;transform:translate(calc(100vw - 120px),100vh) rotate(-90deg)}
-      #gi-flame .gi-fl-edge span{position:absolute;bottom:-20px;border-radius:50% 50% 30% 30% / 80% 80% 20% 20%;transform-origin:50% 100%;
-        background:radial-gradient(ellipse at 50% 100%,#e8fbff 0%,#4fc3f7 25%,#1e6bff 55%,rgba(41,98,255,0) 75%);filter:blur(1.2px);animation:gi-flflick .8s ease-in-out infinite alternate}
-      @keyframes gi-flflick{0%{transform:scale(.8,.5) skewX(-7deg);opacity:.6}40%{transform:scale(1.05,1) skewX(6deg);opacity:.95}100%{transform:scale(1.1,1.15) skewX(-4deg);opacity:1}}
+      #gi-flame canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+      #gi-flame .gi-fl-glow{position:absolute;inset:0;box-shadow:inset 0 0 70px 10px rgba(41,121,255,.38),inset 0 0 170px 30px rgba(79,195,247,.16);animation:gi-flglow 1.7s ease-in-out infinite alternate}
+      @keyframes gi-flglow{0%{opacity:.55}30%{opacity:.9}55%{opacity:.62}100%{opacity:1}}
+      #gi-flame.gi-fl-pulse .gi-fl-glow{box-shadow:inset 0 0 110px 30px rgba(41,121,255,.7),inset 0 0 260px 70px rgba(79,195,247,.35);animation:gi-flpulse 1.3s ease-in-out infinite}
+      #gi-flame.gi-fl-pulse.gi-fl-y .gi-fl-glow{box-shadow:inset 0 0 110px 30px rgba(255,150,0,.72),inset 0 0 260px 70px rgba(255,200,70,.35)}
+      @keyframes gi-flpulse{0%,100%{opacity:.35}50%{opacity:1}}
+      #gi-flame.gi-fl-y .gi-fl-glow{box-shadow:inset 0 0 70px 10px rgba(255,140,0,.4),inset 0 0 170px 30px rgba(255,190,60,.16)}
     ` }));
     const ov = el('div', { id: 'gi-flame' }, el('div', { className: 'gi-fl-glow' }));
-    ['b', 't', 'l', 'r'].forEach(k => {
-      const e = el('div', { className: 'gi-fl-edge gi-fl-' + k });
-      const n = 34;
-      for (let i = 0; i < n; i++) {
-        const sp = el('span');
-        const w = 36 + Math.random() * 44;
-        sp.style.cssText = `left:${(i / n) * 100 - 2 + Math.random() * 4}%;width:${w}px;height:${55 + Math.random() * 70}px;animation-delay:${(-Math.random() * 0.8).toFixed(2)}s;animation-duration:${(0.55 + Math.random() * 0.5).toFixed(2)}s`;
-        e.append(sp);
+    const fcv = el('canvas'); ov.append(fcv);
+    const fctx = fcv.getContext('2d');
+    const RAMPS = {
+      blue: [[0, [235, 248, 255]], [.14, [130, 205, 255]], [.4, [50, 130, 255]], [.7, [25, 60, 215]], [1, [8, 15, 100]]],
+      yellow: [[0, [255, 244, 190]], [.14, [255, 205, 70]], [.4, [255, 130, 20]], [.7, [210, 45, 8]], [1, [70, 10, 4]]]
+    };
+    const SPR = {};
+    const rampAt = (ramp, t) => { for (let i = 1; i < ramp.length; i++) if (t <= ramp[i][0]) { const [t0, c0] = ramp[i - 1], [t1, c1] = ramp[i], k = (t - t0) / (t1 - t0 || 1); return c0.map((v, j) => Math.round(v + (c1[j] - v) * k)); } return ramp[ramp.length - 1][1]; };
+    function sprites(key) {
+      if (SPR[key]) return SPR[key];
+      const arr = [];
+      for (let i = 0; i < 24; i++) {
+        const c = document.createElement('canvas'); c.width = c.height = 64;
+        const x = c.getContext('2d'), [r, g, b] = rampAt(RAMPS[key], i / 23), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gr.addColorStop(0, `rgba(${r},${g},${b},1)`); gr.addColorStop(.35, `rgba(${r},${g},${b},.55)`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        x.fillStyle = gr; x.fillRect(0, 0, 64, 64); arr.push(c);
       }
-      ov.append(e);
-    });
-    let hideT = 0, remT = 0;
+      return (SPR[key] = arr);
+    }
+    let fP = [], fB = [], fRaf = 0, fEmit = false, fKey = 'blue', fLast = 0, fT = 0, fBoltT = 0;
+    const FMAX = 2200;
+    const FCOL = { blue: { main: '#4fc3f7', hot: '#e8fbff', conf: ['#4fc3f7', '#1e6bff', '#e8fbff', '#9575ff', '#80d8ff', '#ffffff'] }, yellow: { main: '#ffb300', hot: '#fff6c8', conf: ['#ffd54f', '#ff9800', '#fff3b0', '#ffffff', '#ff7043', '#ffe082'] } };
+    function fResize() { const w = Math.max(1, innerWidth), h = Math.max(1, innerHeight); if (fcv.width !== w || fcv.height !== h) { fcv.width = w; fcv.height = h; } }
+    function fEdge(u, W, H) {
+      if (u < W) return { x: u, y: H, nx: 0, ny: -1 }; u -= W;
+      if (u < H) return { x: W, y: H - u, nx: -1, ny: 0 }; u -= H;
+      if (u < W) return { x: W - u, y: 0, nx: 0, ny: 1 };
+      return { x: 0, y: u - W, nx: 1, ny: 0 };
+    }
+    function mkBolt(W, H) {
+      const e = fEdge(Math.random() * 2 * (W + H), W, H), len = 140 + Math.random() * 220, pts = [[e.x, e.y]], forks = [];
+      let x = e.x, y = e.y;
+      for (let d = 0; d < len; d += 13) { x += e.nx * 13 + (-e.ny) * (Math.random() - .5) * 26; y += e.ny * 13 + e.nx * (Math.random() - .5) * 26; pts.push([x, y]); if (Math.random() < .16) { const f = [[x, y]]; let fx = x, fy = y; for (let k = 0; k < 4; k++) { fx += e.nx * 9 + (-e.ny) * (Math.random() - .35) * 22; fy += e.ny * 9 + e.nx * (Math.random() - .35) * 22; f.push([fx, fy]); } forks.push(f); } }
+      return { pts, forks, age: 0, life: .16 + Math.random() * .12 };
+    }
+    function fSpawn(dt, st) {
+      const W = fcv.width, H = fcv.height, per = 2 * (W + H);
+      if (st === 'fire') {
+        const flick = .8 + .2 * Math.sin(fT * 9.1) * Math.sin(fT * 3.7 + 1) + .12 * Math.sin(fT * 23);
+        let n = per * 0.34 * dt * flick, tries = 0; n = Math.min(n, FMAX - fP.length);
+        for (let i = 0; i < n && tries < n * 4; tries++) {
+          const u = Math.random() * per, w = .5 + .5 * Math.sin(u * .048 + fT * 3.1) * Math.sin(u * .017 - fT * 1.7 + 2) + .25 * Math.sin(u * .11 + fT * 6.3);
+          if (Math.random() > .25 + .75 * Math.max(0, w)) continue;
+          i++; const e = fEdge(u, W, H), big = Math.random() < .3;
+          fP.push({ t: 'f', x: e.x + (Math.random() - .5) * 10, y: e.y + (Math.random() - .5) * 10, nx: e.nx, ny: e.ny, sp: (50 + Math.random() * 60) * (.7 + .7 * Math.max(0, w)), life: (big ? .95 : .6) + Math.random() * .45, age: 0, sz: (big ? 16 : 9) + Math.random() * 9, ph: Math.random() * 6.28, fr: 4 + Math.random() * 6, ember: Math.random() < .03 });
+        }
+      } else if (st === 'sparks') {
+        const n = Math.min(per * .045 * dt, FMAX - fP.length);
+        for (let i = 0; i < n; i++) { const e = fEdge(Math.random() * per, W, H), a = (Math.random() - .5) * 1.1, c = Math.cos(a), sn = Math.sin(a), sp = 220 + Math.random() * 360; fP.push({ t: 's', x: e.x, y: e.y, vx: (e.nx * c - e.ny * sn) * sp, vy: (e.nx * sn + e.ny * c) * sp, life: .7 + Math.random() * .9, age: 0, w: 1.2 + Math.random() * 1.6 }); }
+      } else if (st === 'confetti') {
+        const cols = FCOL[fKey].conf, n = Math.min(W * .16 * dt, FMAX - fP.length);
+        for (let i = 0; i < n; i++) fP.push({ t: 'c', x: Math.random() * W, y: -12, vx: (Math.random() - .5) * 60, vy: 70 + Math.random() * 120, life: 6, age: 0, w: 5 + Math.random() * 5, h: 3 + Math.random() * 4, r: Math.random() * 6.28, vr: (Math.random() - .5) * 9, ph: Math.random() * 6.28, col: cols[(Math.random() * cols.length) | 0] });
+      } else if (st === 'dust') {
+        const n = Math.min(per * .05 * dt, FMAX - fP.length);
+        for (let i = 0; i < n; i++) { const e = fEdge(Math.random() * per, W, H); fP.push({ t: 'd', x: e.x, y: e.y, nx: e.nx, ny: e.ny, sp: 14 + Math.random() * 34, life: 2.2 + Math.random() * 1.8, age: 0, sz: 5 + Math.random() * 9, ph: Math.random() * 6.28, fr: 1.5 + Math.random() * 3 }); }
+      } else if (st === 'lightning') {
+        fBoltT -= dt; if (fBoltT <= 0) { fBoltT = .1 + Math.random() * .4; fB.push(mkBolt(W, H)); if (Math.random() < .4) fB.push(mkBolt(W, H)); }
+      }
+    }
+    const fCol = (key, k, a) => { const [r, g, b] = rampAt(RAMPS[key], k); return `rgba(${r},${g},${b},${a})`; };
+    function fStep(ts) {
+      fRaf = 0; const dt = Math.min(.05, (ts - (fLast || ts)) / 1000); fLast = ts; fT += dt;
+      const st = cfg.style || 'fire';
+      fResize(); if (fEmit) fSpawn(dt, st);
+      fctx.clearRect(0, 0, fcv.width, fcv.height);
+      const spr = sprites(fKey), C = FCOL[fKey]; let alive = fB.length;
+      fctx.globalCompositeOperation = 'lighter'; fctx.lineCap = 'round';
+      for (let i = fP.length - 1; i >= 0; i--) {
+        const p = fP[i]; p.age += dt; const k = p.age / p.life;
+        if (k >= 1 || p.y > fcv.height + 30) { fP[i] = fP[fP.length - 1]; fP.pop(); continue; }
+        alive++;
+        if (p.t === 'f') {
+          const ease = 1 - k * .5, tx = -p.ny, ty = p.nx, sway = Math.sin(p.age * p.fr + p.ph) * (2 + k * 9);
+          p.x += (p.nx * p.sp * ease + tx * sway * 2) * dt; p.y += (p.ny * p.sp * ease + ty * sway * 2) * dt;
+          if (p.ember) { fctx.globalAlpha = (1 - k) * .9; fctx.drawImage(spr[Math.min(23, Math.round(k * 12))], p.x - 2.5, p.y - 2.5, 5, 5); continue; }
+          const sz = p.sz * (1 - k * .7), a = (k < .1 ? k / .1 : 1) * Math.pow(1 - k, 1.2) * .5, vert = p.nx === 0, wd = sz * 2, ln = sz * 5.2;
+          fctx.globalAlpha = a; const im = spr[Math.min(23, Math.floor(k * 23))];
+          if (vert) fctx.drawImage(im, p.x - wd / 2, p.y - (p.ny < 0 ? ln * .8 : ln * .2), wd, ln); else fctx.drawImage(im, p.x - (p.nx < 0 ? ln * .8 : ln * .2), p.y - wd / 2, ln, wd);
+        } else if (p.t === 's') {
+          p.vy += 90 * dt; p.vx *= (1 - .6 * dt); p.vy *= (1 - .6 * dt); const ox = p.x, oy = p.y; p.x += p.vx * dt; p.y += p.vy * dt;
+          fctx.strokeStyle = fCol(fKey, Math.min(1, k * 1.1), (1 - k) * .95); fctx.lineWidth = p.w * (1 - k * .5); fctx.beginPath(); fctx.moveTo(ox - p.vx * .025, oy - p.vy * .025); fctx.lineTo(p.x, p.y); fctx.stroke();
+        } else if (p.t === 'c') {
+          p.x += (p.vx + Math.sin(p.age * 2 + p.ph) * 40) * dt; p.y += p.vy * dt; p.r += p.vr * dt;
+          fctx.globalCompositeOperation = 'source-over'; fctx.globalAlpha = k > .85 ? (1 - k) / .15 : 1; fctx.fillStyle = p.col;
+          fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.r); fctx.scale(1, Math.abs(Math.cos(p.age * 5 + p.ph)) * .8 + .2); fctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); fctx.restore(); fctx.globalCompositeOperation = 'lighter';
+        } else if (p.t === 'd') {
+          const sway = Math.sin(p.age * p.fr + p.ph) * 14; p.x += (p.nx * p.sp + -p.ny * sway) * dt; p.y += (p.ny * p.sp + p.nx * sway) * dt;
+          const tw = .55 + .45 * Math.sin(p.age * 7 + p.ph); fctx.globalAlpha = Math.sin(Math.PI * k) * tw * .9; const s2 = p.sz * (1.2 - k * .4);
+          fctx.drawImage(spr[Math.min(23, Math.round(k * 8))], p.x - s2, p.y - s2, s2 * 2, s2 * 2);
+        }
+      }
+      for (let i = fB.length - 1; i >= 0; i--) {
+        const b = fB[i]; b.age += dt; if (b.age >= b.life) { fB.splice(i, 1); continue; }
+        const a = (1 - b.age / b.life) * (.6 + .4 * Math.random()), path = pts => { fctx.beginPath(); pts.forEach((q, j) => j ? fctx.lineTo(q[0], q[1]) : fctx.moveTo(q[0], q[1])); fctx.stroke(); };
+        [[10, .16, C.main], [4, .5, C.main], [1.6, 1, C.hot]].forEach(([w, al, col]) => { fctx.globalAlpha = a * al; fctx.strokeStyle = col; fctx.lineWidth = w; path(b.pts); b.forks.forEach(path); });
+      }
+      fctx.globalAlpha = 1; fctx.globalCompositeOperation = 'source-over';
+      if (fEmit || alive) fRaf = requestAnimationFrame(fStep); else { fLast = 0; fctx.clearRect(0, 0, fcv.width, fcv.height); }
+    }
+    let hideT = 0, remT = 0, lastColor = 'blue';
     function show(sec, color) {
       if (!ov.isConnected) document.body.append(ov);
+      fKey = color === 'yellow' ? 'yellow' : 'blue'; lastColor = color === 'yellow' ? 'yellow' : 'blue';
+      ov.classList.toggle('gi-fl-pulse', (cfg.style || 'fire') === 'glow');
       ov.classList.toggle('gi-fl-y', color === 'yellow');
       clearTimeout(hideT); clearTimeout(remT);
       void ov.offsetWidth;
       ov.classList.add('on');
-      hideT = setTimeout(() => ov.classList.remove('on'), Math.max(1, sec) * 1000);
+      fEmit = true; if (!fRaf) { fLast = 0; fRaf = requestAnimationFrame(fStep); }
+      hideT = setTimeout(() => { ov.classList.remove('on'); fEmit = false; }, Math.max(1, sec) * 1000);
     }
     const RAR = /(?:^|\s)t-(leg|her|uni)\w*/;
     const rarityOf = (node, d) => {
@@ -2117,19 +2203,22 @@
     secIn.style.cssText = 'width:52px';
     ['keydown', 'keyup', 'keypress'].forEach(ev => secIn.addEventListener(ev, e => e.stopPropagation()));
     secIn.addEventListener('change', () => { cfg.sec = Math.min(60, Math.max(1, Number(secIn.value) || 10)); save(); });
-    const testBtn = el('button', { textContent: '🔥 Test – heroik (niebieski)' });
+    const testBtn = el('button', { textContent: '▶ Test – heroik (niebieski)' });
     testBtn.style.cssText = 'padding:4px 14px;font-weight:bold;margin-right:6px';
     testBtn.addEventListener('click', () => show(cfg.sec, 'blue'));
-    const testBtn2 = el('button', { textContent: '🔥 Test – unikat (żółty)' });
+    const testBtn2 = el('button', { textContent: '▶ Test – unikat (żółty)' });
     testBtn2.style.cssText = 'padding:4px 14px;font-weight:bold';
     testBtn2.addEventListener('click', () => show(cfg.sec, 'yellow'));
+    const styleSel = isolate(el('select', {}));
+    [['fire', '🔥 Ogień (realistyczny)'], ['sparks', '✨ Fontanna iskier'], ['lightning', '⚡ Błyskawice'], ['glow', '💡 Pulsująca poświata'], ['confetti', '🎉 Konfetti'], ['dust', '🌟 Magiczny pył']].forEach(([v, l]) => styleSel.append(el('option', { value: v, textContent: l, selected: cfg.style === v })));
+    styleSel.addEventListener('change', () => { cfg.style = styleSel.value; save(); show(Math.min(cfg.sec, 4), lastColor); });
     const root = el('div');
     root.settingsBox = setTabs([
-      ['Wizualne', [el('div', { style: 'margin-bottom:6px' }, testBtn, testBtn2), el('div', { textContent: 'Gdy w oknie łupów pojawi się przedmiot o wybranej rzadkości, dookoła ekranu zapala się niebieski ogień.', style: 'color:#888;margin-bottom:4px' }), el('div', {}, 'Czas trwania (s): ', secIn)]],
-      ['Funkcje', [mkChk('her', 'Heroiki – niebieski ogień'), mkChk('uni', 'Unikaty – żółty ogień (gdy razem z unikatem wypadnie heroik, zawsze jest niebieski)')]]
+      ['Wizualne', [el('div', { style: 'font-weight:bold;margin-bottom:2px' }, 'Styl efektu'), styleSel, el('div', { style: 'margin:6px 0' }, testBtn, testBtn2), el('div', { textContent: 'Gdy w oknie łupów pojawi się przedmiot o wybranej rzadkości, dookoła ekranu uruchamia się wybrany efekt (niebieski dla heroików, żółty dla unikatów).', style: 'color:#888;margin-bottom:4px' }), el('div', {}, 'Czas trwania (s): ', secIn)]],
+      ['Funkcje', [mkChk('her', 'Heroiki – niebieski efekt'), mkChk('uni', 'Unikaty – żółty efekt (gdy razem z unikatem wypadnie heroik, zawsze jest niebieski)')]]
     ]);
     root.test = () => show(Math.min(cfg.sec, 5), 'blue');
-    root.stop = () => ov.classList.remove('on');
+    root.stop = () => { ov.classList.remove('on'); fEmit = false; };
     return root;
   }
 
@@ -2350,7 +2439,7 @@
       const r = n.getBoundingClientRect(); if (r.width < 20) return null;
       return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: Math.max(r.width, r.height) / 2 + cfg.gcut };
     };
-    const otherCache = { t: 0, l: [] }, otherSeen = new WeakMap();
+    const otherCache = { t: 0, l: [] }, otherSeen = new WeakMap(), otherSize = new WeakMap(), otherHold = new Map();
     function otherWins(why) {
       const out = [], skip = (n, r) => { if (why) why.push({ sel: (n.tagName + '#' + n.id + '.' + String(n.className && n.className.baseVal === undefined ? n.className : '').slice(0, 50)), r, rect: Math.round(n.getBoundingClientRect().width) + 'x' + Math.round(n.getBoundingClientRect().height) }); return false; };
       const test = n => {
@@ -2364,6 +2453,7 @@
         if (rr.right < 0 || rr.bottom < 0 || rr.left > innerWidth || rr.top > innerHeight) return skip(n, 'poza ekranem');
         if (!(n.textContent || '').trim() && !n.querySelector('img,canvas,svg')) return skip(n, 'pusty');
         const gl = document.querySelector('.game-layer'); if (gl) { const g = gl.getBoundingClientRect(), cx = rr.left + rr.width / 2, cy = rr.top + rr.height / 2; if (cx > g.left && cx < g.right && cy > g.top && cy < g.bottom) return skip(n, 'nad mapą (menu/dymek gry)'); }
+        { const nw = performance.now(), z = otherSize.get(n); if (!z || Math.abs(z.w - rr.width) > 2 || Math.abs(z.h - rr.height) > 2) { otherSize.set(n, { w: rr.width, h: rr.height, t: nw }); if (z) return skip(n, 'zmienia rozmiar'); } else if (nw - z.t < 1500) return skip(n, 'rozmiar niestabilny'); }
         if (!otherSeen.has(n)) otherSeen.set(n, performance.now());
         if (performance.now() - otherSeen.get(n) < 2000) return skip(n, 'zbyt świeże');
         return true;
@@ -2414,7 +2504,7 @@
         if (cs.display === 'none' || cs.visibility === 'hidden' || rr.width < 90 || rr.height < 60 || rr.width * rr.height > innerWidth * innerHeight * 0.7 || !/absolute|fixed/.test(cs.position)) return;
         tmap['g_' + (n.id || i)] = () => n;
       });
-      if (cfg.fT.other || cfg.themeOther) { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherCache.l = otherWins(); } }
+      if (cfg.fT.other || cfg.themeOther) { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherWins().forEach(n => otherHold.set(n, nw)); otherCache.l = [...otherHold.keys()].filter(n => n.isConnected && nw - otherHold.get(n) < 4000); [...otherHold.keys()].forEach(n => { if (!n.isConnected || nw - otherHold.get(n) > 30000) otherHold.delete(n); }); } }
       if (cfg.fT.other) otherCache.l.filter(n => n.isConnected).forEach((n, i) => { tmap['x_' + (n.id || i)] = () => n; });
       Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].miss = (frs[k].miss || 0) + 1; if (frs[k].miss > (k[0] === 'g' ? 2 : 0)) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } } });
       for (const key of Object.keys(tmap)) {
@@ -3121,6 +3211,17 @@
       if (!raf && ov.contains(cv)) raf = requestAnimationFrame(frame);
     }
     setInterval(() => { try { scan(); } catch (err) { log('aura – błąd', err); } }, 250);
+    const floatHoles = () => {
+      const tips = findGameTips();
+      document.querySelectorAll('.gi-float').forEach(f => {
+        if (f.style.display === 'none') { if (f.style.clipPath) f.style.clipPath = ''; return; }
+        const r = f.getBoundingClientRect(), hs = tips.filter(q => q.r > r.left && q.l < r.right && q.b > r.top && q.t < r.bottom);
+        const B0 = 2000, v = hs.length ? 'path(evenodd, "M' + (-B0) + ' ' + (-B0) + 'H' + (r.width + B0) + 'V' + (r.height + B0) + 'H' + (-B0) + 'Z' + hs.map(q => { const a = q.l - r.left, b = q.t - r.top, c = q.r - r.left, d = q.b - r.top; return ' M' + a + ' ' + b + 'H' + c + 'V' + d + 'H' + a + 'Z'; }).join('') + '")' : '';
+        if (f.dataset.hole !== v) { f.dataset.hole = v; f.style.clipPath = v; }
+      });
+    };
+    setInterval(() => { try { floatHoles(); } catch (e) {  } }, 200);
+    let fhRaf = 0; document.addEventListener('mousemove', () => { if (fhRaf) return; fhRaf = requestAnimationFrame(() => { fhRaf = 0; try { floatHoles(); } catch (e) {  } }); }, { passive: true, capture: true });
     let auraTipRaf = 0; document.addEventListener('mousemove', () => { if (auraTipRaf || ov.style.display === 'none') return; auraTipRaf = requestAnimationFrame(() => { auraTipRaf = 0; try { scan(); } catch (err) {  } }); }, { passive: true, capture: true });
 
     const fxBoxes = {};
@@ -3574,7 +3675,7 @@
         return makeFloatWindow({ id: 'gi-drops-win', title: 'Ostatnie dropy', key: 'gi_win_drops_v1', content: dropsView, width: 520, top: 8, mini: true, autoSize: true, headLeft: dropsView.gearBtn ? [dropsView.gearBtn] : [] });
       } catch (err) { log('błąd okna dropów', err); return { el: el('div'), toggle() {}, restore() {}, setOpen() {} }; }
     })();
-    const flameView = safeView('Ogień przy dropie', buildFlameView);
+    const flameView = safeView('Efekt przy unikacie/heroiku', buildFlameView);
     const auraView = safeView('Aura ekwipunku', buildAuraView);
     const relogView = safeView('Przelogowanie', buildRelogView);
     const relogWin = (() => {
@@ -3605,7 +3706,7 @@
     const gtView = safeView('Motyw gry', buildGameThemeView);
     const gtSetWin = mkSetWin('gi-gt-set', 'Ustawienia – Motyw gry', 'gi_win_gtset_v1', gtView.settingsBox || el('div'), 360);
     const auraSetWin = mkSetWin('gi-aura-set', 'Ustawienia – Aura ekwipunku', 'gi_win_auraset_v1', auraView.settingsBox || el('div'), 340);
-    const flameSetWin = mkSetWin('gi-flame-set', 'Ustawienia – Ogień przy dropie', 'gi_win_flameset_v1', flameView.settingsBox || el('div'), 330);
+    const flameSetWin = mkSetWin('gi-flame-set', 'Ustawienia – Efekt przy unikacie/heroiku', 'gi_win_flameset_v1', flameView.settingsBox || el('div'), 330);
     relogView.openSettings = () => relogSetWin.toggle();
     respView.openSettings = () => respSetWin.toggle();
     dropsView.openSettings = () => dropsSetWin.toggle();
@@ -3624,7 +3725,7 @@
         settings: () => dropsSetWin.toggle(),
         isOn: () => dropsEnabled,
         setOn: v => { dropsEnabled = v; try { localStorage.setItem(DROPS_ON_KEY, v ? '1' : '0'); } catch (e) {} applyDrops(); } },
-      { id: 'flame', icon: '🔥', title: 'Ogień przy dropie', desc: 'Gdy w oknie łupów pojawi się heroik (niebieski ogień) lub unikat (żółty), dookoła ekranu zapala się ogień na kilka sekund. W ustawieniach jest przycisk „Test”.', view: el('div'), action: () => { if (flameEnabled && flameView.test) flameView.test(); },
+      { id: 'flame', icon: '🔥', title: 'Efekt przy unikacie/heroiku', desc: 'Gdy w oknie łupów pojawi się heroik (niebieski efekt) lub unikat (żółty), dookoła ekranu uruchamia się efekt na kilka sekund: ogień, iskry, błyskawice, poświata, konfetti albo magiczny pył. Styl i test w ustawieniach.', view: el('div'), action: () => { if (flameEnabled && flameView.test) flameView.test(); },
         settings: () => flameSetWin.toggle(),
         isOn: () => flameEnabled,
         setOn: v => { flameEnabled = v; try { localStorage.setItem(FLAME_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (flameView.stop) flameView.stop(); flameSetWin.setOpen(false); } } },
@@ -3828,7 +3929,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.83.0');
+    log('Załadowano v2.86.0');
   }
 
   let tries = 0;
