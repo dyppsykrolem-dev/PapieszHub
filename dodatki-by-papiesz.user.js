@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.79.0
+// @version      2.81.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2141,7 +2141,7 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], lootState: true, addonTheme: true, hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], themeOther: true, lootState: true, addonTheme: true, hideThin: true, fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
     cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false, addons: true, gwins: true, other: true }, cfg.fT);
     if (cfg.fst === 'ripple') cfg.fst = 'ring';
     if (cfg.fpal === 'win') { cfg.fsync = true; cfg.fpal = 'theme'; }
@@ -2390,11 +2390,11 @@
         if (cs.display === 'none' || cs.visibility === 'hidden' || rr.width < 90 || rr.height < 60 || rr.width * rr.height > innerWidth * innerHeight * 0.7 || !/absolute|fixed/.test(cs.position)) return;
         tmap['g_' + (n.id || i)] = () => n;
       });
-      if (cfg.fT.other) { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherCache.l = otherWins(); } }
+      if (cfg.fT.other || cfg.themeOther) { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherCache.l = otherWins(); } }
       if (cfg.fT.other) otherCache.l.filter(n => n.isConnected).forEach((n, i) => { tmap['x_' + (n.id || i)] = () => n; });
       Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].miss = (frs[k].miss || 0) + 1; if (frs[k].miss > (k[0] === 'x' ? 0 : 6)) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } } });
       for (const key of Object.keys(tmap)) {
-        const want = (anim || parts) && cfg.fT[key.startsWith('a_') ? 'addons' : key.startsWith('g_') ? 'gwins' : key.startsWith('x_') ? 'other' : key];
+        const want = (anim || parts) && cfg.fT[key.startsWith('a_') ? 'addons' : key.startsWith('g_') ? 'gwins' : key.startsWith('x_') ? 'other' : key] && !(key.startsWith('a_') && cfg.addonTheme === false) && !(key.startsWith('x_') && cfg.themeOther === false);
         if (!want) { if (frs[key]) { frs[key].node.remove(); delete frs[key]; } delete frRects[key]; continue; }
         const t = tmap[key](); let r0 = t && t.getBoundingClientRect();
         if (r0 && barTop != null && ['map', 'chat', 'right', 'grid', 'stats'].includes(key) && r0.bottom > barTop) r0 = { left: r0.left, right: r0.right, top: r0.top, bottom: barTop, width: r0.width, height: Math.max(0, barTop - r0.top) };
@@ -2569,7 +2569,7 @@
         mark.add(n);
       });
       const gwi = new Set(), gwc = new Set();
-      if (cfg.theme !== 'none' && cfg.panels) document.querySelectorAll('.border-window').forEach(w => {
+      if (cfg.theme !== 'none' && cfg.panels) [...document.querySelectorAll('.border-window'), ...(cfg.themeOther ? otherCache.l.filter(n => n.isConnected) : [])].forEach(w => {
         if (w.closest(OURS) || w.offsetParent === null && getComputedStyle(w).position !== 'fixed') return;
         [w, ...w.querySelectorAll('*')].forEach(n => {
           const r = n.getBoundingClientRect(); if (r.width < 30 || r.height < 18) return;
@@ -2733,7 +2733,8 @@
     });
     col.addEventListener('input', () => { const [h, s2] = hueOf(col.value); cfg.h = h; cfg.s = Math.max(10, s2); sS.r.value = cfg.s; sS.v.textContent = cfg.s + '%'; chg(); });
     const chk = (label, key) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' ' + label); };
-    const addonChk = chk('Motyw gry na oknach dodatków (tło, nagłówki, przyciski)', 'addonTheme');
+    const addonChk = chk('Włącz motyw dla moich dodatków (tło, nagłówki, przyciski, ramki)', 'addonTheme');
+    const otherChk = chk('Włącz motyw dla dodatków innych autorów (tło, ramki)', 'themeOther');
     const fsyncChk = chk('Kolory ramek i cząsteczek zgodne z motywem głównym (motyw okien dodatków)', 'fsync');
     showCol();
     const dinfo = el('div', { style: 'font-size:11px;color:#90a4ae;margin-bottom:6px' }, 'Zbiera nazwy paneli gry i ich tła (tylko odczyt). Przydatne, gdy jakiś panel nie zmienia koloru – wyślij wynik autorowi.');
@@ -2847,7 +2848,7 @@
     const hideAllChk = (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(cfg.hideOrig && cfg.hideIn && cfg.hideThin) })); c.addEventListener('change', () => { cfg.hideOrig = c.checked; cfg.hideIn = c.checked; cfg.hideThin = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' Ukryj oryginalne ramki gry (zewnętrzną, wewnętrzne i cienkie linie)'); })();
     const tabs = setTabs([
       ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote]],
-      ['Kolory', [h5('Interfejs gry'), ...syncNote, sel, colRow, sS.row, sL.row, h5('Okna dodatków'), addonChk]],
+      ['Kolory', [h5('Interfejs gry'), ...syncNote, sel, colRow, sS.row, sL.row, h5('Okna dodatków'), addonChk, otherChk]],
       ['Ramki', [warn, fSel,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Kolor ramek i cząsteczek:'), fCol, ccRow,
@@ -2913,7 +2914,7 @@
     'Smocza krew': { fx: { fire: true, lightning: true, sparks: true }, color: 'blood' }
   };
   function buildAuraView() {
-    const cfg = Object.assign({ fx: null, style: 'fire', color: 'fire', custom: '#ff3d71', int: 1, spd: 1, op: 1, pad: 10 }, readLS(AURA_CFG_KEY, {}));
+    const cfg = Object.assign({ fx: null, style: 'fire', color: 'fire', custom: '#ff3d71', int: 1, spd: 1, op: 1, pad: 10, sync: false }, readLS(AURA_CFG_KEY, {}));
     if (!cfg.fx || typeof cfg.fx !== 'object') cfg.fx = { [cfg.style || 'fire']: true };
     const save = () => { writeLS(AURA_CFG_KEY, cfg); built = ''; scan(); };
     document.head.append(el('style', { textContent: `
@@ -2939,7 +2940,14 @@
     const ctx = cv.getContext('2d');
     const rgbHex = h => /^#[0-9a-f]{6}$/i.test(h) ? h : '#ff6d00';
     const mix = (h, k) => { const n = parseInt(rgbHex(h).slice(1), 16); const f = c => Math.round(c + (255 - c) * k); return '#' + [f(n >> 16 & 255), f(n >> 8 & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); };
-    const palette = () => cfg.color === 'custom' ? [rgbHex(cfg.custom), mix(cfg.custom, .35), mix(cfg.custom, .85)] : (AURA_COLORS[cfg.color] || AURA_COLORS.fire).slice(1);
+    const hslHex = (h, sat, l) => { sat /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = sat * Math.min(l, 1 - l), f = n => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))))); return '#' + [f(0), f(8), f(4)].map(v => v.toString(16).padStart(2, '0')).join(''); };
+    const syncPal = () => {
+      const gt = readLS(GT_CFG_KEY, {}); let on = false; try { on = localStorage.getItem(GT_ON_KEY) === '1'; } catch (e) {  }
+      if (on && gt.theme && gt.theme !== 'none' && !gt.sync) { const sat = Math.max(25, Number(gt.s) || 0), h = Number(gt.h) || 0; return [hslHex(h, sat, 58), hslHex(h, sat, 75), hslHex(h, sat, 90)]; }
+      const P = PALETTES[getTheme()] || { acc: '#c9b25a', h: '#f1e3a6', btnbd: '#d9c36a' };
+      return [rgbHex(P.acc), mix(P.acc, .35), mix(P.h || P.acc, .85)];
+    };
+    const palette = () => cfg.sync ? syncPal() : cfg.color === 'custom' ? [rgbHex(cfg.custom), mix(cfg.custom, .35), mix(cfg.custom, .85)] : (AURA_COLORS[cfg.color] || AURA_COLORS.fire).slice(1);
     const M = 90;
     let built = '', W2 = 0, H2 = 0, pal = ['#ff6d00', '#ffb300', '#fff3b0'];
     let parts = [], bolts = [], stars = [], blobs = [], nextBolt = 0, last = 0, raf = 0;
@@ -3013,7 +3021,7 @@
       const H = Math.round(18 * cfg.int + 8);
       const t = (0.8 / cfg.spd).toFixed(2);
       ov.style.cssText = `--c1:${c1};--c2:${c2};--c3:${c3};--t:${t}s;--sz:${cfg.int};opacity:${cfg.op};display:block`;
-      ov.classList.toggle('gi-rb', cfg.color === 'rainbow');
+      ov.classList.toggle('gi-rb', cfg.color === 'rainbow' && !cfg.sync);
       ov.replaceChildren();
       W2 = w; H2 = h;
       if (fx.glow || (fx.ring && !fx.glow)) ov.append(el('div', { className: 'gi-ea-glow', style: fx.glow ? '' : 'opacity:.45' }));
@@ -3074,13 +3082,19 @@
       const R = Math.max(...rs.map(r => r.right)) + pad, B = Math.max(...rs.map(r => r.bottom)) + pad;
       const w = Math.round(R - L), h = Math.round(B - T);
       if (!ov.isConnected) document.body.append(ov);
-      const key = [JSON.stringify(cfg.fx), cfg.color, cfg.custom, cfg.int, cfg.spd, Math.round(w / 8), Math.round(h / 8)].join('|');
+      const key = [JSON.stringify(cfg.fx), cfg.color, cfg.custom, cfg.sync ? palette().join() : '', cfg.int, cfg.spd, Math.round(w / 8), Math.round(h / 8)].join('|');
       if (key !== built) { built = key; build(w, h); }
       ov.style.display = 'block'; ov.style.opacity = cfg.op;
       ov.style.left = Math.round(L) + 'px'; ov.style.top = Math.round(T) + 'px'; ov.style.width = w + 'px'; ov.style.height = h + 'px';
+      {
+        const hs = findGameTips().filter(q => q.r > L - 200 && q.l < R + 200 && q.b > T - 200 && q.t < B + 200);
+        const B0 = 3000, v = hs.length ? 'path(evenodd, "M' + (-B0) + ' ' + (-B0) + 'H' + (w + B0) + 'V' + (h + B0) + 'H' + (-B0) + 'Z' + hs.map(q => { const a = q.l - L, b = q.t - T, c = q.r - L, d = q.b - T; return ' M' + a + ' ' + b + 'H' + c + 'V' + d + 'H' + a + 'Z'; }).join('') + '")' : 'none';
+        if (ov.dataset.clip !== v) { ov.dataset.clip = v; ov.style.clipPath = v; }
+      }
       if (!raf && ov.contains(cv)) raf = requestAnimationFrame(frame);
     }
     setInterval(() => { try { scan(); } catch (err) { log('aura – błąd', err); } }, 250);
+    let auraTipRaf = 0; document.addEventListener('mousemove', () => { if (auraTipRaf || ov.style.display === 'none') return; auraTipRaf = requestAnimationFrame(() => { auraTipRaf = 0; try { scan(); } catch (err) {  } }); }, { passive: true, capture: true });
 
     const fxBoxes = {};
     const mkFx = (k, label) => { const cb = el('input', { type: 'checkbox', checked: !!cfg.fx[k] }); fxBoxes[k] = cb; cb.addEventListener('change', () => { cfg.fx[k] = cb.checked; save(); }); return el('label', { style: 'display:block' }, cb, ' ' + label); };
@@ -3090,6 +3104,10 @@
     const customIn = el('input', { type: 'color', value: rgbHex(cfg.custom) });
     customIn.style.cssText = 'width:34px;height:20px;padding:0;vertical-align:middle';
     customIn.addEventListener('input', () => { cfg.custom = customIn.value; save(); });
+    const syncCb = el('input', { type: 'checkbox', checked: !!cfg.sync });
+    const syncRow = el('label', { style: 'display:block;margin:2px 0 6px;cursor:pointer' }, syncCb, ' Synchronizuj aurę z motywem (kolor jak w motywie gry / okien)');
+    const syncLock = () => { colorSel.disabled = !!cfg.sync; colorSel.style.opacity = cfg.sync ? .5 : 1; };
+    syncCb.addEventListener('change', () => { cfg.sync = syncCb.checked; syncLock(); save(); });
     const customRow = el('div', { style: 'margin:2px 0;display:' + (cfg.color === 'custom' ? '' : 'none') }, 'Własny kolor: ', customIn);
     colorSel.addEventListener('change', () => { cfg.color = colorSel.value; customRow.style.display = cfg.color === 'custom' ? '' : 'none'; save(); });
     const mkRange = (key, label, min, max, step, fmt) => {
@@ -3125,7 +3143,7 @@
         ...AURA_FX.map(([k, l]) => mkFx(k, l))
       ]],
       ['Wygląd', [
-        el('div', {}, 'Kolor: ', colorSel), customRow,
+        syncRow, el('div', {}, 'Kolor: ', colorSel), customRow,
         mkRange('int', 'Rozmiar', 0.3, 3.5, 0.1, v => '×' + v.toFixed(1)),
         mkRange('spd', 'Prędkość', 0.2, 4, 0.1, v => '×' + v.toFixed(1)),
         mkRange('op', 'Przezroczystość', 0.2, 1, 0.05, v => Math.round(v * 100) + '%'),
@@ -3133,6 +3151,7 @@
       ]],
       ['Diagnostyka', [el('details', { open: true }, el('summary', { textContent: 'Znalezione pola i przedmioty' }), dbgBtn, dbg)]]
     ]);
+    syncLock();
     root.test = () => { built = ''; scan(); };
     root.stop = () => { ov.style.display = 'none'; };
     return root;
@@ -3165,6 +3184,19 @@
     return wrap;
   }
 
+  const GI_OWN = '.gi-float,#gi-panel,#gi-btn,.gi-gtf,#gi-gtp,.gi-dtip,.gi-utip,#gi-ask,#gi-eqaura,#gi-flame';
+  function findGameTips() {
+    const out = [];
+    document.querySelectorAll('[class*="tip" i],[class*="tooltip" i],[id*="tooltip" i]').forEach(n => {
+      if (n.closest(GI_OWN)) return;
+      const cs = getComputedStyle(n); if ((cs.position !== 'absolute' && cs.position !== 'fixed') || cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return;
+      const r = n.getBoundingClientRect(); if (r.width < 30 || r.height < 14 || r.width > 700 || r.height > 700) return;
+      if (out.some(o => o.n.contains(n))) return;
+      for (let i = out.length - 1; i >= 0; i--) if (n.contains(out[i].n)) out.splice(i, 1);
+      out.push({ n, l: r.left - 3, t: r.top - 3, r: r.right + 3, b: r.bottom + 3 });
+    });
+    return out;
+  }
   function isolate(n) { ['keydown', 'keyup', 'keypress'].forEach(ev => n.addEventListener(ev, e => e.stopPropagation())); return n; }
 
   const THEME_KEY = 'gi_theme_v1';
@@ -3769,7 +3801,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.79.0');
+    log('Załadowano v2.81.0');
   }
 
   let tries = 0;
