@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.93.0
+// @version      2.94.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -37,6 +37,16 @@
   const safe = (fn, fb) => { try { const r = fn(); return r === undefined ? fb : r; } catch (e) { return fb; } };
   const log = (...a) => console.log('%c[Zmieniacz grafik]', 'color:#4fc3f7;font-weight:bold', ...a);
   const W = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
+  const _bt = { t: 0, v: false };
+  function inBattle() {
+    const n = performance.now(); if (n - _bt.t < 250) return _bt.v; _bt.t = n;
+    let v = false;
+    try {
+      const b = W.Engine && W.Engine.battle; v = !!(b && (b.show === true || b.isBattle === true || b.active === true || b.battleStarted === true));
+      if (!v) { const e = document.querySelector('.battle-controller,.battle-interface,.fight-window,[class*="battle-window" i],[class*="battle_window" i]'); v = !!(e && e.offsetParent !== null); }
+    } catch (e) {  }
+    return (_bt.v = v);
+  }
 
   let rules = [];
   try { rules = JSON.parse(localStorage.getItem(RULES_KEY) || '[]'); if (!Array.isArray(rules)) rules = []; } catch (e) { rules = []; }
@@ -2493,18 +2503,26 @@
         const c = maskCv.getContext('2d'); c.clearRect(0, 0, maskCv.width, maskCv.height);
         c.fillStyle = '#000'; c.fillRect(0, 0, maskCv.width, maskCv.height);
         c.globalCompositeOperation = 'destination-out'; c.strokeStyle = '#000';
-        c.filter = 'blur(' + (F * .32 * sc).toFixed(1) + 'px)';
-        holes.forEach(([x, y, aw, ah, wa]) => { c.lineWidth = (wa + F * .3) * sc; c.strokeRect((x + wa / 2) * sc, (y + wa / 2) * sc, (aw - wa) * sc, (ah - wa) * sc); });
+        c.filter = 'blur(' + (F * .3 * sc).toFixed(1) + 'px)';
+        const rw = r.w, rh = r.h;
+        holes.forEach(([x, y, aw, ah, wa]) => {
+          const nested = (x <= 2 && y <= 2 && x + aw >= rw - 2 && y + ah >= rh - 2) || (x >= -2 && y >= -2 && x + aw <= rw + 2 && y + ah <= rh + 2);
+          if (nested) { c.lineWidth = (wa + F * .3) * sc; c.strokeRect((x + wa / 2) * sc, (y + wa / 2) * sc, (aw - wa) * sc, (ah - wa) * sc); }
+          else { const e = F * .5; c.fillRect((x - e) * sc, (y - e) * sc, (aw + 2 * e) * sc, (ah + 2 * e) * sc); }
+        });
         c.filter = 'none';
         if (globe) { const [gx, gy, gr] = globe, g = c.createRadialGradient(gx * sc, gy * sc, gr * sc, gx * sc, gy * sc, (gr + 4) * sc); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.beginPath(); c.arc(gx * sc, gy * sc, (gr + 4) * sc, 0, 6.283); c.fill(); c.fillStyle = '#000'; c.beginPath(); c.arc(gx * sc, gy * sc, gr * sc, 0, 6.283); c.fill(); }
         const url = 'url(' + maskCv.toDataURL('image/png') + ')';
         st.webkitMaskImage = url; st.maskImage = url; st.maskSize = '100% 100%'; st.webkitMaskSize = '100% 100%';
       }
     }
+    { const stl = document.createElement('style'); stl.textContent = '.gi-inbattle .gi-gtf,.gi-inbattle .gi-gtf *{animation-play-state:paused!important}'; document.head.append(stl);
+      let was = false; setInterval(() => { const b = inBattle(); if (b === was) return; was = b; document.documentElement.classList.toggle('gi-inbattle', b); try { if (frSvg && frSvg.pauseAnimations) { if (b || cfg.fstatic) frSvg.pauseAnimations(); else frSvg.unpauseAnimations(); } } catch (e) {  } }, 300); }
     const frMasksSoon = () => { if (!maskTimer && cfg.fgrad) maskTimer = setTimeout(frMasks, 90); };
     let followRaf = 0;
     function follow() {
       followRaf = 0;
+      if (inBattle()) { followRaf = requestAnimationFrame(follow); return; }
       let n = 0;
       for (const k of Object.keys(frs)) {
         const o = frs[k]; if (!/^[agx]_/.test(k) || !o.el) continue; n++;
@@ -2592,7 +2610,7 @@
       tipOn(anim || parts); if (anim || parts) updTips();
       try { if (frSvg && frSvg.pauseAnimations) { if (cfg.fstatic) frSvg.pauseAnimations(); else frSvg.unpauseAnimations(); } } catch (e) {  }
       if (!anim && !parts) { clearInterval(frTimer); frTimer = 0; pStop(); }
-      else { if (!frTimer) frTimer = setInterval(() => frSync(false), 400); if (parts) pStart(); else pStop(); }
+      else { if (!frTimer) frTimer = setInterval(() => { if (!inBattle()) frSync(false); }, 400); if (parts) pStart(); else pStop(); }
     }
     let frGlobe = null, pcv = null, pctx = null, pRaf = 0, pLast = 0, pArr = [], pBolts = [], pOrb = {}, pBoltT = 0;
     const PT = [['sparks', 'Iskry'], ['embers', 'Żar unoszący się'], ['snow', 'Śnieg / lodowy pył'], ['stars', 'Gwiazdki'], ['magic', 'Magiczny pył'], ['lightning', 'Błyskawice'], ['orbit', 'Świetliki okrążające'], ['fireflies', 'Świetliki (błądzące)'], ['bubbles', 'Bąbelki'], ['leaves', 'Opadające liście'], ['rain', 'Deszcz'], ['confetti', 'Konfetti'], ['runes', 'Runy'], ['smoke', 'Dym / mgła'], ['meteors', 'Spadające gwiazdy']];
@@ -2641,7 +2659,7 @@
       if (pRaf) return;
       if (!pcv) { pcv = el('canvas', { id: 'gi-gtp' }); pcv.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:99001'; document.body.append(pcv); pctx = pcv.getContext('2d'); }
       pLast = performance.now();
-      const loop = t => { pRaf = requestAnimationFrame(loop); pStep(Math.min(0.05, (t - pLast) / 1000)); pLast = t; };
+      const loop = t => { pRaf = requestAnimationFrame(loop); if (inBattle()) { pLast = t; return; } pStep(Math.min(0.05, (t - pLast) / 1000)); pLast = t; };
       pRaf = requestAnimationFrame(loop);
     }
     function pStop() { if (pRaf) cancelAnimationFrame(pRaf); pRaf = 0; pStaticSig = ''; if (pcv) { pcv.remove(); pcv = null; pctx = null; } pArr = []; pBolts = []; pOrb = {}; }
@@ -2751,7 +2769,7 @@
     }
     function thinSync() {
       clearInterval(thinTimer); thinTimer = 0;
-      if (gtEnabled && (cfg.hideThin || cfg.theme !== 'none')) { thinScan(); thinTimer = setInterval(thinScan, 2500); }
+      if (gtEnabled && (cfg.hideThin || cfg.theme !== 'none')) { thinScan(); thinTimer = setInterval(() => { if (!inBattle()) thinScan(); }, 2500); }
       else document.querySelectorAll('[data-gi-thin],[data-gi-bd],[data-gi-gi],[data-gi-gc]').forEach(n => { n.removeAttribute('data-gi-thin'); n.removeAttribute('data-gi-bd'); n.removeAttribute('data-gi-gw'); n.removeAttribute('data-gi-gi'); n.removeAttribute('data-gi-gc'); });
     }
     const chg = () => { save(); apply(); thinSync(); };
@@ -3038,7 +3056,7 @@
       });
       document.querySelectorAll('[data-gi-ls],[data-gi-lw]').forEach(n => { if (!marked.has(n)) { n.removeAttribute('data-gi-ls'); n.removeAttribute('data-gi-lw'); } });
     }
-    lootTimer = setInterval(lootScan, 500);
+    lootTimer = setInterval(() => { if (!inBattle()) lootScan(); }, 500);
     thinSync();
     root.settingsBox = box;
     root.getSync = () => !!cfg.sync;
@@ -3254,7 +3272,7 @@
       }
       if (!raf && ov.contains(cv)) raf = requestAnimationFrame(frame);
     }
-    setInterval(() => { try { scan(); } catch (err) { log('aura – błąd', err); } }, 250);
+    setInterval(() => { try { if (!inBattle()) scan(); } catch (err) { log('aura – błąd', err); } }, 250);
     const floatHoles = () => {
       const tips = findGameTips();
       document.querySelectorAll('.gi-float').forEach(f => {
@@ -3264,7 +3282,7 @@
         if (f.dataset.hole !== v) { f.dataset.hole = v; f.style.clipPath = v; }
       });
     };
-    setInterval(() => { try { floatHoles(); } catch (e) {  } }, 200);
+    setInterval(() => { try { if (!inBattle()) floatHoles(); } catch (e) {  } }, 200);
     let fhRaf = 0; document.addEventListener('mousemove', () => { if (fhRaf) return; fhRaf = requestAnimationFrame(() => { fhRaf = 0; try { floatHoles(); } catch (e) {  } }); }, { passive: true, capture: true });
     let auraTipRaf = 0; document.addEventListener('mousemove', () => { if (auraTipRaf || ov.style.display === 'none') return; auraTipRaf = requestAnimationFrame(() => { auraTipRaf = 0; try { scan(); } catch (err) {  } }); }, { passive: true, capture: true });
 
@@ -4191,7 +4209,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.93.0');
+    log('Załadowano v2.94.0');
   }
 
   let tries = 0;
