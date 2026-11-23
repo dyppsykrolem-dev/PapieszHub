@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.53.0
+// @version      2.54.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2133,6 +2133,45 @@
     return root;
   }
 
+  const GT_ON_KEY = 'gi_gt_on_v1';
+  let gtEnabled = (() => { try { return localStorage.getItem(GT_ON_KEY) === '1'; } catch (e) { return false; } })();
+  function buildGameThemeView() {
+    const root = el('div');
+    const box = el('div');
+    const info = el('div', { style: 'font-size:11px;color:#90a4ae;margin-bottom:6px' }, 'Etap 1: diagnostyka interfejsu gry. Zbiera nazwy paneli, ich tła i ramki (tylko odczyt, nic nie zmienia). Wyślij wynik, a na jego podstawie zbuduję motywy.');
+    const out = isolate(el('textarea', { rows: 12, readOnly: true, placeholder: 'Wynik diagnostyki' })); out.style.fontSize = '10px';
+    const btn = el('button', { textContent: 'Zbierz diagnostykę interfejsu' });
+    const short = v => String(v || '').replace(/data:[^")]{0,40}[^")]*/g, m => m.slice(0, 40) + '…(' + m.length + ' zn.)').replace(/https?:\/\/[^/"]+/g, '').slice(0, 170);
+    const sig = n => n.tagName.toLowerCase() + (n.id ? '#' + n.id : '') + String(n.className && n.className.baseVal === undefined ? n.className : '').split(/\s+/).filter(Boolean).slice(0, 4).map(c => '.' + c).join('');
+    btn.addEventListener('click', () => {
+      const R = { when: new Date().toISOString(), viewport: [innerWidth, innerHeight] };
+      const own = n => n.closest('.gi-float,#gi-panel,#gi-btn,#gi-ask,#gi-eqaura,#gi-flame');
+      const all = [...document.querySelectorAll('body *')].filter(n => !own(n));
+      const seen = new Map();
+      all.forEach(n => {
+        const r = n.getBoundingClientRect(); if (r.width < 24 || r.height < 14) return;
+        const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        const bg = cs.backgroundImage, bi = cs.borderImageSource, hasBg = bg && bg !== 'none', hasBi = bi && bi !== 'none';
+        const bcol = cs.backgroundColor !== 'rgba(0, 0, 0, 0)', bw = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none';
+        if (!hasBg && !hasBi && !(bcol && r.width > 90 && r.height > 60) && !(bw && r.width > 90 && r.height > 60)) return;
+        const key = sig(n) + '|' + short(bg) + '|' + short(bi);
+        const rec = seen.get(key) || { sel: sig(n), parent: n.parentElement ? sig(n.parentElement) : '', count: 0, w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.left), y: Math.round(r.top), bgImage: hasBg ? short(bg) : null, bgSize: hasBg ? cs.backgroundSize : null, bgRepeat: hasBg ? cs.backgroundRepeat : null, bgColor: cs.backgroundColor, borderImage: hasBi ? short(bi) + ' slice=' + cs.borderImageSlice + ' width=' + cs.borderImageWidth : null, border: bw ? cs.borderTopWidth + ' ' + cs.borderTopStyle + ' ' + cs.borderTopColor : null, radius: cs.borderRadius, shadow: cs.boxShadow !== 'none' ? cs.boxShadow.slice(0, 80) : null };
+        rec.count++; seen.set(key, rec);
+      });
+      R.elements = [...seen.values()].sort((a, b) => b.w * b.h - a.w * a.h).slice(0, 120);
+      R.topLevel = [...document.body.children].filter(n => !own(n)).slice(0, 25).map(n => ({ sel: sig(n), kids: n.children.length, w: Math.round(n.getBoundingClientRect().width), h: Math.round(n.getBoundingClientRect().height) }));
+      R.known = ['.eq-slot', '.bags-navigation', '.tip-wrapper', '.elite-timer-wnd', '.relogger__char-group', '[class*="chat" i]', '[class*="inventory" i]', '[class*="panel" i]', '[class*="window" i]', '[class*="border" i]', '[class*="frame" i]'].map(q => { const l = [...document.querySelectorAll(q)].filter(n => !own(n)); return { q, n: l.length, sample: l.slice(0, 4).map(sig) }; });
+      R.cssVars = (() => { const o = {}; try { const cs = getComputedStyle(document.documentElement); for (const k of cs) if (k.indexOf('--') === 0 && Object.keys(o).length < 30) o[k] = cs.getPropertyValue(k).slice(0, 60); } catch (e) {  } return o; })();
+      out.value = JSON.stringify(R, null, 1);
+      if (navigator.clipboard) navigator.clipboard.writeText(out.value).catch(() => {});
+      btn.textContent = 'Gotowe – skopiowane do schowka (kliknij, aby powtórzyć)';
+    });
+    box.append(info, btn, out);
+    root.settingsBox = box;
+    root.stop = () => {};
+    return root;
+  }
+
   const AURA_ON_KEY = 'gi_aura_on_v1', AURA_CFG_KEY = 'gi_aura_cfg_v1';
   let auraEnabled = (() => { try { return localStorage.getItem(AURA_ON_KEY) === '1'; } catch (e) { return false; } })();
   const AURA_COLORS = {
@@ -2769,6 +2808,8 @@
     const respSetWin = mkSetWin('gi-resp-set', 'Ustawienia – Minutnik', 'gi_win_respset_v1', respView.settingsBox || el('div'), 330);
     const dropsSetWin = mkSetWin('gi-drops-set', 'Ustawienia – Ostatnie dropy', 'gi_win_dropset_v1', dropsView.settingsBox || el('div'), 330);
     const relogSetWin = mkSetWin('gi-relog-set', 'Ustawienia – Przelogowanie', 'gi_win_relogset_v1', relogView.settingsBox || el('div'), 330);
+    const gtView = safeView('Motyw gry', buildGameThemeView);
+    const gtSetWin = mkSetWin('gi-gt-set', 'Ustawienia – Motyw gry', 'gi_win_gtset_v1', gtView.settingsBox || el('div'), 360);
     const auraSetWin = mkSetWin('gi-aura-set', 'Ustawienia – Aura ekwipunku', 'gi_win_auraset_v1', auraView.settingsBox || el('div'), 340);
     const flameSetWin = mkSetWin('gi-flame-set', 'Ustawienia – Ogień przy dropie', 'gi_win_flameset_v1', flameView.settingsBox || el('div'), 330);
     relogView.openSettings = () => relogSetWin.toggle();
@@ -2797,6 +2838,10 @@
         settings: () => auraSetWin.toggle(),
         isOn: () => auraEnabled,
         setOn: v => { auraEnabled = v; try { localStorage.setItem(AURA_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (auraView.stop) auraView.stop(); auraSetWin.setOpen(false); } } },
+      { id: 'gt', icon: '🖼', title: 'Motyw gry', desc: 'Zmiana wyglądu ramek i teł paneli samej gry (czat, ekwipunek itp.). Na razie etap testowy: w ustawieniach jest diagnostyka interfejsu, po której zbuduję motywy.', view: el('div'), action: () => { if (gtEnabled) gtSetWin.toggle(); },
+        settings: () => gtSetWin.toggle(),
+        isOn: () => gtEnabled,
+        setOn: v => { gtEnabled = v; try { localStorage.setItem(GT_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) gtSetWin.setOpen(false); } },
       { id: 'relog', icon: '👥', title: 'Przelogowanie', desc: 'Własny pasek postaci z outfitami, nickiem i poziomem. Klik (lub dwuklik) przełącza postać. Można filtrować po świecie, ustawić liczbę rzędów i tryb „ultra clear” (same outfity).', view: el('div'), action: () => { if (relogEnabled) relogWin.toggle(); },
         settings: () => relogSetWin.toggle(),
         isOn: () => relogEnabled,
@@ -2979,7 +3024,7 @@
       if (panel.style.display === 'block' && typeof win.x === 'number') placePanel(win.x, win.y);
     });
 
-    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, flameSetWin.el);
+    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, flameSetWin.el, gtSetWin.el);
     respWin.restore();
     applyResp();
     dropsWin.restore();
