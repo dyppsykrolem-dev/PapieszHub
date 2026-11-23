@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.64.0
+// @version      2.66.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2141,11 +2141,13 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], fclip: true, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, fpal: 'theme', fc1: '#ffe9a8', fc2: '#ffb300', fc3: '#8a4b00', fspd: 1, fglow: 0.8, hideOrig: false, fsync: false, hideIn: false, hideBars: false, hideSel: [], fclip: true, fstatic: false, fout: 0, gAvoid: true, gcut: 6, fgap: 5, sync: false, fpt: {}, fpd: 1, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
     cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false, game: true, top: false, bottom: false, map: false }, cfg.fT);
     if (cfg.fst === 'ripple') cfg.fst = 'ring';
     if (cfg.fpal === 'win') { cfg.fsync = true; cfg.fpal = 'theme'; }
     if (cfg.gcut === 16) cfg.gcut = 6;
+    if (STATIC_FR.includes(cfg.fst)) cfg.fst = 'ring';
+    Object.assign(cfg, { gAvoid: true, gcut: 6, fgap: 5, fout: 0, fclip: true, frame: true, panels: true, btns: true, hideBars: false, bgChat: '', bgRight: '', bgTop: '' });
     const save = () => writeLS(GT_CFG_KEY, cfg);
     let styleEl = null;
     const SYNC = { game: [0, 0], fantasy: [130, 45], classic: [205, 55], crimson: [2, 60], violet: [272, 45], gold: [42, 70], mono: [0, 0] };
@@ -2242,6 +2244,34 @@
     };
     const frs = {};
     let frTimer = 0, frSvg = null;
+    let tipHoles = [], tipSig = '', tipListen = false, tipRaf = 0;
+    const OURS = '.gi-float,#gi-panel,#gi-btn,.gi-gtf,#gi-gtp,.gi-dtip,.gi-utip,#gi-ask,#gi-eqaura,#gi-flame';
+    function findTips() {
+      const out = [];
+      document.querySelectorAll('[class*="tip" i],[class*="tooltip" i],[id*="tooltip" i]').forEach(n => {
+        if (n.closest(OURS)) return;
+        const cs = getComputedStyle(n); if ((cs.position !== 'absolute' && cs.position !== 'fixed') || cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return;
+        const r = n.getBoundingClientRect(); if (r.width < 30 || r.height < 14 || r.width > 700 || r.height > 700) return;
+        if (out.some(o => o.n.contains(n))) return;
+        for (let i = out.length - 1; i >= 0; i--) if (n.contains(out[i].n)) out.splice(i, 1);
+        out.push({ n, l: r.left - 3, t: r.top - 3, r: r.right + 3, b: r.bottom + 3 });
+      });
+      return out;
+    }
+    function updTips() {
+      const h = findTips(), sig = h.map(q => [q.l | 0, q.t | 0, q.r | 0, q.b | 0].join(',')).join('|');
+      if (sig === tipSig) return; tipSig = sig; tipHoles = h;
+      Object.keys(frs).forEach(k => holeNode(frs[k]));
+    }
+    function holeNode(o) {
+      if (!o || !o.node || o.node.style.display === 'none') return;
+      const x = parseFloat(o.node.style.left) || 0, y = parseFloat(o.node.style.top) || 0, w = parseFloat(o.node.style.width) || 0, hh = parseFloat(o.node.style.height) || 0;
+      const hs = tipHoles.filter(q => q.r > x && q.l < x + w && q.b > y && q.t < y + hh);
+      const v = hs.length ? 'path(evenodd, "M0 0H' + w + 'V' + hh + 'H0Z' + hs.map(q => { const a = Math.max(0, q.l - x), b = Math.max(0, q.t - y), c = Math.min(w, q.r - x), d = Math.min(hh, q.b - y); return ' M' + a + ' ' + b + 'H' + c + 'V' + d + 'H' + a + 'Z'; }).join('') + '")' : 'none';
+      if (o.clip !== v) { o.clip = v; o.node.style.clipPath = v; }
+    }
+    const tipMove = () => { if (tipRaf) return; tipRaf = requestAnimationFrame(() => { tipRaf = 0; updTips(); }); };
+    const tipOn = on => { if (on && !tipListen) { document.addEventListener('mousemove', tipMove, { passive: true, capture: true }); tipListen = true; } else if (!on && tipListen) { document.removeEventListener('mousemove', tipMove, true); tipListen = false; tipHoles = []; tipSig = ''; } };
     const frColors = () => {
       if (cfg.fpal === 'custom') return [cfg.fc1, cfg.fc2, cfg.fc3];
       if (cfg.fsync) return WINPAL[getTheme()] || WINPAL.classic;
@@ -2293,7 +2323,7 @@
     };
     function frSync(force) {
       const anim = gtEnabled && ANIM_FR.includes(cfg.fst);
-      const parts = gtEnabled && Object.keys(cfg.fpt || {}).some(k => cfg.fpt[k]);
+      const parts = gtEnabled && !cfg.fstatic && Object.keys(cfg.fpt || {}).some(k => cfg.fpt[k]);
       const gc = globeCircle(), out = Number(cfg.fout) || 0, barTop = barTopY();
       const Wd = Math.min(14, Math.max(2, cfg.fw)), gap = Math.max(0, Number(cfg.fgap) || 0);
       const R = {};
@@ -2326,14 +2356,17 @@
         let o = frs[key];
         if (!anim) { if (o) o.node.style.display = 'none'; continue; }
         if (!o) { o = frs[key] = { node: el('div', { className: 'gi-gtf' }) }; document.body.append(o.node); }
-        if (o.built !== cfg.fst || force) { frEnsureSvg(); frBuild(o, key); const [c1, c2, c3] = frColors(); const st = o.node.style; st.setProperty('--c1', c1); st.setProperty('--c2', c2); st.setProperty('--c3', c3); st.setProperty('--w', Wd + 'px'); st.setProperty('--spd', String(cfg.fspd)); st.setProperty('--glow', String(cfg.fglow)); o.node.className = 'gi-gtf s-' + cfg.fst + (cfg.fclip !== false ? ' clip' : ''); }
+        if (o.built !== cfg.fst || force) { frEnsureSvg(); frBuild(o, key); const [c1, c2, c3] = frColors(); const st = o.node.style; st.setProperty('--c1', c1); st.setProperty('--c2', c2); st.setProperty('--c3', c3); st.setProperty('--w', Wd + 'px'); st.setProperty('--spd', String(cfg.fspd)); st.setProperty('--glow', String(cfg.fglow)); o.node.className = 'gi-gtf s-' + cfg.fst + (cfg.fclip !== false ? ' clip' : '') + (cfg.fstatic ? ' freeze' : ''); }
         const st = o.node.style; st.display = ''; st.left = Math.round(r.left) + 'px'; st.top = Math.round(r.top) + 'px'; st.width = Math.round(r.width) + 'px'; st.height = Math.round(r.height) + 'px';
         let mk = 'none';
         if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 4)}px)`; }
         if (o.mk !== mk) { o.mk = mk; st.webkitMaskImage = mk; st.maskImage = mk; }
         frGeo(o, Math.round(r.width), Math.round(r.height));
+        holeNode(o);
       }
       frGlobe = gc;
+      tipOn(anim || parts); if (anim || parts) updTips();
+      try { if (frSvg && frSvg.pauseAnimations) { if (cfg.fstatic) frSvg.pauseAnimations(); else frSvg.unpauseAnimations(); } } catch (e) {  }
       if (!anim && !parts) { clearInterval(frTimer); frTimer = 0; pStop(); }
       else { if (!frTimer) frTimer = setInterval(() => frSync(false), 400); if (parts) pStart(); else pStop(); }
     }
@@ -2391,7 +2424,7 @@
         const al = 1 - b.age / b.life, path = (pts, w, col) => { c.beginPath(); pts.forEach((q, j) => j ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.lineWidth = w; c.strokeStyle = col; c.stroke(); };
         c.lineJoin = 'round'; c.globalAlpha = al * .55; path(b.pts, 7, c2); b.forks.forEach(f => path(f, 4, c2)); c.globalAlpha = al; path(b.pts, 2, c1); b.forks.forEach(f => path(f, 1.2, c1));
       }
-      c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+      c.globalAlpha = 1; c.globalCompositeOperation = 'destination-out'; c.fillStyle = '#000'; tipHoles.forEach(q => c.fillRect(q.l, q.t, q.r - q.l, q.b - q.t)); c.globalCompositeOperation = 'source-over';
     }
     function mkP(type, q) {
       const R = Math.random, o = { type, x: q.x, y: q.y, vx: 0, vy: 0, age: 0, life: 1, s: 2, g: 0, sw: 0, ph: R() * 6.28, a: 1, hi: R() < .5 };
@@ -2423,6 +2456,7 @@
       @keyframes gi-fa-dash{from{stroke-dashoffset:calc(var(--s) * 1px)}to{stroke-dashoffset:calc((var(--s) - var(--P)) * 1px)}}
       .gi-gtf{position:fixed;z-index:99000;pointer-events:none;box-sizing:border-box;isolation:isolate;contain:layout style;--w:4px;--spd:1;--glow:.8;--c1:#fff;--c2:#4fc3f7;--c3:#1565c0}
       .gi-gtf.clip{overflow:hidden}
+      .gi-gtf.freeze,.gi-gtf.freeze *{animation:none !important}
       .gi-gtf>i{position:absolute;display:block;inset:0;animation:gi-fa-rot calc(5s / var(--spd)) linear infinite}
       .gi-gtf .r{padding:var(--w);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
       .gi-gtf .g{inset:calc(var(--w) * -1);padding:calc(var(--w) * 2);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);filter:blur(calc(var(--w) * 1.6));opacity:var(--glow)}
@@ -2575,7 +2609,7 @@
     const og = (lab, arr) => { const g = el('optgroup', { label: lab }); arr.forEach(([v, l]) => g.append(el('option', { value: v, textContent: l, selected: cfg.fst === v }))); return g; };
     fSel.append(el('option', { value: 'none', textContent: 'Bez ramki (oryginał)', selected: cfg.fst === 'none' }),
       og('Animowane', [['plasma', 'Plazma (zmieniające się barwy)'], ['vortex', 'Wir (dwa obracające się promienie)'], ['glitch', 'Glitch (zakłócenia)'], ['flicker', 'Neon z migotaniem'], ['heartbeat', 'Bicie serca'], ['frost', 'Szron (kryształki lodu)'], ['prism', 'Pryzmat (tęcza z błyskiem)'], ['circuit', 'Obwody (kreskowane pierścienie)'], ['twin', 'Dwie komety'], ['ring', 'Obracający się promień'], ['pulse', 'Neon pulsujący'], ['fire', 'Ogień (falujący)'], ['energy', 'Energia (iskrzenie)'], ['chase', 'Biegnące światełka'], ['comet', 'Kometa dookoła'], ['sweep', 'Złoto z błyskiem'], ['royal', 'Królewska podwójna'], ['corners', 'Świecące rogi'], ['rainbow', 'Tęcza'], ['aurora', 'Zorza polarna']]),
-      og('Proste (statyczne)', [['gold', 'Złota podwójna'], ['silver', 'Srebrna (rowek)'], ['stone', 'Kamienna'], ['neon', 'Neon (statyczny)'], ['fantasy', 'Fantasy (zielone grafiki)'], ['custom', 'Własna grafika (link)']]));
+      );
     fSel.addEventListener('change', () => { cfg.fst = fSel.value; chg(); });
     const fW = slide('Grubość ramki', 2, 20, 1, 'fw', x => x + ' px');
     const fSp = slide('Prędkość animacji', 0.3, 3, 0.1, 'fspd', x => x.toFixed(1) + '×');
@@ -2645,19 +2679,17 @@
       el('div', {}, 'Tło czatu'), urlIn2('bgChat', 'https://…/tlo-czatu.jpg'), el('div', {}, 'Tło prawej kolumny'), urlIn2('bgRight', 'https://…/tlo-prawej.jpg'), el('div', {}, 'Górny pasek'), urlIn2('bgTop', 'https://…/gorny-pasek.png'));
     const h5 = t => el('div', { style: 'font-weight:bold;margin:8px 0 2px' }, t);
     const syncNote = cfg.sync ? [el('div', { style: 'color:#ffd54f;font-size:11px;margin:2px 0' }, 'Kolor interfejsu gry podąża teraz za motywem okien dodatków (ustawienie w menu głównym panelu).')] : [];
+    const hideAllChk = (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(cfg.hideOrig && cfg.hideIn) })); c.addEventListener('change', () => { cfg.hideOrig = c.checked; cfg.hideIn = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' Ukryj oryginalne ramki gry (zewnętrzną i wewnętrzne)'); })();
     const tabs = setTabs([
-      ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote, note('Zakładki: „Kolory” (wszystkie kolory), „Ramki” (styl i miejsca), „Efekty” (cząsteczki), „Tempo” (prędkość, blask, gęstość), „Więcej” (własne grafiki, diagnostyka).')]],
-      ['Kolory', [h5('Interfejs gry'), ...syncNote, info, sel, colRow, sS.row, sL.row, el('div', { style: 'font-weight:bold;margin:6px 0 2px' }, 'Co przefarbować:'), chk('Ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Zielone przyciski interfejsu', 'btns'),
-        h5('Ramki i cząsteczki'), fsyncChk, fCol, ccRow]],
-      ['Ramki', [warn, fSel, fGp.row, fOut.row,
+      ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote]],
+      ['Kolory', [h5('Interfejs gry'), ...syncNote, sel, colRow, sS.row, sL.row, h5('Ramki i cząsteczki'), fsyncChk, fCol, ccRow]],
+      ['Ramki', [warn, fSel,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
-        el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Oryginalne ramki gry:'), chk('Ukryj ramkę dookoła okna gry', 'hideOrig'), chk('Ukryj ramki wewnętrzne (czat, ekwipunek, statystyki, obwódki paneli)', 'hideIn'), chk('Ukryj grafikę górnego i dolnego paska', 'hideBars'),
-        el('div', { style: 'margin-top:4px' }, pickBtn), pickIn, pickFullL, pickRow, pickInfo, hidList,
-        chk('Omijaj okrągły pasek życia (wycięcie)', 'gAvoid'), gCut.row, chk('Przytnij blask do obszaru ramki (czyściej, bez nakładania)', 'fclip'),
-        el('details', { style: 'margin-top:6px' }, el('summary', { textContent: 'Własna grafika ramki (styl „Własna grafika”)' }), note('Link do obrazka z ramką (rogi + krawędzie, np. PNG 3×3). Ustaw „slice” na wielkość rogu w obrazku.'), urlIn2('fUrl', 'https://…/ramka.png'), fSl.row)]],
-      ['Efekty', [note('Cząsteczki lecą od krawędzi miejsc zaznaczonych w zakładce „Ramki”. Można łączyć kilka naraz.'), ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt))]],
-      ['Tempo', [note('Jedno miejsce na prędkość i intensywność: prędkość dotyczy animacji ramek i cząsteczek razem.'), fSp.row, fGl.row, fPd.row]],
-      ['Więcej', [el('details', { open: true }, el('summary', { textContent: 'Własne grafiki (tła, górny pasek)' }), imgBox), el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Diagnostyka interfejsu' }), dinfo, btn, out)]]
+        el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Oryginalne ramki gry:'), hideAllChk,
+        el('div', { style: 'margin-top:4px' }, pickBtn), pickIn, pickFullL, pickRow, pickInfo, hidList]],
+      ['Efekty', [ptBox, el('div', {}, mkBtn('Wyłącz wszystkie', clearPt))]],
+      ['Tempo', [chk('Zatrzymaj animacje (wersja statyczna, bez cząsteczek)', 'fstatic'), fSp.row, fGl.row, fPd.row, note('Prędkość dotyczy ramek i cząsteczek razem.')]],
+      ['Więcej', [el('details', {}, el('summary', { textContent: 'Diagnostyka interfejsu (dla autora)' }), dinfo, btn, out)]]
     ]);
     box.append(tabs);
     }
@@ -3430,7 +3462,7 @@
       layerDbg.value = JSON.stringify(out, null, 1); layerDbg.select();
       if (navigator.clipboard) navigator.clipboard.writeText(layerDbg.value).catch(() => {});
     });
-    menuView.append(el('div', { className: 'gi-rset' }, el('div', { style: 'font-weight:bold;margin-bottom:2px' }, 'Warstwa okien'), layerSel, layerNote, el('details', { style: 'margin-top:4px' }, el('summary', { textContent: 'Diagnostyka warstw' }), layerBtn, layerDbg)));
+    menuView.append(el('div', { className: 'gi-rset' }, el('div', { style: 'font-weight:bold;margin-bottom:2px' }, 'Warstwa okien'), layerSel, layerNote));
     layerApply();
     setInterval(() => { try { layerApply(); } catch (err) {  } }, 1500);
 
@@ -3534,7 +3566,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.64.0');
+    log('Załadowano v2.66.0');
   }
 
   let tries = 0;
