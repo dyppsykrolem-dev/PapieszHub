@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.55.0
+// @version      2.56.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2139,7 +2139,8 @@
     const root = el('div');
     const box = el('div');
     const PRE = [['lod', 'Lodowy', 205, 55], ['szkarlat', 'Szkarłat', 2, 60], ['las', 'Leśny', 130, 45], ['fiolet', 'Fiolet', 272, 45], ['zloto', 'Złoty', 42, 70], ['roz', 'Różowy', 330, 50], ['mrok', 'Mroczny (szary)', 0, 0]];
-    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true }, readLS(GT_CFG_KEY, {}));
+    const cfg = Object.assign({ theme: 'lod', h: 205, s: 55, l: 1, frame: true, panels: true, btns: true, fst: 'none', fw: 8, fcol: 'theme', fT: { chat: true, right: true, grid: false, stats: false }, fUrl: '', fSlice: 30, bgChat: '', bgRight: '', bgTop: '' }, readLS(GT_CFG_KEY, {}));
+    cfg.fT = Object.assign({ chat: true, right: true, grid: false, stats: false }, cfg.fT);
     const save = () => writeLS(GT_CFG_KEY, cfg);
     let styleEl = null;
     function css() {
@@ -2161,13 +2162,43 @@
         html .interface-element-one-black-tile.bag-slot-wrapper,html .chat-channel-card{background-image:linear-gradient(${c(.3, 17)},${c(.3, 12)}) !important}
         html .chat-channel-card.active{background-image:linear-gradient(${c(.35, 42)},${c(.35, 25)}) !important}\n`;
       if (cfg.btns) o += `html .widget-button.green,html .button.green{background-image:linear-gradient(${c(1, 40)},${c(1, 13)}) !important}\n`;
+      const bgu = u => { const x = cleanUrl(u || ''); return x ? x.replace(/["\\()\s]/g, encodeURIComponent) : ''; };
+      const uc = bgu(cfg.bgChat), ur = bgu(cfg.bgRight), ut = bgu(cfg.bgTop);
+      if (uc) o += `html .left-column.main-column,html .new-chat-window,html .chat-input-wrapper{background-image:url("${uc}") !important;background-size:cover !important;background-blend-mode:normal !important}\n`;
+      if (ur) o += `html .right-column.main-column{background-image:url("${ur}") !important;background-size:cover !important;background-blend-mode:normal !important}\n`;
+      if (ut) o += `html .top.positioner>.bg{background-image:url("${ut}") !important;background-size:100% 100% !important;filter:none !important}\n`;
+      const T = { chat: '.left-column.main-column', right: '.right-column.main-column', grid: '.inventory-grid-bg.interface-element-grid-border', stats: '.stats-wrapper' };
+      const sels = Object.keys(T).filter(k => cfg.fT[k]).map(k => 'html ' + T[k]);
+      if (cfg.fst !== 'none' && sels.length) {
+        const W = cfg.fw, fc = cfg.fcol === 'theme' ? c(1, 50) : '#d4af37', fcd = cfg.fcol === 'theme' ? c(1, 22) : '#6e5a1e';
+        const base = 'content:"";position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:60;box-sizing:border-box;';
+        let rule = '';
+        if (cfg.fst === 'gold') rule = `border:${W}px double ${fc};box-shadow:inset 0 0 0 1px #000,inset 0 0 10px rgba(0,0,0,.7)`;
+        else if (cfg.fst === 'silver') rule = `border:${W}px ridge #c8c8c8;box-shadow:inset 0 0 0 1px #000,0 0 6px rgba(0,0,0,.8)`;
+        else if (cfg.fst === 'stone') rule = `border:${W}px groove ${c(.25, 38)};box-shadow:inset 0 0 14px rgba(0,0,0,.85)`;
+        else if (cfg.fst === 'neon') rule = `border:${Math.max(2, Math.round(W / 3))}px solid ${fc};box-shadow:inset 0 0 12px ${fc},0 0 12px ${fc}`;
+        else if (cfg.fst === 'fantasy') { const k = W / 12, f = n => (n * k).toFixed(1); rule = `border:0;background:${['tl left top', 'tr right top', 'bl left bottom', 'br right bottom'].map(x => { const [q, h, v] = x.split(' '); return `url(${ART[q]}) ${h} ${v}/${f(q[1] === 'l' ? 40 : 38)}px ${f(q[0] === 't' ? 68 : 66)}px no-repeat`; }).concat([`url(${ART.top}) left top/auto ${f(24)}px repeat-x`, `url(${ART.bot}) left bottom/auto ${f(23)}px repeat-x`, `url(${ART.left}) left top/${f(9)}px auto repeat-y`, `url(${ART.right}) right top/${f(9)}px auto repeat-y`]).join(',')}`; }
+        else if (cfg.fst === 'custom') { const fu = bgu(cfg.fUrl); if (fu) rule = `border:${W}px solid transparent;border-image:url("${fu}") ${cfg.fSlice} / ${W}px stretch`; }
+        if (rule) o += `${sels.map(x => x + '::after').join(',')}{${base}${rule}}\n`;
+      }
       return o;
     }
+    const posFix = [];
+    const FRAME_SEL = ['.left-column.main-column', '.right-column.main-column', '.inventory-grid-bg.interface-element-grid-border', '.stats-wrapper'];
+    function fixPos() {
+      posFix.splice(0).forEach(n => { n.style.removeProperty('position'); });
+      if (!styleEl || cfg.fst === 'none') return;
+      FRAME_SEL.forEach(q => document.querySelectorAll(q).forEach(n => { if (getComputedStyle(n).position === 'static') { n.style.position = 'relative'; posFix.push(n); } }));
+    }
+    let fixTimer = 0;
     function apply() {
       if (styleEl) { styleEl.remove(); styleEl = null; }
-      if (!gtEnabled || cfg.theme === 'none') return;
+      clearInterval(fixTimer);
+      if (!gtEnabled || cfg.theme === 'none') { fixPos(); return; }
       styleEl = el('style', { id: 'gi-gt-css', textContent: css() });
       document.head.append(styleEl);
+      fixPos();
+      fixTimer = setInterval(() => { if (posFix.some(n => !n.isConnected) || !posFix.length) fixPos(); }, 3000);
     }
     const chg = () => { save(); apply(); };
 
@@ -2227,7 +2258,24 @@
       if (navigator.clipboard) navigator.clipboard.writeText(out.value).catch(() => {});
       btn.textContent = 'Gotowe – skopiowane do schowka (kliknij, aby powtórzyć)';
     });
-    box.append(info, sel, colRow, sS.row, sL.row, chk('Ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Zielone przyciski interfejsu', 'btns'),
+    const fSel = isolate(el('select', {}));
+    [['none', 'Bez ramki (oryginał)'], ['gold', 'Złota podwójna'], ['silver', 'Srebrna (rowek)'], ['stone', 'Kamienna'], ['neon', 'Neon (kolor motywu)'], ['fantasy', 'Fantasy (zielone grafiki)'], ['custom', 'Własna grafika (link)']].forEach(([v, l]) => fSel.append(el('option', { value: v, textContent: l, selected: cfg.fst === v })));
+    fSel.addEventListener('change', () => { cfg.fst = fSel.value; chg(); });
+    const fW = slide('Grubość ramki / skala grafik', 2, 20, 1, 'fw', x => x + ' px');
+    const fCol = isolate(el('select', {}));
+    [['theme', 'Kolor ramki: z motywu'], ['gold', 'Kolor ramki: złoty']].forEach(([v, l]) => fCol.append(el('option', { value: v, textContent: l, selected: cfg.fcol === v })));
+    fCol.addEventListener('change', () => { cfg.fcol = fCol.value; chg(); });
+    const tgt = (label, k) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg.fT[k] })); c.addEventListener('change', () => { cfg.fT[k] = c.checked; chg(); }); return el('label', { style: 'display:inline-block;margin:2px 10px 2px 0;cursor:pointer' }, c, ' ' + label); };
+    const urlIn2 = (key, ph, w) => { const i = isolate(el('input', { type: 'text', placeholder: ph, value: cfg[key] || '' })); i.style.cssText = 'width:100%;box-sizing:border-box;margin:2px 0'; i.addEventListener('change', () => { cfg[key] = i.value.trim(); chg(); }); return i; };
+    const fSl = slide('Własna ramka: obszar rogów (slice)', 5, 120, 1, 'fSlice', x => x + ' px');
+    const framesBox = el('div', {}, el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0' }, 'Ramka rysowana na brzegach wybranych paneli gry.'), fSel, fCol, fW.row,
+      el('div', {}, tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats')),
+      el('div', { style: 'font-size:11px;color:#90a4ae;margin-top:6px' }, 'Własna ramka: link do obrazka z ramką (rogi + krawędzie, np. PNG 3×3). Ustaw „slice” na wielkość rogu w obrazku.'), urlIn2('fUrl', 'https://…/ramka.png'), fSl.row);
+    const imgBox = el('div', {}, el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0' }, 'Wklej linki do własnych obrazków (puste = oryginał). Muszą być dostępne publicznie.'),
+      el('div', {}, 'Tło czatu'), urlIn2('bgChat', 'https://…/tlo-czatu.jpg'), el('div', {}, 'Tło prawej kolumny'), urlIn2('bgRight', 'https://…/tlo-prawej.jpg'), el('div', {}, 'Górny pasek'), urlIn2('bgTop', 'https://…/gorny-pasek.png'));
+    box.append(info, sel, colRow, sS.row, sL.row, chk('Przefarbuj ramki (górny i dolny pasek, tabliczka z mapą)', 'frame'), chk('Przefarbuj tła paneli (czat, ekwipunek, statystyki, sloty)', 'panels'), chk('Przefarbuj zielone przyciski interfejsu', 'btns'),
+      el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Style ramek dookoła paneli' }), framesBox),
+      el('details', { style: 'margin-top:4px' }, el('summary', { textContent: 'Własne grafiki (tła, górny pasek)' }), imgBox),
       el('details', { style: 'margin-top:8px' }, el('summary', { textContent: 'Diagnostyka interfejsu' }), dinfo, btn, out));
     root.settingsBox = box;
     root.apply = apply;
@@ -3098,7 +3146,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.52.0');
+    log('Załadowano v2.56.0');
   }
 
   let tries = 0;
