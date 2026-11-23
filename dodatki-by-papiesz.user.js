@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.51.0
+// @version      2.51.1
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2192,6 +2192,7 @@
     const isEquipped = (node, d) => {
       const loc = d && d.loc != null ? String(d.loc) : '';
       if (loc) return loc === 's';
+      if (d && Number(d.st) > 0) return true;
       return !!node.closest('[class*="equip" i],[class*="eq-" i]');
     };
     let testUntil = 0;
@@ -2806,7 +2807,7 @@
       if (panel.style.display === 'block' && typeof win.x === 'number') placePanel(win.x, win.y);
     });
 
-    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, flameSetWin.el);
+    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, flameSetWin.el);
     respWin.restore();
     applyResp();
     dropsWin.restore();
@@ -2816,7 +2817,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.51.0');
+    log('Załadowano v2.51.1');
   }
 
   let tries = 0;
