@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.74.0
+// @version      2.75.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2349,7 +2349,7 @@
       const Wd = Math.min(14, Math.max(2, cfg.fw)), gap = Math.max(0, Number(cfg.fgap) || 0);
       const R = {};
       const tmap = Object.assign({}, frTargets);
-      document.querySelectorAll('.gi-float').forEach((n, i) => { const rr = n.getBoundingClientRect(); if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') return; if (getComputedStyle(n).display === 'none' || rr.width < 60) return; tmap['a_' + (n.id || i)] = () => n; });
+      document.querySelectorAll('.gi-float').forEach((n, i) => { const rr = n.getBoundingClientRect(); if (n.offsetParent === null && getComputedStyle(n).position !== 'fixed') return; if (getComputedStyle(n).display === 'none' || rr.width < 60 || n.querySelector('.gi-ultra')) return; tmap['a_' + (n.id || i)] = () => n; });
       document.querySelectorAll('.border-window').forEach((n, i) => {
         if (n.closest(OURS) || (n.parentElement && n.parentElement.closest('.border-window'))) return;
         const cs = getComputedStyle(n), rr = n.getBoundingClientRect();
@@ -2402,6 +2402,7 @@
         let mk = 'none';
         if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 4)}px)`; }
         if (o.mk !== mk) { o.mk = mk; st.webkitMaskImage = mk; st.maskImage = mk; }
+        if (/^[agx]_/.test(key)) { const te = tmap[key](), zt = te && te.nodeType === 1 ? parseInt(getComputedStyle(te).zIndex, 10) : NaN; const zz = Math.max(99000, (isNaN(zt) ? 0 : zt) + 1); if (o.z !== zz) { o.z = zz; o.node.style.zIndex = String(zz); } }
         const wk = (key === 'game' || /^[agx]_/.test(key)) ? Wd : Math.max(3, Math.round(Wd * 0.55));
         if (o.W !== wk) { o.W = wk; o.node.style.setProperty('--w', wk + 'px'); o.geo = ''; }
         frGeo(o, Math.round(r.width), Math.round(r.height));
@@ -3719,7 +3720,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.74.0');
+    log('Załadowano v2.75.0');
   }
 
   let tries = 0;
