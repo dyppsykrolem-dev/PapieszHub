@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.72.0
+// @version      2.72.1
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2186,6 +2186,8 @@
         html .gi-float:not(.gi-bare) .gi-fhead,html #gi-head{background:linear-gradient(${c(.5, 24)},${c(.5, 13)}) !important;border-bottom-color:${c(.55, 42)} !important}
         html .gi-float:not(.gi-bare) .gi-ft,html .gi-float:not(.gi-bare) .gi-fhead>span,html .gi-mtitle,html .gi-float h4,html #gi-panel h4,html .gi-float summary{color:${c(.8, 82)} !important;border-color:${c(.5, 38)} !important}
         html .gi-float:not(.gi-bare) button,html .gi-float:not(.gi-bare) select,html #gi-panel button,html #gi-panel select{background:linear-gradient(${c(.5, 26)},${c(.5, 15)}) !important;border:1px solid ${c(.55, 44)} !important}
+        html .gi-float select option,html .gi-float select optgroup,html #gi-panel select option,html #gi-panel select optgroup{background:${c(.45, 11)} !important;color:${c(.8, 90)} !important}
+        html .gi-float select option:checked,html #gi-panel select option:checked{background:${c(.6, 34)} !important;color:#fff !important}
         html .gi-float:not(.gi-bare) .gi-fhead button,html #gi-head button,html .gi-themebtn{background:none !important;border:0 !important}
         html .gi-float input[type=text],html .gi-float input[type=number],html .gi-float textarea,html #gi-panel input[type=text],html #gi-panel textarea{background:${c(.45, 7)} !important;border:1px solid ${c(.5, 32)} !important}\n`;
       if (rc && cfg.btns) o += `html .widget-button.green,html .button.green{background-image:linear-gradient(${c(1, 40)},${c(1, 13)}) !important}\n`;
@@ -3135,6 +3137,9 @@
 
   function installTheme() {
     document.head.append(el('style', { id: 'gi-theme-css', textContent: `
+      .gi-float select,#gi-panel select{color-scheme:dark}
+      .gi-float select option,.gi-float select optgroup,#gi-panel select option,#gi-panel select optgroup{background:#16202a;color:#e8eef2}
+      .gi-float select option:checked,#gi-panel select option:checked{background:#2f6f9f;color:#fff}
       /* czytelniejsze ustawienia motywu gry */
       #gi-gt-set{width:440px !important;font-size:13px}
       #gi-gt-set .gi-stabs{flex-wrap:wrap;gap:5px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.12)}
@@ -3680,7 +3685,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.72.0');
+    log('Załadowano v2.72.1');
   }
 
   let tries = 0;
