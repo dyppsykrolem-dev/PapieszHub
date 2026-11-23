@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.51.2
+// @version      2.52.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2139,61 +2139,155 @@
     blue: ['Niebieski ogień', '#1e6bff', '#4fc3f7', '#e8fbff'],
     green: ['Zielony', '#2e9d3a', '#7be06f', '#eaffd9'],
     violet: ['Fioletowy', '#7a35ff', '#c9a0ff', '#f5eaff'],
-    gold: ['Złoty', '#c79100', '#ffd54f', '#fffbe0']
+    gold: ['Złoty', '#c79100', '#ffd54f', '#fffbe0'],
+    ice: ['Lód', '#0097a7', '#4dd0e1', '#e0f7fa'],
+    blood: ['Krew', '#7f0000', '#e53935', '#ffcdd2'],
+    rainbow: ['Tęcza (zmienia kolory)', '#ff3d00', '#ffd600', '#fffde7']
+  };
+  const AURA_FX = [
+    ['fire', 'Płomienie dookoła'], ['ring', 'Obracająca się ramka energii'], ['glow', 'Pulsująca poświata'],
+    ['sparks', 'Iskry unoszące się'], ['lightning', 'Błyskawice'], ['chaser', 'Biegnące światełka'], ['stars', 'Migające gwiazdki'], ['mist', 'Mgiełka / dym']
+  ];
+  const AURA_PRESETS = {
+    'Ogień': { fx: { fire: true, sparks: true, glow: true }, color: 'fire' },
+    'Lód': { fx: { ring: true, stars: true, mist: true }, color: 'ice' },
+    'Burza': { fx: { lightning: true, glow: true, mist: true }, color: 'violet' },
+    'Magia': { fx: { chaser: true, stars: true, ring: true }, color: 'rainbow' },
+    'Smocza krew': { fx: { fire: true, lightning: true, sparks: true }, color: 'blood' }
   };
   function buildAuraView() {
-    const cfg = Object.assign({ style: 'fire', color: 'fire', custom: '#ff3d71', int: 1, spd: 1, pad: 10 }, readLS(AURA_CFG_KEY, {}));
+    const cfg = Object.assign({ fx: null, style: 'fire', color: 'fire', custom: '#ff3d71', int: 1, spd: 1, op: 1, pad: 10 }, readLS(AURA_CFG_KEY, {}));
+    if (!cfg.fx || typeof cfg.fx !== 'object') cfg.fx = { [cfg.style || 'fire']: true };
     const save = () => { writeLS(AURA_CFG_KEY, cfg); built = ''; scan(); };
     document.head.append(el('style', { textContent: `
       @property --gi-a{syntax:'<angle>';inherits:false;initial-value:0deg}
       #gi-eqaura{position:fixed;z-index:99985;pointer-events:none;display:none}
+      #gi-eqaura.gi-rb{animation:gi-eahue calc(var(--t)*12) linear infinite}
+      @keyframes gi-eahue{to{filter:hue-rotate(360deg)}}
+      #gi-eqaura canvas{position:absolute;pointer-events:none}
       #gi-eqaura .gi-ea-edge{position:absolute;left:0;top:0;transform-origin:0 0}
       #gi-eqaura .gi-ea-edge span{position:absolute;bottom:-4px;border-radius:50% 50% 30% 30% / 80% 80% 20% 20%;transform-origin:50% 100%;filter:blur(1px);
         background:radial-gradient(ellipse at 50% 100%,var(--c3) 0%,var(--c2) 28%,var(--c1) 58%,transparent 76%);animation:gi-eaflick var(--t) ease-in-out infinite alternate}
       @keyframes gi-eaflick{0%{transform:scale(.8,.55) skewX(-7deg);opacity:.65}45%{transform:scale(1.05,1) skewX(6deg);opacity:.95}100%{transform:scale(1.08,1.15) skewX(-4deg);opacity:1}}
-      #gi-eqaura .gi-ea-ring{position:absolute;inset:0;border-radius:10px;padding:3px;
+      #gi-eqaura .gi-ea-ring{position:absolute;inset:0;border-radius:10px;padding:calc(3px*var(--sz));
         background:conic-gradient(from var(--gi-a),transparent,var(--c2) 22%,var(--c3) 30%,transparent 50%,var(--c1) 72%,var(--c2) 80%,transparent);
         -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
-        animation:gi-earot calc(var(--t)*5) linear infinite;filter:drop-shadow(0 0 5px var(--c2))}
+        animation:gi-earot calc(var(--t)*5) linear infinite;filter:drop-shadow(0 0 calc(5px*var(--sz)) var(--c2))}
       @keyframes gi-earot{to{--gi-a:360deg}}
       #gi-eqaura .gi-ea-glow{position:absolute;inset:0;border-radius:10px;animation:gi-eapulse calc(var(--t)*3) ease-in-out infinite alternate}
-      @keyframes gi-eapulse{from{box-shadow:0 0 6px 1px var(--c1),inset 0 0 8px 0 var(--c1);opacity:.65}to{box-shadow:0 0 22px 5px var(--c2),inset 0 0 16px 2px var(--c1);opacity:1}}
+      @keyframes gi-eapulse{from{box-shadow:0 0 calc(6px*var(--sz)) 1px var(--c1),inset 0 0 calc(8px*var(--sz)) 0 var(--c1);opacity:.65}to{box-shadow:0 0 calc(22px*var(--sz)) calc(5px*var(--sz)) var(--c2),inset 0 0 calc(16px*var(--sz)) 2px var(--c1);opacity:1}}
     ` }));
     const ov = el('div', { id: 'gi-eqaura' });
+    const cv = el('canvas');
+    const ctx = cv.getContext('2d');
     const rgbHex = h => /^#[0-9a-f]{6}$/i.test(h) ? h : '#ff6d00';
     const mix = (h, k) => { const n = parseInt(rgbHex(h).slice(1), 16); const f = c => Math.round(c + (255 - c) * k); return '#' + [f(n >> 16 & 255), f(n >> 8 & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); };
-    const palette = () => cfg.color === 'custom' ? [rgbHex(cfg.custom), mix(cfg.custom, .35), mix(cfg.custom, .85)] : AURA_COLORS[cfg.color].slice(1);
-    let built = '', flameLen = 0;
+    const palette = () => cfg.color === 'custom' ? [rgbHex(cfg.custom), mix(cfg.custom, .35), mix(cfg.custom, .85)] : (AURA_COLORS[cfg.color] || AURA_COLORS.fire).slice(1);
+    const M = 90;
+    let built = '', W2 = 0, H2 = 0, pal = ['#ff6d00', '#ffb300', '#fff3b0'];
+    let parts = [], bolts = [], stars = [], blobs = [], nextBolt = 0, last = 0, raf = 0;
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    function per(t) {
+      const L = 2 * (W2 + H2); let d = ((t % 1) + 1) % 1 * L;
+      if (d < W2) return { x: M + d, y: M, nx: 0, ny: -1 };
+      d -= W2; if (d < H2) return { x: M + W2, y: M + d, nx: 1, ny: 0 };
+      d -= H2; if (d < W2) return { x: M + W2 - d, y: M + H2, nx: 0, ny: 1 };
+      d -= W2; return { x: M, y: M + H2 - d, nx: -1, ny: 0 };
+    }
+    function hexA(h, a) { const n = parseInt(rgbHex(h).slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+    function frame(ts) {
+      raf = 0;
+      if (ov.style.display === 'none') return;
+      raf = requestAnimationFrame(frame);
+      const dt = Math.min(0.06, (ts - last) / 1000 || 0.016); last = ts;
+      const sp = cfg.spd, sz = cfg.int, fx = cfg.fx, L = 2 * (W2 + H2);
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.globalCompositeOperation = 'lighter';
+      if (fx.mist) {
+        blobs.forEach(b => {
+          b.t += dt * sp * 0.012 * b.v; const p = per(b.t); const r = 34 * sz * b.s;
+          const g = ctx.createRadialGradient(p.x + p.nx * 8, p.y + p.ny * 8, 0, p.x + p.nx * 8, p.y + p.ny * 8, r);
+          g.addColorStop(0, hexA(pal[0], .22)); g.addColorStop(1, hexA(pal[0], 0));
+          ctx.fillStyle = g; ctx.fillRect(p.x - r - 10, p.y - r - 10, 2 * r + 20, 2 * r + 20);
+        });
+      }
+      if (fx.sparks) {
+        const n = (L / 26) * sz * sp * dt; let k = Math.floor(n) + (Math.random() < n % 1 ? 1 : 0);
+        while (k-- > 0 && parts.length < 400) { const p = per(Math.random()); const v = rnd(18, 55) * sp; parts.push({ x: p.x, y: p.y, vx: p.nx * v + rnd(-14, 14), vy: p.ny * v - rnd(5, 30), life: 0, max: rnd(.6, 1.5), r: rnd(1, 2.4) * sz, c: Math.random() < .5 ? pal[1] : pal[2] }); }
+        parts = parts.filter(q => (q.life += dt) < q.max);
+        parts.forEach(q => { q.x += q.vx * dt; q.y += q.vy * dt; q.vy -= 14 * dt; const a = 1 - q.life / q.max; ctx.fillStyle = hexA(q.c, a); ctx.beginPath(); ctx.arc(q.x, q.y, q.r * (0.6 + a * .6), 0, 6.283); ctx.fill(); });
+      }
+      if (fx.lightning) {
+        nextBolt -= dt;
+        if (nextBolt <= 0) {
+          nextBolt = rnd(.25, .9) / sp;
+          const t0 = Math.random(), len = rnd(.05, .2); const pts = []; const steps = Math.max(6, Math.round(len * L / 9));
+          for (let i = 0; i <= steps; i++) { const p = per(t0 + len * i / steps); const j = (i === 0 || i === steps) ? 0 : rnd(-1, 1) * 9 * sz; pts.push([p.x + p.nx * (6 + j + 5 * sz), p.y + p.ny * (6 + j + 5 * sz)]); }
+          bolts.push({ pts, life: 0, max: .22 });
+          if (Math.random() < .5) { const p = per(Math.random()), br = []; let x = p.x, y = p.y; for (let i = 0; i < 6; i++) { br.push([x, y]); x += p.nx * rnd(6, 12) * sz + rnd(-8, 8); y += p.ny * rnd(6, 12) * sz + rnd(-8, 8); } bolts.push({ pts: br, life: 0, max: .18 }); }
+        }
+        bolts = bolts.filter(bt => (bt.life += dt) < bt.max);
+        bolts.forEach(bt => {
+          const a = 1 - bt.life / bt.max; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+          [[6 * sz, pal[0], .35], [3 * sz, pal[1], .7], [1.3, pal[2], 1]].forEach(([wd, c, al]) => { ctx.strokeStyle = hexA(c, al * a); ctx.lineWidth = wd; ctx.beginPath(); bt.pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke(); });
+        });
+      }
+      if (fx.chaser) {
+        const cnt = Math.max(3, Math.round(L / 110)), head = (ts / 1000) * sp * 0.06;
+        for (let i = 0; i < cnt; i++) {
+          for (let s = 0; s < 14; s++) {
+            const p = per(head + i / cnt - s * (7 / L)); const a = 1 - s / 14;
+            ctx.fillStyle = hexA(s ? pal[1] : pal[2], a * .9); ctx.beginPath(); ctx.arc(p.x + p.nx * 4, p.y + p.ny * 4, (s ? 2.2 : 3.4) * sz * (.5 + a * .5), 0, 6.283); ctx.fill();
+          }
+        }
+      }
+      if (fx.stars) {
+        stars.forEach(st => {
+          st.ph += dt * sp * st.v; const a = Math.max(0, Math.sin(st.ph));
+          if (st.ph > Math.PI) { st.ph = 0; const p = per(Math.random()), d = rnd(8, 60); st.x = p.x + p.nx * d; st.y = p.y + p.ny * d; st.s = rnd(3, 7) * sz; }
+          const r = st.s * a; if (r < .5) return;
+          ctx.fillStyle = hexA(pal[2], a); ctx.beginPath();
+          ctx.moveTo(st.x, st.y - r); ctx.quadraticCurveTo(st.x, st.y, st.x + r, st.y); ctx.quadraticCurveTo(st.x, st.y, st.x, st.y + r); ctx.quadraticCurveTo(st.x, st.y, st.x - r, st.y); ctx.quadraticCurveTo(st.x, st.y, st.x, st.y - r); ctx.fill();
+        });
+      }
+    }
     function build(w, h) {
-      const [c1, c2, c3] = palette();
+      pal = palette(); const [c1, c2, c3] = pal; const fx = cfg.fx;
       const H = Math.round(18 * cfg.int + 8);
       const t = (0.8 / cfg.spd).toFixed(2);
-      ov.style.cssText = `--c1:${c1};--c2:${c2};--c3:${c3};--t:${t}s;display:block`;
+      ov.style.cssText = `--c1:${c1};--c2:${c2};--c3:${c3};--t:${t}s;--sz:${cfg.int};opacity:${cfg.op};display:block`;
+      ov.classList.toggle('gi-rb', cfg.color === 'rainbow');
       ov.replaceChildren();
-      if (cfg.style === 'ring') { ov.append(el('div', { className: 'gi-ea-glow' }), el('div', { className: 'gi-ea-ring' })); }
-      else if (cfg.style === 'glow') { ov.append(el('div', { className: 'gi-ea-glow' })); }
-      else {
-        ov.append(el('div', { className: 'gi-ea-glow', style: 'opacity:.5' }));
+      W2 = w; H2 = h;
+      if (fx.glow || (fx.ring && !fx.glow)) ov.append(el('div', { className: 'gi-ea-glow', style: fx.glow ? '' : 'opacity:.45' }));
+      if (fx.ring) ov.append(el('div', { className: 'gi-ea-ring' }));
+      if (fx.fire) {
         const edge = (len, tf) => {
           const e = el('div', { className: 'gi-ea-edge' });
           e.style.cssText = `width:${len}px;height:${H}px;transform:${tf}`;
           const n = Math.max(4, Math.round(len / 13));
           for (let i = 0; i < n; i++) {
             const sp = el('span'); const wd = 14 + Math.random() * 20;
-            sp.style.cssText = `left:${(i / n) * 100 - 1 + Math.random() * 2}%;width:${wd}px;height:${H * (0.55 + Math.random() * 0.6)}px;animation-delay:${(-Math.random() * 0.9).toFixed(2)}s;animation-duration:${(0.5 + Math.random() * 0.5).toFixed(2)}s`;
+            sp.style.cssText = `left:${(i / n) * 100 - 1 + Math.random() * 2}%;width:${wd}px;height:${H * (0.55 + Math.random() * 0.6)}px;animation-delay:${(-Math.random() * 0.9).toFixed(2)}s;animation-duration:${((0.5 + Math.random() * 0.5) / cfg.spd).toFixed(2)}s`;
             e.append(sp);
           }
           return e;
         };
         ov.append(edge(w, `translate(0,${-H}px)`), edge(w, `translate(0,${h + H}px) scaleY(-1)`), edge(h, `translate(${-H}px,${h}px) rotate(-90deg)`), edge(h, `translate(${w + H}px,0) rotate(90deg)`));
       }
-      flameLen = w + h;
+      const need = fx.sparks || fx.lightning || fx.chaser || fx.stars || fx.mist;
+      if (need) {
+        cv.width = w + 2 * M; cv.height = h + 2 * M; cv.style.cssText = `left:${-M}px;top:${-M}px;width:${cv.width}px;height:${cv.height}px`;
+        ov.append(cv);
+        parts = []; bolts = [];
+        stars = Array.from({ length: Math.round(10 + (w + h) / 40) }, () => ({ x: 0, y: 0, s: 0, ph: rnd(0, 6.28), v: rnd(1.2, 3) }));
+        blobs = Array.from({ length: Math.max(5, Math.round((w + h) / 60)) }, () => ({ t: Math.random(), v: rnd(.6, 1.6), s: rnd(.7, 1.4) }));
+      }
     }
     const isEquipped = (node, d) => {
       if (node.closest('.eq-slot')) return true;
       return !!(d && String(d.loc) === 's');
     };
-    let testUntil = 0;
     function equippedRects() {
       const vis = r => r.width >= 20 && r.width <= 90 && r.height >= 20 && r.height <= 90;
       let rs = [...document.querySelectorAll('.eq-slot')].filter(n => !n.closest('#gi-panel,.gi-float')).map(n => n.getBoundingClientRect()).filter(vis);
@@ -2223,21 +2317,41 @@
       const R = Math.max(...rs.map(r => r.right)) + pad, B = Math.max(...rs.map(r => r.bottom)) + pad;
       const w = Math.round(R - L), h = Math.round(B - T);
       if (!ov.isConnected) document.body.append(ov);
-      const key = [cfg.style, cfg.color, cfg.custom, cfg.int, cfg.spd, Math.round(w / 8), Math.round(h / 8)].join('|');
+      const key = [JSON.stringify(cfg.fx), cfg.color, cfg.custom, cfg.int, cfg.spd, Math.round(w / 8), Math.round(h / 8)].join('|');
       if (key !== built) { built = key; build(w, h); }
-      ov.style.display = 'block';
+      ov.style.display = 'block'; ov.style.opacity = cfg.op;
       ov.style.left = Math.round(L) + 'px'; ov.style.top = Math.round(T) + 'px'; ov.style.width = w + 'px'; ov.style.height = h + 'px';
+      if (!raf && ov.contains(cv)) raf = requestAnimationFrame(frame);
     }
     setInterval(() => { try { scan(); } catch (err) { log('aura – błąd', err); } }, 250);
 
-    const mkSel = (key, opts, num) => { const sl = el('select'); opts.forEach(([v, l]) => sl.append(el('option', { value: v, textContent: l, selected: String(cfg[key]) === String(v) }))); sl.addEventListener('change', () => { cfg[key] = num ? Number(sl.value) : sl.value; if (key === 'color') customRow.style.display = cfg.color === 'custom' ? '' : 'none'; save(); }); return sl; };
+    const fxBoxes = {};
+    const mkFx = (k, label) => { const cb = el('input', { type: 'checkbox', checked: !!cfg.fx[k] }); fxBoxes[k] = cb; cb.addEventListener('change', () => { cfg.fx[k] = cb.checked; save(); }); return el('label', { style: 'display:block' }, cb, ' ' + label); };
+    const colorSel = el('select');
+    Object.keys(AURA_COLORS).forEach(k => colorSel.append(el('option', { value: k, textContent: AURA_COLORS[k][0], selected: cfg.color === k })));
+    colorSel.append(el('option', { value: 'custom', textContent: 'Własny…', selected: cfg.color === 'custom' }));
     const customIn = el('input', { type: 'color', value: rgbHex(cfg.custom) });
     customIn.style.cssText = 'width:34px;height:20px;padding:0;vertical-align:middle';
     customIn.addEventListener('input', () => { cfg.custom = customIn.value; save(); });
     const customRow = el('div', { style: 'margin:2px 0;display:' + (cfg.color === 'custom' ? '' : 'none') }, 'Własny kolor: ', customIn);
-    const padIn = isolate(el('input', { type: 'number', min: 0, max: 60, value: cfg.pad }));
-    padIn.style.cssText = 'width:52px';
-    padIn.addEventListener('change', () => { cfg.pad = Math.min(60, Math.max(0, Number(padIn.value) || 0)); save(); });
+    colorSel.addEventListener('change', () => { cfg.color = colorSel.value; customRow.style.display = cfg.color === 'custom' ? '' : 'none'; save(); });
+    const mkRange = (key, label, min, max, step, fmt) => {
+      const val = el('span', { style: 'display:inline-block;min-width:38px;text-align:right;color:#aaa' });
+      const r = el('input', { type: 'range', min, max, step, value: cfg[key] }); r.style.cssText = 'flex:1;min-width:90px;vertical-align:middle';
+      const show = () => { val.textContent = fmt ? fmt(Number(r.value)) : r.value; };
+      r.addEventListener('input', () => { cfg[key] = Number(r.value); show(); save(); });
+      show();
+      return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:80px' }), r, val);
+    };
+    const presetBox = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;margin:4px 0' });
+    Object.keys(AURA_PRESETS).forEach(name => {
+      const b = el('button', { textContent: name });
+      b.addEventListener('click', () => {
+        const pr = AURA_PRESETS[name]; cfg.fx = Object.assign({}, pr.fx); cfg.color = pr.color; colorSel.value = pr.color; customRow.style.display = 'none';
+        Object.keys(fxBoxes).forEach(k => { fxBoxes[k].checked = !!cfg.fx[k]; }); save();
+      });
+      presetBox.append(b);
+    });
     const dbg = isolate(el('textarea', { rows: 6, readOnly: true, placeholder: 'Diagnostyka aury' })); dbg.style.fontSize = '10px';
     const dbgBtn = el('button', { textContent: 'Pokaż znalezione przedmioty' });
     dbgBtn.addEventListener('click', () => {
@@ -2247,18 +2361,20 @@
     });
     const root = el('div');
     root.settingsBox = setTabs([
-      ['Wizualne', [
-        el('div', { textContent: 'Aura otacza cały obszar, w którym leżą Twoje założone przedmioty (widoczna, gdy okno ekwipunku jest otwarte).', style: 'color:#888;margin-bottom:4px' }),
-        el('div', {}, 'Styl: ', mkSel('style', [['fire', 'Płomienie dookoła'], ['ring', 'Obracająca się ramka energii'], ['glow', 'Pulsująca poświata']])),
-        el('div', {}, 'Kolor: ', mkSel('color', Object.keys(AURA_COLORS).map(k => [k, AURA_COLORS[k][0]]).concat([['custom', 'Własny…']]))),
-        customRow,
-        el('div', {}, 'Siła: ', mkSel('int', [[0.6, 'Delikatna'], [1, 'Normalna'], [1.6, 'Mocna'], [2.2, 'Bardzo mocna']], true)),
-        el('div', {}, 'Tempo: ', mkSel('spd', [[0.6, 'Wolne'], [1, 'Normalne'], [1.7, 'Szybkie']], true))
+      ['Efekty', [
+        el('div', { textContent: 'Aura otacza cały obszar z założonymi przedmiotami (widoczna, gdy okno ekwipunku jest otwarte). Efekty można łączyć.', style: 'color:#888;margin-bottom:4px' }),
+        el('div', { style: 'font-weight:bold' }, 'Gotowe zestawy'), presetBox,
+        el('div', { style: 'font-weight:bold;margin-top:4px' }, 'Efekty'),
+        ...AURA_FX.map(([k, l]) => mkFx(k, l))
       ]],
-      ['Funkcje', [
-        el('div', {}, 'Odstęp od przedmiotów (px): ', padIn),
-        el('details', { style: 'margin-top:4px' }, el('summary', { textContent: 'Diagnostyka' }), dbgBtn, dbg)
-      ]]
+      ['Wygląd', [
+        el('div', {}, 'Kolor: ', colorSel), customRow,
+        mkRange('int', 'Rozmiar', 0.3, 3.5, 0.1, v => '×' + v.toFixed(1)),
+        mkRange('spd', 'Prędkość', 0.2, 4, 0.1, v => '×' + v.toFixed(1)),
+        mkRange('op', 'Przezroczystość', 0.2, 1, 0.05, v => Math.round(v * 100) + '%'),
+        mkRange('pad', 'Odstęp', 0, 60, 1, v => v + ' px')
+      ]],
+      ['Diagnostyka', [el('details', { open: true }, el('summary', { textContent: 'Znalezione pola i przedmioty' }), dbgBtn, dbg)]]
     ]);
     root.test = () => { built = ''; scan(); };
     root.stop = () => { ov.style.display = 'none'; };
@@ -2823,7 +2939,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.51.2');
+    log('Załadowano v2.52.0');
   }
 
   let tries = 0;
