@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.98.1
+// @version      2.98.2
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3732,7 +3732,7 @@
 
   const CH_ON_KEY = 'gi_chat_on_v1', CH_CFG_KEY = 'gi_chat_cfg_v1';
   let chEnabled = (() => { try { return localStorage.getItem(CH_ON_KEY) === '1'; } catch (e) { return false; } })();
-  const CH_CHANNELS = [['global', 'Ogólny / lokalny', '#e0e0e0', /global|general|ogoln|local|lokaln|map\b/i], ['clan', 'Klan', '#8bc34a', /clan|klan/i], ['group', 'Drużyna', '#4fc3f7', /party|group|team|dru[zż]yn/i], ['private', 'Prywatne', '#ff80ab', /priv|whisper|szept|prywat|\bpm\b/i], ['trade', 'Handel', '#ffd54f', /trade|handel|market|aukcj/i], ['system', 'System / informacje', '#b0bec5', /system|server|serwer|info|notice/i]];
+  const CH_CHANNELS = [['global', 'Ogólny / lokalny', '#e0e0e0', /global|general|ogoln|local|lokaln|map\b/i], ['clan', 'Klan', '#8bc34a', /clan|klan/i], ['group', 'Drużyna', '#4fc3f7', /party|group|team|dru[zż]yn/i], ['private', 'Prywatne', '#ff80ab', /priv|whisper|szept|prywat|\bpm\b/i], ['trade', 'Handel', '#ffd54f', /trade|commercial|handel|market|aukcj/i], ['system', 'System / informacje', '#b0bec5', /system|server|serwer|info|notice/i]];
   const CH_FONTS = ['', 'Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'Consolas', 'Segoe UI', 'Comic Sans MS', 'Impact'];
   function buildChatView() {
     const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
@@ -3754,13 +3754,15 @@
       if (cfg.outline) f.push('text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000 !important');
       if (f.length) o += `html body .new-chat-window.new-chat-window ${WR},html body .new-chat-window.new-chat-window ${WR} *:not(img):not(svg):not(i){${f.join(';')}}\n`;
       if (cfg.lh) o += `html body .new-chat-window.new-chat-window ${WR} [data-gi-m]{line-height:${cfg.lh}px !important}\n`;
-      if (cfg.recolor) CH_CHANNELS.forEach(([k]) => { const c = cfg.colors[k]; if (c) o += `html body .new-chat-window.new-chat-window [data-gi-ch="${k}"],html body .new-chat-window.new-chat-window [data-gi-ch="${k}"] *:not([class*="nick" i]):not([class*="time" i]):not([class*="date" i]){color:${c} !important}\n`; });
+      if (cfg.recolor) CH_CHANNELS.forEach(([k, , d0]) => { const c = cfg.colors[k] || d0; if (c) o += `html body .new-chat-window.new-chat-window [data-gi-ch="${k}"],html body .new-chat-window.new-chat-window [data-gi-ch="${k}"] *:not([class*="nick" i]):not([class*="time" i]):not([class*="date" i]){color:${c} !important}\n`; });
       o += `html body .new-chat-window.new-chat-window [data-gi-c],html body .new-chat-window.new-chat-window [data-gi-c] *:not([class*="time" i]){color:var(--gi-c) !important}\n`;
       o += `html body .new-chat-window.new-chat-window [data-gi-bg]{background:linear-gradient(90deg,var(--gi-bg),transparent) !important;border-radius:3px}\n`;
       return o;
     };
     function classify(m) {
-      let s = clsOf(m); m.querySelectorAll('*').forEach((c, i) => { if (i < 30) s += ' ' + clsOf(c); });
+      const own0 = clsOf(m), tk = /chat-([A-Za-z]+)-message/.exec(own0) || /(?:^|\s)([A-Za-z]+)-channel-in-/.exec(own0);
+      if (tk) { for (const [k, , , re] of CH_CHANNELS) if (re.test(tk[1])) return k; return 'global'; }
+      let s = own0.replace(/-channel-in-[A-Za-z]+-channel/gi, ' '); m.querySelectorAll('*').forEach((c, i) => { if (i < 30) s += ' ' + clsOf(c).replace(/-channel-in-[A-Za-z]+-channel/gi, ' '); });
       for (const [k, , , re] of CH_CHANNELS) if (re.test(s)) return k;
       return '';
     }
@@ -4728,7 +4730,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.98.1');
+    log('Załadowano v2.98.2');
   }
 
   let tries = 0;
