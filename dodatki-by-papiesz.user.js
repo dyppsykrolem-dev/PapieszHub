@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.99.0
+// @version      2.99.1
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2248,7 +2248,7 @@
     styleSel.addEventListener('change', () => { cfg.style = styleSel.value; save(); show(Math.min(cfg.sec, 4), lastColor); });
     const root = el('div');
     root.settingsBox = setTabs([
-      ['Wizualne', [el('div', { style: 'font-weight:bold;margin-bottom:2px' }, 'Styl efektu'), styleSel, el('div', { style: 'margin:6px 0' }, testBtn, testBtn2), el('div', { textContent: 'Gdy w oknie łupów pojawi się przedmiot o wybranej rzadkości, dookoła ekranu uruchamia się wybrany efekt (niebieski dla heroików, żółty dla unikatów).', style: 'color:#888;margin-bottom:4px' }), el('div', {}, 'Czas trwania (s): ', secIn)]],
+      ['Wizualne', [el('div', { style: 'font-weight:bold;margin-bottom:2px' }, 'Styl efektu'), tileify(styleSel, v => ({ fire: 'background:linear-gradient(160deg,#7a1608,#ff6d00,#ffd54f)', sparks: 'background:radial-gradient(circle at 50% 100%,#ffd54f,#4a2a05 70%)', lightning: 'background:linear-gradient(160deg,#1a1040,#7a5cff 60%,#ffe94d)', glow: 'background:radial-gradient(circle,#7fe9ff,#0b2a3a 75%)', confetti: 'background:linear-gradient(135deg,#ff6fa8,#ffd54f,#69f0ae,#4fc3f7)', dust: 'background:radial-gradient(circle at 30% 30%,#d2a8ff,#2a1450 75%)' }[v] || 'background:#222'), 3), el('div', { style: 'margin:6px 0' }, testBtn, testBtn2), el('div', { textContent: 'Gdy w oknie łupów pojawi się przedmiot o wybranej rzadkości, dookoła ekranu uruchamia się wybrany efekt (niebieski dla heroików, żółty dla unikatów).', style: 'color:#888;margin-bottom:4px' }), el('div', {}, 'Czas trwania (s): ', secIn)]],
       ['Funkcje', [mkChk('her', 'Heroiki – niebieski efekt'), mkChk('uni', 'Unikaty – żółty efekt (gdy razem z unikatem wypadnie heroik, zawsze jest niebieski)')]]
     ]);
     root.test = () => show(Math.min(cfg.sec, 5), 'blue');
@@ -3080,11 +3080,11 @@
     const syncNote = cfg.sync ? [el('div', { style: 'color:#ffd54f;font-size:11px;margin:2px 0' }, 'Kolor interfejsu gry podąża teraz za motywem okien dodatków (ustawienie w menu głównym panelu).')] : [];
     const hideAllChk = (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(cfg.hideOrig && cfg.hideIn && cfg.hideThin) })); c.addEventListener('change', () => { cfg.hideOrig = c.checked; cfg.hideIn = c.checked; cfg.hideThin = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' Ukryj oryginalne ramki gry (zewnętrzną, wewnętrzne i cienkie linie)'); })();
     const tabs = setTabs([
-      ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), pSel, offNote, el('div', { style: 'font-weight:bold;margin-top:10px' }, 'Co ma zmieniać zestaw'), chk('Zachowaj moje tempo (prędkość, jasność, gęstość, grubość ramki) przy zmianie zestawu', 'keepTempo'), chk('Zestaw zmienia tylko efekty – zostaw kolory motywu bez zmian', 'keepColors')]],
-      ['Kolory', [h5('Interfejs gry'), ...syncNote, sel, colRow, sS.row, sL.row, h5('Okna dodatków'), addonChk, otherChk]],
-      ['Ramki', [warn, fSel,
+      ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), tileify(pSel, v => { if (v === '') return null; const pr = PRESETS[Number(v)]; const c = pr && PAL[pr.fpal]; return c ? `background:linear-gradient(135deg,${c[2]},${c[1]},${c[0]})` : 'background:#222'; }, 3), offNote, el('div', { style: 'font-weight:bold;margin-top:10px' }, 'Co ma zmieniać zestaw'), chk('Zachowaj moje tempo (prędkość, jasność, gęstość, grubość ramki) przy zmianie zestawu', 'keepTempo'), chk('Zestaw zmienia tylko efekty – zostaw kolory motywu bez zmian', 'keepColors')]],
+      ['Kolory', [h5('Interfejs gry'), ...syncNote, tileify(sel, v => { if (v === 'none') return 'background:repeating-linear-gradient(45deg,#2a2a2a 0 6px,#1d1d1d 6px 12px)'; if (v === 'custom') return 'background:' + CONIC; const q = PRE.find(x => x[0] === v); return q ? `background:linear-gradient(135deg,hsl(${q[2]} ${Math.max(q[3], 8)}% 22%),hsl(${q[2]} ${Math.max(q[3], 8)}% 52%))` : null; }, 4), colRow, sS.row, sL.row, h5('Okna dodatków'), addonChk, otherChk]],
+      ['Ramki', [warn, tileify(fSel, v => { const c = frColors()[1] || '#fff', an = ['plasma', 'rainbow', 'prism', 'aurora'].includes(v) ? ';animation:gitHue 6s linear infinite' : ['pulse', 'heartbeat', 'flicker', 'glitch', 'energy'].includes(v) ? ';animation:gitpulse 1.1s ease-in-out infinite alternate' : ''; return v === 'none' ? 'background:#15151c' : `background:#15151c;box-shadow:inset 0 0 0 2px ${c},0 0 7px ${c}${an}`; }, 3),
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
-        el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Kolor ramek i cząsteczek:'), fCol, ccRow,
+        el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Kolor ramek i cząsteczek:'), tileify(fCol, v => PAL[v] ? `background:linear-gradient(135deg,${PAL[v][0]},${PAL[v][1]},${PAL[v][2]})` : (v === 'custom' ? 'background:' + CONIC : 'background:linear-gradient(135deg,#2a2a35,#6a6a80)'), 3), ccRow,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gradient ramek'), gradChk, fGf.row,
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Oryginalne ramki gry:'), hideAllChk,
         ]],
@@ -3390,7 +3390,7 @@
         ...AURA_FX.map(([k, l]) => mkFx(k, l))
       ]],
       ['Wygląd', [
-        syncRow, el('div', {}, 'Kolor: ', colorSel), customRow,
+        syncRow, el('div', {}, 'Kolor:'), tileify(colorSel, auraTile, 3), customRow,
         mkRange('int', 'Rozmiar', 0.3, 3.5, 0.1, v => '×' + v.toFixed(1)),
         mkRange('spd', 'Prędkość', 0.2, 4, 0.1, v => '×' + v.toFixed(1)),
         mkRange('op', 'Przezroczystość', 0.2, 1, 0.05, v => Math.round(v * 100) + '%'),
@@ -3622,7 +3622,7 @@
       ['Efekty', [el('div', { style: 'font-weight:bold' }, 'Gotowe zestawy'), presetBox, el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Warstwy (łącz dowolnie)'), ...HA_FX.map(([k, l]) => mkFx(k, l))]],
       ['Wygląd', [
         el('label', { style: 'display:block;cursor:pointer;margin:2px 0 6px' }, syncCb, ' Synchronizuj z motywem (te same kolory co ramki motywu gry)'),
-        el('div', {}, 'Kolor: ', colorSel), customRow,
+        el('div', {}, 'Kolor:'), tileify(colorSel, auraTile, 3), customRow,
         mkRange('size', 'Rozmiar', .4, 3, .05, v => '×' + v.toFixed(2)), mkRange('spd', 'Prędkość', .2, 3, .05, v => '×' + v.toFixed(2)), mkRange('dens', 'Ilość cząsteczek', .2, 3, .1, v => '×' + v.toFixed(1)), mkRange('op', 'Przezroczystość', .2, 1, .05, v => Math.round(v * 100) + '%')
       ]],
       ['Pozycja', [el('div', {}, 'Pozycja aury: ', posSel), mkRange('ox', 'Przesuń w prawo', -80, 80, 1, v => v + ' px'), mkRange('oy', 'Przesuń w dół', -80, 80, 1, v => v + ' px'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0' }, 'Jeśli aura nie trafia w postać, ustaw suwakami albo wybierz „Środek mapy” (postać zwykle jest w środku ekranu). Przy diagnostyce wyślij mi dane z przycisku poniżej.'), dbgBtn, dbg]]
@@ -3768,8 +3768,8 @@
   const CH_ON_KEY = 'gi_chat_on_v1', CH_CFG_KEY = 'gi_chat_cfg_v1';
   let chEnabled = (() => { try { return localStorage.getItem(CH_ON_KEY) === '1'; } catch (e) { return false; } })();
   const CH_FONTS = {
-    sys: ['Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'Consolas', 'Segoe UI', 'Calibri', 'Cambria', 'Candara', 'Palatino Linotype', 'Lucida Console', 'Comic Sans MS', 'Impact'],
-    web: ['Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Nunito', 'PT Sans', 'Ubuntu', 'Oswald', 'Merriweather', 'Lora', 'Playfair Display', 'Cinzel', 'MedievalSharp', 'Pirata One', 'Uncial Antiqua', 'Almendra', 'Caveat', 'Kalam', 'Lobster', 'Fira Code', 'Source Code Pro', 'JetBrains Mono', 'VT323', 'Press Start 2P']
+    sys: ['Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'Consolas', 'Segoe UI', 'Calibri', 'Cambria', 'Candara', 'Palatino Linotype', 'Lucida Console'],
+    web: ['Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Nunito', 'PT Sans', 'Ubuntu', 'Merriweather', 'Lora', 'Fira Code', 'Source Code Pro', 'JetBrains Mono']
   };
   function buildChatView() {
     const cfg = Object.assign({ font: '', size: 0, bold: false, lh: 0, outline: false }, readLS(CH_CFG_KEY, {}));
@@ -4033,6 +4033,28 @@
     }) : [el('div', { textContent: 'Brak reguł.', style: 'color:#888' })]));
   }
 
+  function tileify(sel, tileFn, cols) {
+    if (!document.getElementById('gi-tile-css')) { const st = document.createElement('style'); st.id = 'gi-tile-css'; st.textContent = '@keyframes gitpulse{from{opacity:.55}to{opacity:1}}@keyframes gitHue{from{filter:hue-rotate(0)}to{filter:hue-rotate(360deg)}}'; document.head.append(st); }
+    const wrap = el('div'), grid = el('div', { style: `display:grid;grid-template-columns:repeat(${cols || 3},1fr);gap:5px;margin:4px 0` });
+    sel.style.display = 'none';
+    const tiles = []; let lastGroup = null;
+    [...sel.querySelectorAll('option')].forEach(o => {
+      if (o.value === '' && !o.textContent.trim().match(/\S/)) return;
+      const t0 = tileFn(o.value, o.textContent, o); if (!t0) return;
+      const g = o.parentElement && o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : null;
+      if (g && g !== lastGroup) { grid.append(el('div', { textContent: g, style: 'grid-column:1/-1;font-size:11px;color:#90a4ae;margin-top:4px' })); }
+      lastGroup = g;
+      const label = o.textContent.replace(/\s*\(.*\)\s*$/, '').replace(/…$/, '');
+      const t = el('div', { title: o.textContent, style: 'min-height:42px;border-radius:5px;cursor:pointer;position:relative;overflow:hidden;box-sizing:border-box;' + t0 }, el('span', { textContent: label, style: 'position:absolute;left:2px;right:2px;bottom:2px;text-align:center;font-size:10px;line-height:11px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000,0 0 2px #000' }));
+      t.addEventListener('click', () => { if (sel.disabled) return; sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); sync(); });
+      tiles.push([t, o]); grid.append(t);
+    });
+    function sync() { tiles.forEach(([t, o]) => { const on = sel.value === o.value; t.style.outline = on ? '2px solid #ffd54a' : '1px solid #fff4'; t.style.opacity = sel.disabled ? '.45' : ''; }); }
+    sync(); setInterval(() => { if (wrap.isConnected) sync(); }, 700);
+    wrap.append(sel, grid); return wrap;
+  }
+  const CONIC = 'conic-gradient(#f44,#fd4,#4f4,#4df,#44f,#f4f,#f44)';
+  const auraTile = v => v === 'custom' ? `background:${CONIC}` : (AURA_COLORS[v] ? `background:linear-gradient(135deg,${AURA_COLORS[v][1]},${AURA_COLORS[v][2]},${AURA_COLORS[v][3]})` : null);
   function setTabs(groups) {
     const bar = el('div', { className: 'gi-stabs' });
     const wrap = el('div', { className: 'gi-rset gi-sbox' }, bar);
@@ -4705,7 +4727,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.99.0');
+    log('Załadowano v2.99.1');
   }
 
   let tries = 0;
