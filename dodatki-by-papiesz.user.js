@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.99.2
+// @version      2.100.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3765,6 +3765,207 @@
     return root0;
   }
 
+  const IF_ON_KEY = 'gi_if_on_v1', IF_CFG_KEY = 'gi_if_cfg_v1';
+  let ifEnabled = (() => { try { return localStorage.getItem(IF_ON_KEY) === '1'; } catch (e) { return false; } })();
+  const IF_RAR = [['normal', 'Zwykłe', '#9e9e9e'], ['upgraded', 'Ulepszone', '#26c6da'], ['uni', 'Unikaty', '#ffd54f'], ['her', 'Heroiki', '#4fc3f7'], ['leg', 'Legendy', '#ff7a1a']];
+  const IF_FRAMES = [['none', 'Brak'], ['thin', 'Cienka'], ['thick', 'Gruba'], ['double', 'Podwójna'], ['inner', 'Wewnętrzna poświata'], ['glow', 'Poświata'], ['soft', 'Miękki cień'], ['bevel', 'Fazowana'], ['corners', 'Narożniki'], ['gem', 'Klejnoty w rogach'], ['dashed', 'Kreskowana'], ['dotted', 'Kropkowana'],
+    ['pulse', 'Pulsująca'], ['breath', 'Oddychająca'], ['neon', 'Neon (migotanie)'], ['spin', 'Obracający się promień'], ['chase', 'Dwa biegnące światła'], ['rainbow', 'Tęcza'], ['sweep', 'Błysk po przekątnej'], ['march', 'Maszerujące kreski'], ['sparkle', 'Iskierki'], ['flame', 'Płomień u dołu']];
+  const IF_ANIM = ['pulse', 'breath', 'neon', 'spin', 'chase', 'rainbow', 'sweep', 'march', 'sparkle', 'flame'];
+  const IF_EQFX = [['none', 'Brak'], ['shine', 'Błysk co kilka sekund'], ['glow', 'Pulsująca poświata'], ['orbit', 'Orbitujące światło'], ['sparks', 'Unoszące się iskry'], ['shimmer', 'Mieniący się połysk'], ['electric', 'Iskrzenie'], ['stars', 'Migające gwiazdki']];
+  const IF_BADGES = [['plain', 'Sam tekst'], ['pill', 'Plakietka'], ['star', 'Gwiazdka'], ['shield', 'Okrąg'], ['ribbon', 'Wstęga na dole'], ['glow', 'Świecący tekst']];
+  const IF_CSS = `
+@property --giang{syntax:'<angle>';inherits:false;initial-value:0deg}
+@keyframes gi-rf-ang{to{--giang:360deg}}
+@keyframes gi-rf-pulse{from{box-shadow:inset 0 0 0 1px var(--c),inset 0 0 2px 0 var(--c)}to{box-shadow:inset 0 0 0 1px var(--c),inset 0 0 9px 3px var(--c)}}
+@keyframes gi-rf-sweep{from{background-position:130% 0}to{background-position:-30% 0}}
+@keyframes gi-rf-flick{0%,19%,22%,62%,64%,100%{opacity:1}20%,21%,63%{opacity:.3}}
+@keyframes gi-rf-breath{from{opacity:.3}to{opacity:1}}
+@keyframes gi-rf-march{to{background-position:8px 0,-8px 100%,0 -8px,100% 8px}}
+@keyframes gi-rf-twk{0%,100%{opacity:.1}50%{opacity:1}}
+@keyframes gi-rf-flame{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.65)}}
+@keyframes gi-rf-rise{from{transform:translateY(8px);opacity:0}30%{opacity:1}to{transform:translateY(-22px);opacity:0}}
+@keyframes gi-fe-shine{0%{background-position:150% 0}45%,100%{background-position:-50% 0}}
+@keyframes gi-fe-glow{from{opacity:.25}to{opacity:1}}
+@keyframes gi-fe-shim{from{background-position:130% 0}to{background-position:-130% 0}}
+@keyframes gi-up-glow{from{text-shadow:0 0 2px #000,0 0 3px var(--c)}to{text-shadow:0 0 2px #000,0 0 9px var(--c),0 0 4px #fff}}
+.gi-rar,.gi-eqfx{position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;box-sizing:border-box;border-radius:2px;--c:#fff;--w:2px;--d:2s}
+.gi-rar{z-index:4}.gi-eqfx{z-index:5}
+.gi-rar[data-fs="thin"]{box-shadow:inset 0 0 0 1px var(--c)}
+.gi-rar[data-fs="thick"]{box-shadow:inset 0 0 0 var(--w) var(--c)}
+.gi-rar[data-fs="double"]{box-shadow:inset 0 0 0 1px var(--c),inset 0 0 0 3px rgba(0,0,0,.55),inset 0 0 0 4px var(--c)}
+.gi-rar[data-fs="inner"]{box-shadow:inset 0 0 7px 2px var(--c)}
+.gi-rar[data-fs="glow"]{box-shadow:inset 0 0 0 1px var(--c),0 0 6px 1px var(--c),inset 0 0 4px var(--c)}
+.gi-rar[data-fs="soft"]{box-shadow:inset 0 0 11px 4px var(--c);opacity:.75}
+.gi-rar[data-fs="bevel"]{border:2px solid;border-color:color-mix(in srgb,var(--c),#fff 45%) color-mix(in srgb,var(--c),#000 45%) color-mix(in srgb,var(--c),#000 45%) color-mix(in srgb,var(--c),#fff 45%)}
+.gi-rar[data-fs="dashed"]{border:var(--w) dashed var(--c)}
+.gi-rar[data-fs="dotted"]{border:var(--w) dotted var(--c)}
+.gi-rar[data-fs="corners"]{background:linear-gradient(var(--c),var(--c)) 0 0/7px 2px,linear-gradient(var(--c),var(--c)) 0 0/2px 7px,linear-gradient(var(--c),var(--c)) 100% 0/7px 2px,linear-gradient(var(--c),var(--c)) 100% 0/2px 7px,linear-gradient(var(--c),var(--c)) 0 100%/7px 2px,linear-gradient(var(--c),var(--c)) 0 100%/2px 7px,linear-gradient(var(--c),var(--c)) 100% 100%/7px 2px,linear-gradient(var(--c),var(--c)) 100% 100%/2px 7px;background-repeat:no-repeat}
+.gi-rar[data-fs="gem"]{background:radial-gradient(circle at 3px 3px,var(--c) 2.2px,transparent 3.2px),radial-gradient(circle at calc(100% - 3px) 3px,var(--c) 2.2px,transparent 3.2px),radial-gradient(circle at 3px calc(100% - 3px),var(--c) 2.2px,transparent 3.2px),radial-gradient(circle at calc(100% - 3px) calc(100% - 3px),var(--c) 2.2px,transparent 3.2px);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent)}
+.gi-rar[data-fs="pulse"]{animation:gi-rf-pulse var(--d) ease-in-out infinite alternate}
+.gi-rar[data-fs="breath"]{box-shadow:inset 0 0 0 var(--w) var(--c);animation:gi-rf-breath var(--d) ease-in-out infinite alternate}
+.gi-rar[data-fs="neon"]{box-shadow:inset 0 0 0 1px var(--c),0 0 5px var(--c),inset 0 0 5px var(--c);animation:gi-rf-flick calc(var(--d)*2.2) steps(1) infinite}
+.gi-rar[data-fs="spin"],.gi-rar[data-fs="chase"],.gi-rar[data-fs="rainbow"],.gi-eqfx[data-fe="orbit"]{padding:var(--w);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask-composite:exclude;animation:gi-rf-ang var(--d) linear infinite}
+.gi-rar[data-fs="spin"],.gi-eqfx[data-fe="orbit"]{background:conic-gradient(from var(--giang),color-mix(in srgb,var(--c) 22%,transparent) 0 50%,var(--c) 88%,#fff 100%)}
+.gi-rar[data-fs="chase"]{background:conic-gradient(from var(--giang),color-mix(in srgb,var(--c) 20%,transparent) 0 20%,var(--c) 38%,color-mix(in srgb,var(--c) 20%,transparent) 45% 70%,var(--c) 88%,color-mix(in srgb,var(--c) 20%,transparent))}
+.gi-rar[data-fs="rainbow"]{background:conic-gradient(from var(--giang),#f44,#fd4,#4f4,#4df,#44f,#f4f,#f44)}
+.gi-rar[data-fs="sweep"]{box-shadow:inset 0 0 0 1px var(--c);overflow:hidden}
+.gi-rar[data-fs="sweep"]::after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.85) 50%,transparent 65%) 130% 0/250% 100%;animation:gi-rf-sweep var(--d) linear infinite}
+.gi-rar[data-fs="march"]{background:repeating-linear-gradient(90deg,var(--c) 0 4px,transparent 4px 8px) 0 0/100% 2px no-repeat,repeating-linear-gradient(90deg,var(--c) 0 4px,transparent 4px 8px) 0 100%/100% 2px no-repeat,repeating-linear-gradient(0deg,var(--c) 0 4px,transparent 4px 8px) 0 0/2px 100% no-repeat,repeating-linear-gradient(0deg,var(--c) 0 4px,transparent 4px 8px) 100% 0/2px 100% no-repeat;animation:gi-rf-march var(--d) linear infinite}
+.gi-rar[data-fs="sparkle"],.gi-eqfx[data-fe="stars"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 50%,transparent)}
+.gi-rar[data-fs="sparkle"]::before,.gi-rar[data-fs="sparkle"]::after,.gi-eqfx[data-fe="stars"]::before,.gi-eqfx[data-fe="stars"]::after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;animation:gi-rf-twk var(--d) ease-in-out infinite;background:radial-gradient(circle at 18% 14%,var(--c) 1.3px,transparent 2.2px),radial-gradient(circle at 82% 28%,#fff 1px,transparent 2px),radial-gradient(circle at 36% 86%,var(--c) 1.3px,transparent 2.2px),radial-gradient(circle at 90% 80%,#fff 1px,transparent 2px)}
+.gi-rar[data-fs="sparkle"]::after,.gi-eqfx[data-fe="stars"]::after{animation-delay:calc(var(--d)/-2);background:radial-gradient(circle at 60% 12%,#fff 1px,transparent 2px),radial-gradient(circle at 12% 55%,var(--c) 1.3px,transparent 2.2px),radial-gradient(circle at 70% 70%,var(--c) 1.3px,transparent 2.2px),radial-gradient(circle at 48% 45%,#fff 1px,transparent 2px)}
+.gi-rar[data-fs="flame"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 60%,transparent);overflow:hidden}
+.gi-rar[data-fs="flame"]::after{content:'';position:absolute;left:0;right:0;bottom:0;height:48%;background:linear-gradient(to top,var(--c),transparent);transform-origin:bottom;animation:gi-rf-flame calc(var(--d)*.5) ease-in-out infinite;mix-blend-mode:screen;opacity:.85}
+.gi-eqfx[data-fe="shine"]{overflow:hidden}
+.gi-eqfx[data-fe="shine"]::after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.8) 50%,transparent 62%) 150% 0/250% 100%;animation:gi-fe-shine calc(var(--d)*2.2) ease-in-out infinite}
+.gi-eqfx[data-fe="glow"]{box-shadow:inset 0 0 7px 2px var(--c),0 0 9px 2px var(--c);animation:gi-fe-glow var(--d) ease-in-out infinite alternate}
+.gi-eqfx[data-fe="sparks"]{overflow:hidden}
+.gi-eqfx[data-fe="sparks"]::before,.gi-eqfx[data-fe="sparks"]::after{content:'';position:absolute;left:18%;bottom:0;width:2px;height:2px;border-radius:50%;background:var(--c);box-shadow:9px -4px 0 var(--c),17px 3px 0 #fff,-2px -9px 0 var(--c);animation:gi-rf-rise var(--d) linear infinite}
+.gi-eqfx[data-fe="sparks"]::after{left:52%;animation-delay:calc(var(--d)/-2)}
+.gi-eqfx[data-fe="shimmer"]{overflow:hidden;mix-blend-mode:screen;background:linear-gradient(135deg,transparent 28%,color-mix(in srgb,var(--c) 55%,transparent) 50%,transparent 72%) 130% 0/300% 100%;animation:gi-fe-shim calc(var(--d)*1.6) linear infinite}
+.gi-eqfx[data-fe="electric"]{box-shadow:inset 0 0 0 1px var(--c),0 0 4px var(--c),inset 0 0 4px var(--c);animation:gi-rf-flick calc(var(--d)*.7) steps(1) infinite}
+.gi-up{position:absolute;z-index:6;pointer-events:none;font:bold var(--fs,10px)/1.1 Arial,sans-serif;color:var(--c);white-space:nowrap}
+.gi-up[data-pos="tl"]{left:1px;top:1px}.gi-up[data-pos="tr"]{right:1px;top:1px}.gi-up[data-pos="bl"]{left:1px;bottom:1px}.gi-up[data-pos="br"]{right:1px;bottom:1px}
+.gi-up[data-bs="plain"],.gi-up[data-bs="star"],.gi-up[data-bs="glow"]{text-shadow:0 0 2px #000,0 0 2px #000,1px 1px 0 #000}
+.gi-up[data-bs="glow"]{animation:gi-up-glow 1.2s ease-in-out infinite alternate}
+.gi-up[data-bs="pill"]{background:var(--c);color:#111;border-radius:8px;padding:0 3px;box-shadow:0 0 2px #000}
+.gi-up[data-bs="shield"]{background:rgba(10,10,14,.85);border:1px solid var(--c);border-radius:50%;min-width:13px;height:13px;line-height:11px;text-align:center;box-sizing:border-box;padding:0 1px}
+.gi-up[data-bs="ribbon"]{left:0 !important;right:0 !important;top:auto !important;bottom:0 !important;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.75));text-shadow:0 0 2px #000}
+`;
+  function buildItemFramesView() {
+    const defRar = { normal: { on: false, fs: 'thin', c: '#9e9e9e' }, upgraded: { on: true, fs: 'pulse', c: '#26c6da' }, uni: { on: true, fs: 'glow', c: '#ffd54f' }, her: { on: true, fs: 'spin', c: '#4fc3f7' }, leg: { on: true, fs: 'chase', c: '#ff7a1a' } };
+    const cfg = Object.assign({ where: { bag: true, eq: true, loot: true, other: false }, rar: {}, w: 2, spd: 50, hideGame: false, up: {}, eq: {} }, readLS(IF_CFG_KEY, {}));
+    cfg.where = Object.assign({ bag: true, eq: true, loot: true, other: false }, cfg.where);
+    IF_RAR.forEach(([k]) => { cfg.rar[k] = Object.assign({}, defRar[k], cfg.rar[k] || {}); });
+    cfg.up = Object.assign({ on: true, bs: 'pill', pos: 'br', tier: true, c: '#ffd54f', min: 1, size: 10 }, cfg.up);
+    cfg.eq = Object.assign({ on: false, fe: 'shine', rar: true, c: '#ffffff' }, cfg.eq);
+    let ver = 1, timer = 0;
+    const cssEl = document.createElement('style'); cssEl.id = 'gi-if-css'; cssEl.textContent = IF_CSS; document.head.append(cssEl);
+    const hideEl = document.createElement('style'); hideEl.id = 'gi-if-hide'; document.head.append(hideEl);
+    const dur = () => (3.6 / Math.max(0.2, (Number(cfg.spd) || 50) / 50)).toFixed(2) + 's';
+    const tierCol = n => n >= 10 ? '#ff5252' : n >= 7 ? '#ffd54f' : n >= 4 ? '#cfd8dc' : '#cd7f32';
+    const upLvl = d => { const s = String((d && d.stat) || ''); const m = /(?:^|;)enhancement_upgrade_lvl=(\d+)/.exec(s) || /(?:^|;)(?:upgrade|upgr|ulepszenie)(?:_?lvl|_?level)?=(\d+)/.exec(s); return m ? Number(m[1]) : 0; };
+    const rarOf = (node, d) => {
+      const h = node.querySelector(':scope > .highlight'); const m = /(?:^|\s)t-(leg|her|uni|upgraded)(?:\s|$)/.exec(h ? clsOf(h) : '');
+      if (m) return m[1];
+      const sm = /rarity=(unique|heroic|legendary|upgraded)/.exec(String((d && d.stat) || '')); if (sm) return { unique: 'uni', heroic: 'her', legendary: 'leg', upgraded: 'upgraded' }[sm[1]];
+      return 'normal';
+    };
+    const ctxOf = (node, d) => {
+      if (node.closest('.eq-slot') || (d && String(d.loc) === 's')) return 'eq';
+      if (node.closest('[class*="loot" i]') || (d && (String(d.loc) === 'l' || String(d.loc) === 'loot'))) return 'loot';
+      if ((d && String(d.loc) === 'g') || /(?:^|\s)(?:bag|inventory-item)(?:\s|$)/.test(clsOf(node))) return 'bag';
+      return 'other';
+    };
+    const stt = new WeakMap();
+    function clean(node) { node.querySelectorAll(':scope > .gi-rar,:scope > .gi-eqfx,:scope > .gi-up').forEach(n => n.remove()); }
+    function decorate(node) {
+      const id = idOf(node); if (!id) return;
+      const d = itemData(id) || {};
+      const ctx = ctxOf(node, d), rar = rarOf(node, d), lvl = upLvl(d), sig = [ctx, rar, lvl, ver].join('|');
+      const cur = stt.get(node), have = node.querySelectorAll(':scope > .gi-rar,:scope > .gi-eqfx,:scope > .gi-up').length;
+      if (cur && cur.sig === sig && cur.n === have) return;
+      clean(node);
+      const rec = { sig, n: 0 }; stt.set(node, rec);
+      if (!cfg.where[ctx]) return;
+      if (getComputedStyle(node).position === 'static') node.style.position = 'relative';
+      const rc = cfg.rar[rar] || cfg.rar.normal;
+      if (rc.on && rc.fs !== 'none') { const f = el('div', { className: 'gi-rar' }); f.dataset.fs = rc.fs; f.style.setProperty('--c', rc.c); f.style.setProperty('--w', (cfg.w || 2) + 'px'); f.style.setProperty('--d', dur()); node.append(f); }
+      if (ctx === 'eq' && cfg.eq.on && cfg.eq.fe !== 'none') { const f = el('div', { className: 'gi-eqfx' }); f.dataset.fe = cfg.eq.fe; f.style.setProperty('--c', cfg.eq.rar ? (rc.c || cfg.eq.c) : cfg.eq.c); f.style.setProperty('--d', dur()); node.append(f); }
+      rec.n = (rc.on && rc.fs !== 'none' ? 1 : 0) + (ctx === 'eq' && cfg.eq.on && cfg.eq.fe !== 'none' ? 1 : 0) + (cfg.up.on && lvl >= (cfg.up.min || 1) ? 1 : 0);
+      if (cfg.up.on && lvl >= (cfg.up.min || 1)) { const u = el('div', { className: 'gi-up', textContent: (cfg.up.bs === 'star' ? '★' : '+') + lvl }); u.dataset.bs = cfg.up.bs; u.dataset.pos = cfg.up.pos; u.style.setProperty('--c', cfg.up.tier ? tierCol(lvl) : cfg.up.c); u.style.setProperty('--fs', (cfg.up.size || 10) + 'px'); node.append(u); }
+    }
+    function scan() {
+      if (!ifEnabled) return;
+      document.querySelectorAll('[class*="item-id-"]').forEach(node => {
+        if (node.closest(GI_OWN + ',[class*="tip" i]')) return;
+        const r = node.getBoundingClientRect(); if (r.width < 14 || r.width > 90 || r.height < 14 || r.height > 90) return;
+        try { decorate(node); } catch (e) {  }
+      });
+    }
+    function apply() {
+      ver++; clearInterval(timer); timer = 0;
+      hideEl.textContent = ifEnabled && cfg.hideGame ? '[class*="item-id-"]>.highlight{opacity:0 !important}' : '';
+      if (!ifEnabled) { document.querySelectorAll('.gi-rar,.gi-eqfx,.gi-up').forEach(n => { if (!n.closest('.gi-float')) n.remove(); }); return; }
+      scan(); timer = setInterval(scan, 600);
+    }
+    const save = () => { writeLS(IF_CFG_KEY, cfg); apply(); rebuildPrev(); };
+    const mkR = (obj, key, label, min, max, step, fmt) => {
+      const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' });
+      const r = isolate(el('input', { type: 'range', min, max, step, value: obj[key] })); r.style.cssText = 'flex:1;min-width:90px';
+      const show = () => { val.textContent = fmt(Number(r.value)); };
+      r.addEventListener('input', () => { obj[key] = Number(r.value); show(); save(); }); show();
+      return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val);
+    };
+    const mkC = (obj, key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!obj[key] })); c.addEventListener('change', () => { obj[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
+    const prevBox = (inner) => el('div', { style: 'position:relative;width:34px;height:34px;margin:4px auto 15px;background:linear-gradient(135deg,#3a3a44,#1c1c22);border-radius:2px;box-shadow:inset 0 0 0 1px #0008' }, ...inner);
+    const frTile = (key, label, col, selected, onPick) => {
+      const f = el('div', { className: 'gi-rar' }); if (key !== 'none') { f.dataset.fs = key; f.style.setProperty('--c', col); f.style.setProperty('--w', (cfg.w || 2) + 'px'); f.style.setProperty('--d', dur()); }
+      const t = el('div', { title: label, style: 'position:relative;border-radius:5px;cursor:pointer;padding:4px 2px 2px;background:#0006;box-sizing:border-box;outline:' + (selected ? '2px solid #ffd54a' : '1px solid #fff3') }, prevBox([f]), el('span', { textContent: label, style: 'position:absolute;left:1px;right:1px;bottom:2px;text-align:center;font-size:9px;line-height:10px;color:#ddd' }));
+      t.addEventListener('click', onPick); return t;
+    };
+    const grid = (cols) => el('div', { style: `display:grid;grid-template-columns:repeat(${cols},1fr);gap:5px;margin:4px 0` });
+    const swatches = ['#9e9e9e', '#ffffff', '#26c6da', '#4fc3f7', '#4caf50', '#ffd54f', '#ff7a1a', '#ff5252', '#e040fb', '#7c4dff'];
+    const rebuilders = [];
+    const rebuildPrev = () => rebuilders.forEach(f => f());
+    let curR = 'her';
+    const rarBar = el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 6px' });
+    const rarBody = el('div');
+    const drawRar = () => {
+      rarBar.replaceChildren(...IF_RAR.map(([k, l]) => { const b = el('button', { textContent: l, style: `padding:3px 8px;border-radius:10px;cursor:pointer;border:1px solid ${cfg.rar[k].c};background:${curR === k ? cfg.rar[k].c : '#0006'};color:${curR === k ? '#111' : '#fff'};font-weight:bold;font-size:11px` }); b.addEventListener('click', () => { curR = k; drawRar(); }); return b; }));
+      const rc = cfg.rar[curR];
+      const on = isolate(el('input', { type: 'checkbox', checked: !!rc.on })); on.addEventListener('change', () => { rc.on = on.checked; save(); });
+      const col = isolate(el('input', { type: 'color', value: rc.c })); col.addEventListener('input', () => { rc.c = col.value; save(); drawRar(); });
+      const sw = el('div', { style: 'display:flex;gap:3px;margin:3px 0;flex-wrap:wrap' }, ...swatches.map(c => { const s = el('div', { style: `width:18px;height:18px;border-radius:3px;cursor:pointer;background:${c};outline:${rc.c.toLowerCase() === c ? '2px solid #ffd54a' : '1px solid #fff4'}` }); s.addEventListener('click', () => { rc.c = c; save(); drawRar(); }); return s; }));
+      const g = grid(4); IF_FRAMES.forEach(([k, l]) => g.append(frTile(k, l, rc.c, rc.fs === k, () => { rc.fs = k; rc.on = true; save(); drawRar(); })));
+      const all = el('button', { textContent: 'Ten styl dla wszystkich rzadkości' }); all.addEventListener('click', () => { IF_RAR.forEach(([k]) => { cfg.rar[k].fs = rc.fs; cfg.rar[k].on = true; }); save(); drawRar(); });
+      rarBody.replaceChildren(el('label', { style: 'display:block;cursor:pointer;margin:2px 0;font-weight:bold' }, on, ' Pokazuj ramkę dla: ' + IF_RAR.find(x => x[0] === curR)[1].toLowerCase()), el('div', {}, 'Kolor: ', col), sw, g, el('div', { style: 'margin-top:4px' }, all));
+    };
+    rebuilders.push(drawRar); drawRar();
+    const upBody = el('div');
+    const drawUp = () => {
+      const g = grid(3), sample = n => { const u = el('div', { className: 'gi-up', textContent: (cfg.up.bs === 'star' ? '★' : '+') + n }); return u; };
+      IF_BADGES.forEach(([k, l]) => { const u = el('div', { className: 'gi-up', textContent: (k === 'star' ? '★' : '+') + '7' }); u.dataset.bs = k; u.dataset.pos = cfg.up.pos; u.style.setProperty('--c', cfg.up.tier ? tierCol(7) : cfg.up.c); u.style.setProperty('--fs', (cfg.up.size || 10) + 'px'); const t = el('div', { title: l, style: 'position:relative;border-radius:5px;cursor:pointer;padding:4px 2px 2px;background:#0006;box-sizing:border-box;outline:' + (cfg.up.bs === k ? '2px solid #ffd54a' : '1px solid #fff3') }, prevBox([u]), el('span', { textContent: l, style: 'position:absolute;left:1px;right:1px;bottom:2px;text-align:center;font-size:9px;line-height:10px;color:#ddd' })); t.addEventListener('click', () => { cfg.up.bs = k; save(); drawUp(); }); g.append(t); });
+      void sample;
+      const pos = el('div', { style: 'display:flex;gap:4px;margin:4px 0' }, 'Miejsce: ', ...[['tl', '↖'], ['tr', '↗'], ['bl', '↙'], ['br', '↘']].map(([k, l]) => { const b = el('button', { textContent: l, style: `padding:2px 8px;cursor:pointer;${cfg.up.pos === k ? 'outline:2px solid #ffd54a' : ''}` }); b.addEventListener('click', () => { cfg.up.pos = k; save(); drawUp(); }); return b; }));
+      const col = isolate(el('input', { type: 'color', value: cfg.up.c })); col.addEventListener('input', () => { cfg.up.c = col.value; cfg.up.tier = false; save(); });
+      upBody.replaceChildren(mkC(cfg.up, 'on', 'Pokazuj poziom ulepszenia (np. +5) na przedmiotach'), g, pos, mkC(cfg.up, 'tier', 'Kolor zależny od poziomu (brąz → srebro → złoto → czerwień)'), el('div', {}, 'Własny kolor: ', col), mkR(cfg.up, 'min', 'Od poziomu', 1, 15, 1, v => '+' + v), mkR(cfg.up, 'size', 'Wielkość', 8, 16, 1, v => v + ' px'), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, 'Poziom czytam z danych przedmiotu. Jeśli nic się nie pojawia, użyj zakładki Diagnostyka i wklej mi wynik.'));
+    };
+    rebuilders.push(drawUp); drawUp();
+    const eqBody = el('div');
+    const drawEq = () => {
+      const g = grid(4), col0 = cfg.eq.rar ? (cfg.rar.her.c) : cfg.eq.c;
+      IF_EQFX.forEach(([k, l]) => { const f = el('div', { className: 'gi-eqfx' }); if (k !== 'none') { f.dataset.fe = k; f.style.setProperty('--c', col0); f.style.setProperty('--d', dur()); } const t = el('div', { title: l, style: 'position:relative;border-radius:5px;cursor:pointer;padding:4px 2px 2px;background:#0006;box-sizing:border-box;outline:' + (cfg.eq.fe === k ? '2px solid #ffd54a' : '1px solid #fff3') }, prevBox([f]), el('span', { textContent: l.replace(/ co kilka sekund/, ''), style: 'position:absolute;left:1px;right:1px;bottom:2px;text-align:center;font-size:9px;line-height:10px;color:#ddd' })); t.addEventListener('click', () => { cfg.eq.fe = k; cfg.eq.on = k !== 'none'; save(); drawEq(); }); g.append(t); });
+      const col = isolate(el('input', { type: 'color', value: cfg.eq.c })); col.addEventListener('input', () => { cfg.eq.c = col.value; cfg.eq.rar = false; save(); });
+      eqBody.replaceChildren(mkC(cfg.eq, 'on', 'Ruchomy efekt na założonych przedmiotach (okno ekwipunku)'), g, mkC(cfg.eq, 'rar', 'Kolor efektu według rzadkości przedmiotu'), el('div', {}, 'Własny kolor: ', col), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, 'Podgląd pokazuje kolor heroika. Przy kolorach według rzadkości każdy przedmiot dostaje swój.'));
+    };
+    rebuilders.push(drawEq); drawEq();
+    const where = el('div', {}, mkC(cfg.where, 'bag', 'Torba i ekwipunek'), mkC(cfg.where, 'eq', 'Założone przedmioty'), mkC(cfg.where, 'loot', 'Okno łupów'), mkC(cfg.where, 'other', 'Pozostałe okna (sklep, wymiana, aukcje…)'));
+    const hideG = mkC(cfg, 'hideGame', 'Ukryj wbudowane podświetlenie rzadkości z gry (żeby nie dublowało ramek)');
+    const dbg = isolate(el('textarea', { rows: 9, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
+    const dbgBtn = el('button', { textContent: 'Zbierz dane o przedmiotach' });
+    dbgBtn.addEventListener('click', () => {
+      const out = { ile: 0, przedmioty: [] };
+      document.querySelectorAll('[class*="item-id-"]').forEach(n => {
+        if (n.closest(GI_OWN + ',[class*="tip" i]')) return; out.ile++;
+        const id = idOf(n), d = itemData(id) || {}, h = n.querySelector(':scope > .highlight');
+        if (out.przedmioty.length < 14 && (upLvl(d) || out.przedmioty.length < 6)) out.przedmioty.push({ cls: clsOf(n).slice(0, 70), highlight: h ? clsOf(h) : null, loc: d.loc, kontekst: ctxOf(n, d), rzadkosc: rarOf(n, d), poziom: upLvl(d), stat: String(d.stat || '').slice(0, 160), nasze: [...n.children].filter(c => /gi-(rar|eqfx|up)/.test(clsOf(c))).length });
+      });
+      dbg.value = JSON.stringify(out, null, 1);
+    });
+    const root = el('div');
+    root.settingsBox = setTabs([
+      ['Ramki', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Wybierz rzadkość, potem styl i kolor. Podgląd na kafelkach jest na żywo.'), rarBar, rarBody]],
+      ['Ulepszenia', [upBody]],
+      ['Założone', [eqBody]],
+      ['Ogólne', [el('div', { style: 'font-weight:bold' }, 'Gdzie rysować'), where, hideG, mkR(cfg, 'w', 'Grubość ramki', 1, 4, 1, v => v + ' px'), mkR(cfg, 'spd', 'Szybkość animacji', 10, 200, 5, v => v + '%'), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, 'Dodatek rysuje własne nakładki na ikonach i nic nie zmienia w samej grze. Jeśli masz drugi dodatek z ramkami, wyłącz w nim ramki albo tu opcję „Ukryj wbudowane podświetlenie”.')]],
+      ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Gdy ramki lub poziomy się nie pojawiają, kliknij i wklej mi wynik.'), dbgBtn, dbg]]
+    ]);
+    root.test = () => apply(); root.apply = apply; root.stop = () => apply();
+    apply();
+    return root;
+  }
+
   const CH_ON_KEY = 'gi_chat_on_v1', CH_CFG_KEY = 'gi_chat_cfg_v1';
   let chEnabled = (() => { try { return localStorage.getItem(CH_ON_KEY) === '1'; } catch (e) { return false; } })();
   const CH_FONTS = {
@@ -4418,9 +4619,13 @@
       el('h4', { textContent: '1. Przedmiot' }), pickBtn, selBox,
       el('h4', { textContent: '2. Nowa grafika' }), urlIn, prev,
       el('div', {}, 'Zakres: ', scopeSel), apply, status,
-      el('h4', { textContent: 'Reguły' }), rulesBox,
-      el('h4', { textContent: 'Kopia / diagnostyka' }), io, exp, ' ', imp, el('br'), dump, dumpBox
+      el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:8px' }, 'Reguły, kopię zapasową i diagnostykę znajdziesz w ustawieniach (⚙ przy tym dodatku w menu).')
     );
+    const imgSettingsBox = setTabs([
+      ['Reguły', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Zapisane podmiany grafik. Usuń regułę, aby wrócić do oryginalnego wyglądu przedmiotu.'), rulesBox]],
+      ['Kopia', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Eksport zapisuje wszystkie reguły jako tekst, import wczytuje je z powrotem (np. na innym komputerze).'), io, el('div', {}, exp, ' ', imp)]],
+      ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli podmiana nie działa dla jakiegoś przedmiotu, wskaż go, kliknij i wklej mi wynik.'), dump, dumpBox]]
+    ]);
 
     const safeView = (name, fn) => {
       try { return fn(); } catch (err) {
@@ -4458,6 +4663,7 @@
     const chView = safeView('Zmieniacz czatu', buildChatView);
     const dmView = safeView('Obrażenia w walce', buildDmgView);
     const bgView = safeView('Zmieniacz tła', buildBgView);
+    const ifView = safeView('Ramki przedmiotów', buildItemFramesView);
     const relogView = safeView('Przelogowanie', buildRelogView);
     const relogWin = (() => {
       try {
@@ -4482,6 +4688,7 @@
       } catch (err) { log('błąd okna ustawień', err); return { el: el('div'), toggle() {}, restore() {}, setOpen() {} }; }
     };
     const respSetWin = mkSetWin('gi-resp-set', 'Ustawienia – Minutnik', 'gi_win_respset_v1', respView.settingsBox || el('div'), 330);
+    const imgSetWin = mkSetWin('gi-img-set', 'Ustawienia – Zmieniacz grafik', 'gi_win_imgset_v1', imgSettingsBox, 330);
     const dropsSetWin = mkSetWin('gi-drops-set', 'Ustawienia – Ostatnie dropy', 'gi_win_dropset_v1', dropsView.settingsBox || el('div'), 330);
     const relogSetWin = mkSetWin('gi-relog-set', 'Ustawienia – Przelogowanie', 'gi_win_relogset_v1', relogView.settingsBox || el('div'), 330);
     const gtView = safeView('Motyw gry', buildGameThemeView);
@@ -4489,6 +4696,7 @@
     const auraSetWin = mkSetWin('gi-aura-set', 'Ustawienia – Aura ekwipunku', 'gi_win_auraset_v1', auraView.settingsBox || el('div'), 340);
     const haSetWin = mkSetWin('gi-ha-set', 'Ustawienia – Aura postaci', 'gi_win_haset_v1', haView.settingsBox || el('div'), 340);
     const chSetWin = mkSetWin('gi-ch-set', 'Ustawienia – Zmieniacz czatu', 'gi_win_chset_v1', chView.settingsBox || el('div'), 340);
+    const ifSetWin = mkSetWin('gi-if-set', 'Ustawienia – Ramki przedmiotów', 'gi_win_ifset_v1', ifView.settingsBox || el('div'), 330);
     const bgSetWin = mkSetWin('gi-bg-set', 'Ustawienia – Zmieniacz tła', 'gi_win_bgset_v1', bgView.settingsBox || el('div'), 340);
     const dmSetWin = mkSetWin('gi-dm-set', 'Ustawienia – Obrażenia w walce', 'gi_win_dmset_v1', dmView.settingsBox || el('div'), 340);
     const flameSetWin = mkSetWin('gi-flame-set', 'Ustawienia – Efekt przy unikacie/heroiku', 'gi_win_flameset_v1', flameView.settingsBox || el('div'), 330);
@@ -4500,6 +4708,7 @@
 
     const ADDONS = [
       { id: 'grafiki', icon: '🖼', title: 'Zmieniacz grafik', desc: 'Podmienia wygląd wybranych przedmiotów w grze na Twój własny obrazek (np. inna ikona miecza). Zmiana jest widoczna tylko u Ciebie. Wskazujesz przedmiot i wklejasz link do grafiki.', view: imagesView,
+        settings: () => imgSetWin.toggle(),
         isOn: () => enabled,
         setOn: v => { enabled = v; try { localStorage.setItem(ON_KEY, v ? '1' : '0'); } catch (e) {} if (onCbRef) onCbRef.checked = v; sweep(); } },
       { id: 'resp', icon: '⏱', title: 'Minutnik', desc: 'Okno z licznikami respawnu elit II, herosów i tytanów, z ogniem i dźwiękiem przed respawnem. WYMAGA włączonego i widocznego minutnika z gry – schowaj go pod tym oknem (okno dodatku przesuń na wierzch), bo bez niego czasy są tylko szacowane.', view: el('div'), action: () => { if (respEnabled) respWin.toggle(); },
@@ -4522,6 +4731,10 @@
         settings: () => chSetWin.toggle(),
         isOn: () => chEnabled,
         setOn: v => { chEnabled = v; try { localStorage.setItem(CH_ON_KEY, v ? '1' : '0'); } catch (e) {} if (chView.apply) chView.apply(); if (!v) chSetWin.setOpen(false); } },
+      { id: 'itemfr', icon: '🟦', title: 'Ramki przedmiotów', desc: 'Ramki na ikonach przedmiotów według rzadkości (zwykłe, ulepszone, unikaty, heroiki, legendy), 22 style statyczne i animowane, oznaczenie poziomu ulepszenia (+N) oraz ruchome efekty na założonych przedmiotach. Nie koliduje z innymi dodatkami.', view: el('div'), action: () => { if (ifEnabled) ifSetWin.toggle(); },
+        settings: () => ifSetWin.toggle(),
+        isOn: () => ifEnabled,
+        setOn: v => { ifEnabled = v; try { localStorage.setItem(IF_ON_KEY, v ? '1' : '0'); } catch (e) {} if (ifView.apply) ifView.apply(); if (!v) ifSetWin.setOpen(false); } },
       { id: 'bg', icon: '🌄', title: 'Zmieniacz tła', desc: 'Własne tło za grą: 28 gotowych gradientów i wzorów, własny gradient lub kolor oraz efekty w tle (gwiazdy, śnieg, deszcz, żar, świetliki, bąbelki, spadające gwiazdy, zorza, płynący gradient), z przyciemnieniem i winietą.', view: el('div'), action: () => { if (bgEnabled) bgSetWin.toggle(); },
         settings: () => bgSetWin.toggle(),
         isOn: () => bgEnabled,
@@ -4741,7 +4954,7 @@
       if (panel.style.display === 'block' && typeof win.x === 'number') placePanel(win.x, win.y);
     });
 
-    document.body.append(btn, panel, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, chSetWin.el, bgSetWin.el, dmSetWin.el, flameSetWin.el, gtSetWin.el);
+    document.body.append(btn, panel, imgSetWin.el, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, chSetWin.el, ifSetWin.el, bgSetWin.el, dmSetWin.el, flameSetWin.el, gtSetWin.el);
     respWin.restore();
     applyResp();
     dropsWin.restore();
@@ -4751,7 +4964,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.99.2');
+    log('Załadowano v2.100.0');
   }
 
   let tries = 0;
