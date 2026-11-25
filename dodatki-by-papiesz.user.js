@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.97.6
+// @version      2.97.7
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2403,7 +2403,7 @@
       const out = [];
       document.querySelectorAll('[class*="tip" i],[class*="tooltip" i],[id*="tooltip" i]').forEach(n => {
         if (n.closest(OURS)) return;
-        const cs = getComputedStyle(n); if ((cs.position !== 'absolute' && cs.position !== 'fixed') || cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return;
+        const cs = getComputedStyle(n); if ((cs.position === 'static' && !/tip/i.test(String(n.className && n.className.baseVal === undefined ? n.className : '').replace(/multiple/gi, ''))) || !/(^|[^a-z])tip|tooltip/i.test(String(n.className && n.className.baseVal === undefined ? n.className : '') + ' ' + n.id) || cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return;
         const r = n.getBoundingClientRect(); if (r.width < 30 || r.height < 14 || r.width > 700 || r.height > 700) return;
         if (out.some(o => o.n.contains(n))) return;
         for (let i = out.length - 1; i >= 0; i--) if (n.contains(out[i].n)) out.splice(i, 1);
@@ -4603,7 +4603,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.97.6');
+    log('Załadowano v2.97.7');
   }
 
   let tries = 0;
