@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.97.0
+// @version      2.97.1
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -4442,7 +4442,12 @@
       return zo === Infinity ? null : zo;
     }
     function layerApply() {
-      if (layerCfg.mode !== 'under') { const zo = otherAddonZ(); if (zo != null && zo - 2 < 99997) setZ(Math.max(3, zo - 2)); else setZ(null); return; }
+      if (layerCfg.mode !== 'under') {
+        const gp = document.querySelector('.game-window-positioner'), gz = gameWins().filter(n => !gp || gp.contains(n)).map(n => Number(getComputedStyle(n).zIndex)).filter(z => isFinite(z)), gmax = gz.length ? Math.max(...gz) : 0, zo = otherAddonZ();
+        let z = 99997; if (zo != null) { const cap = zo - 2; z = cap > gmax ? cap : gmax + 1; } else if (gmax >= 99997) z = gmax + 1;
+        if (z >= 99997 && gmax < 99997) setZ(null); else setZ(Math.max(3, z));
+        return;
+      }
       const zs = gameWins().map(n => Number(getComputedStyle(n).zIndex)).filter(z => isFinite(z));
       if (!zs.length) return;
       const z = Math.max(1, Math.min(...zs) - 1);
@@ -4584,7 +4589,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.97.0');
+    log('Załadowano v2.97.1');
   }
 
   let tries = 0;
