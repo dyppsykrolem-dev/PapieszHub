@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.97.2
+// @version      2.97.3
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2396,7 +2396,7 @@
     };
     const frs = {};
     let frTimer = 0, frSvg = null;
-    let tipHoles = [], tipSig = '', tipListen = false, tipRaf = 0;
+    let winHoles = [], tipHoles = [], tipSig = '', tipListen = false, tipRaf = 0;
     const OURS = '.gi-float,#gi-panel,#gi-btn,.gi-gtf,#gi-gtp,.gi-dtip,.gi-utip,#gi-ask,#gi-eqaura,#gi-flame';
     function findTips() {
       const out = [];
@@ -2418,7 +2418,7 @@
     function holeNode(o) {
       if (!o || !o.node || o.node.style.display === 'none') return;
       const x = parseFloat(o.node.style.left) || 0, y = parseFloat(o.node.style.top) || 0, w = parseFloat(o.node.style.width) || 0, hh = parseFloat(o.node.style.height) || 0;
-      const hs = tipHoles.filter(q => q.r > x && q.l < x + w && q.b > y && q.t < y + hh);
+      const hs = (o.k && /^[agx]_/.test(o.k) && o.k[0] !== 'a' ? tipHoles : tipHoles.concat(o.k && o.k[0] === 'x' ? [] : winHoles)).filter(q => q.r > x && q.l < x + w && q.b > y && q.t < y + hh);
       const v = hs.length ? 'path(evenodd, "M0 0H' + w + 'V' + hh + 'H0Z' + hs.map(q => { const a = Math.max(0, q.l - x), b = Math.max(0, q.t - y), c = Math.min(w, q.r - x), d = Math.min(hh, q.b - y); return ' M' + a + ' ' + b + 'H' + c + 'V' + d + 'H' + a + 'Z'; }).join('') + '")' : 'none';
       if (o.clip !== v) { o.clip = v; o.node.style.clipPath = v; }
     }
@@ -2582,7 +2582,7 @@
         if (cs.display === 'none' || cs.visibility === 'hidden' || rr.width < 90 || rr.height < 60 || rr.width * rr.height > innerWidth * innerHeight * 0.7 || !/absolute|fixed/.test(cs.position)) return;
         tmap['g_' + (n.id || i)] = () => n;
       });
-      if (cfg.fT.other || cfg.themeOther) { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherWins().forEach(n => otherHold.set(n, nw)); otherCache.l = [...otherHold.keys()].filter(n => n.isConnected && nw - otherHold.get(n) < 4000); [...otherHold.keys()].forEach(n => { if (!n.isConnected || nw - otherHold.get(n) > 30000) otherHold.delete(n); }); } }
+      { const nw = performance.now(); if (!otherCache.t || nw - otherCache.t > 1200) { otherCache.t = nw; otherWins().forEach(n => otherHold.set(n, nw)); otherCache.l = [...otherHold.keys()].filter(n => n.isConnected && nw - otherHold.get(n) < 4000); [...otherHold.keys()].forEach(n => { if (!n.isConnected || nw - otherHold.get(n) > 30000) otherHold.delete(n); }); } }
       if (cfg.fT.other) otherCache.l.filter(n => n.isConnected).forEach((n, i) => { tmap['x_' + (n.id || i)] = () => n; });
       Object.keys(frs).forEach(k => { if (/^[agx]_/.test(k) && !tmap[k]) { frs[k].miss = (frs[k].miss || 0) + 1; if (frs[k].miss > (k[0] === 'g' ? 2 : 0)) { frs[k].node.remove(); delete frs[k]; delete frRects[k]; } } });
       for (const key of Object.keys(tmap)) {
@@ -2609,6 +2609,7 @@
           }
         }
       });
+      winHoles = (otherCache.l || []).filter(n => n.isConnected).map(n => n.getBoundingClientRect()).filter(r => r.width > 40 && r.height > 20 && r.width * r.height < innerWidth * innerHeight * 0.6).map(r => ({ l: r.left, t: r.top, r: r.right, b: r.bottom }));
       for (const key of Object.keys(R)) {
         const q = R[key], r = { left: q.l, top: q.t, width: q.r - q.l, height: q.b - q.t };
         if (r.width < 30 || r.height < 14) { delete frRects[key]; if (frs[key]) frs[key].node.style.display = 'none'; continue; }
@@ -2617,12 +2618,12 @@
         if (!anim) { if (o) o.node.style.display = 'none'; continue; }
         if (!o) { o = frs[key] = { node: el('div', { className: 'gi-gtf' }) }; document.body.append(o.node); }
         if (o.built !== cfg.fst || force) { frEnsureSvg(); frBuild(o, key); const [c1, c2, c3] = frColors(); const st = o.node.style; st.setProperty('--c1', c1); st.setProperty('--c2', c2); st.setProperty('--c3', c3); st.setProperty('--w', Wd + 'px'); st.setProperty('--spd', String(cfg.fspd)); st.setProperty('--glow', String(cfg.fglow)); o.node.className = 'gi-gtf s-' + cfg.fst + (cfg.fclip !== false ? ' clip' : '') + (cfg.fstatic ? ' freeze' : ''); }
-        o.miss = 0; if (/^[agx]_/.test(key)) { o.el = tmap[key](); o.fx = Math.round(r.left); o.fy = Math.round(r.top); o.fw = Math.round(r.width); o.fh = Math.round(r.height); }
+        o.miss = 0; o.k = key; if (/^[agx]_/.test(key)) { o.el = tmap[key](); o.fx = Math.round(r.left); o.fy = Math.round(r.top); o.fw = Math.round(r.width); o.fh = Math.round(r.height); }
         const st = o.node.style; st.display = ''; st.left = Math.round(r.left) + 'px'; st.top = Math.round(r.top) + 'px'; st.width = Math.round(r.width) + 'px'; st.height = Math.round(r.height) + 'px';
         let mk = 'none';
         if (gc) { const dx = Math.max(r.left - gc.x, 0, gc.x - (r.left + r.width)), dy = Math.max(r.top - gc.y, 0, gc.y - (r.top + r.height)); if (dx * dx + dy * dy < (gc.r + 14) * (gc.r + 14)) mk = `radial-gradient(circle at ${Math.round(gc.x - r.left)}px ${Math.round(gc.y - r.top)}px,transparent ${Math.round(gc.r)}px,#000 ${Math.round(gc.r + 4)}px)`; }
         if (!cfg.fgrad && o.mk !== mk) { o.mk = mk; st.webkitMaskImage = mk; st.maskImage = mk; st.maskSize = ''; }
-        if (/^[agx]_/.test(key)) { const te = tmap[key](), zt = te && te.nodeType === 1 ? parseInt(getComputedStyle(te).zIndex, 10) : NaN; const zz = Math.max(99000, (isNaN(zt) ? 0 : zt) + 1); if (o.z !== zz) { o.z = zz; o.node.style.zIndex = String(zz); } }
+        if (/^[agx]_/.test(key)) { const te = tmap[key](), zt = te && te.nodeType === 1 ? parseInt(getComputedStyle(te).zIndex, 10) : NaN; const zz = Math.max(key[0] === 'x' ? 100001 : 99000, (isNaN(zt) ? 0 : zt) + 1); if (o.z !== zz) { o.z = zz; o.node.style.zIndex = String(zz); } }
         const wk = (key === 'game' || /^[agx]_/.test(key)) ? Wd : Math.max(3, Math.round(Wd * 0.55));
         if (o.W !== wk) { o.W = wk; o.node.style.setProperty('--w', wk + 'px'); o.geo = ''; }
         frGeo(o, Math.round(r.width), Math.round(r.height));
@@ -4589,7 +4590,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.97.2');
+    log('Załadowano v2.97.3');
   }
 
   let tries = 0;
