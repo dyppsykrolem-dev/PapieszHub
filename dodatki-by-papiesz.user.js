@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.100.0
+// @version      2.100.1
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3769,10 +3769,11 @@
   let ifEnabled = (() => { try { return localStorage.getItem(IF_ON_KEY) === '1'; } catch (e) { return false; } })();
   const IF_RAR = [['normal', 'Zwykłe', '#9e9e9e'], ['upgraded', 'Ulepszone', '#26c6da'], ['uni', 'Unikaty', '#ffd54f'], ['her', 'Heroiki', '#4fc3f7'], ['leg', 'Legendy', '#ff7a1a']];
   const IF_FRAMES = [['none', 'Brak'], ['thin', 'Cienka'], ['thick', 'Gruba'], ['double', 'Podwójna'], ['inner', 'Wewnętrzna poświata'], ['glow', 'Poświata'], ['soft', 'Miękki cień'], ['bevel', 'Fazowana'], ['corners', 'Narożniki'], ['gem', 'Klejnoty w rogach'], ['dashed', 'Kreskowana'], ['dotted', 'Kropkowana'],
-    ['pulse', 'Pulsująca'], ['breath', 'Oddychająca'], ['neon', 'Neon (migotanie)'], ['spin', 'Obracający się promień'], ['chase', 'Dwa biegnące światła'], ['rainbow', 'Tęcza'], ['sweep', 'Błysk po przekątnej'], ['march', 'Maszerujące kreski'], ['sparkle', 'Iskierki'], ['flame', 'Płomień u dołu']];
-  const IF_ANIM = ['pulse', 'breath', 'neon', 'spin', 'chase', 'rainbow', 'sweep', 'march', 'sparkle', 'flame'];
+    ['pulse', 'Pulsująca'], ['breath', 'Oddychająca'], ['neon', 'Neon (migotanie)'], ['spin', 'Obracający się promień'], ['chase', 'Dwa biegnące światła'], ['rainbow', 'Tęcza'], ['sweep', 'Błysk po przekątnej'], ['march', 'Maszerujące kreski'], ['sparkle', 'Iskierki'], ['flame', 'Płomień u dołu'],
+    ['ring3', 'Potrójna cienka'], ['brackets', 'Długie narożniki'], ['ticks', 'Znaczniki na bokach'], ['diamonds', 'Romby w rogach'], ['stripe', 'Ukośne paski'], ['duo', 'Dwukolorowa'], ['frost', 'Szron'], ['ripple', 'Rozchodząca się fala'], ['heart', 'Bicie serca'], ['scan', 'Skaner'], ['ember', 'Żar unoszący się'], ['lightning', 'Błyskawica'], ['spin2', 'Dwukolorowy obrót'], ['hue', 'Zmiana barw']];
+  const IF_ANIM = ['ripple', 'heart', 'scan', 'ember', 'lightning', 'spin2', 'hue', 'pulse', 'breath', 'neon', 'spin', 'chase', 'rainbow', 'sweep', 'march', 'sparkle', 'flame'];
   const IF_EQFX = [['none', 'Brak'], ['shine', 'Błysk co kilka sekund'], ['glow', 'Pulsująca poświata'], ['orbit', 'Orbitujące światło'], ['sparks', 'Unoszące się iskry'], ['shimmer', 'Mieniący się połysk'], ['electric', 'Iskrzenie'], ['stars', 'Migające gwiazdki']];
-  const IF_BADGES = [['plain', 'Sam tekst'], ['pill', 'Plakietka'], ['star', 'Gwiazdka'], ['shield', 'Okrąg'], ['ribbon', 'Wstęga na dole'], ['glow', 'Świecący tekst']];
+  const IF_BADGES = [['plain', 'Sam tekst'], ['pill', 'Plakietka'], ['star', 'Gwiazdka'], ['shield', 'Okrąg'], ['ribbon', 'Wstęga na dole'], ['glow', 'Świecący tekst'], ['stars', 'Rząd gwiazdek'], ['dots', 'Rząd kropek'], ['bar', 'Pasek 5 segmentów'], ['hex', 'Sześciokąt'], ['tag', 'Chorągiewka'], ['solid', 'Pełne koło']];
   const IF_CSS = `
 @property --giang{syntax:'<angle>';inherits:false;initial-value:0deg}
 @keyframes gi-rf-ang{to{--giang:360deg}}
@@ -3784,6 +3785,10 @@
 @keyframes gi-rf-twk{0%,100%{opacity:.1}50%{opacity:1}}
 @keyframes gi-rf-flame{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.65)}}
 @keyframes gi-rf-rise{from{transform:translateY(8px);opacity:0}30%{opacity:1}to{transform:translateY(-22px);opacity:0}}
+ @keyframes gi-rf-heart{0%,100%{transform:scale(1)}15%{transform:scale(.93)}30%{transform:scale(1)}45%{transform:scale(.95)}}
+@keyframes gi-rf-ripple{from{transform:scale(.8);opacity:.9}to{transform:scale(1.35);opacity:0}}
+@keyframes gi-rf-scan{from{top:0}to{top:calc(100% - 2px)}}
+@keyframes gi-rf-hue{to{filter:hue-rotate(360deg)}}
 @keyframes gi-fe-shine{0%{background-position:150% 0}45%,100%{background-position:-50% 0}}
 @keyframes gi-fe-glow{from{opacity:.25}to{opacity:1}}
 @keyframes gi-fe-shim{from{background-position:130% 0}to{background-position:-130% 0}}
@@ -3808,6 +3813,24 @@
 .gi-rar[data-fs="spin"],.gi-eqfx[data-fe="orbit"]{background:conic-gradient(from var(--giang),color-mix(in srgb,var(--c) 22%,transparent) 0 50%,var(--c) 88%,#fff 100%)}
 .gi-rar[data-fs="chase"]{background:conic-gradient(from var(--giang),color-mix(in srgb,var(--c) 20%,transparent) 0 20%,var(--c) 38%,color-mix(in srgb,var(--c) 20%,transparent) 45% 70%,var(--c) 88%,color-mix(in srgb,var(--c) 20%,transparent))}
 .gi-rar[data-fs="rainbow"]{background:conic-gradient(from var(--giang),#f44,#fd4,#4f4,#4df,#44f,#f4f,#f44)}
+.gi-rar[data-fs="ring3"]{box-shadow:inset 0 0 0 1px var(--c),inset 0 0 0 3px rgba(0,0,0,.5),inset 0 0 0 4px var(--c),inset 0 0 0 6px rgba(0,0,0,.5),inset 0 0 0 7px var(--c)}
+.gi-rar[data-fs="brackets"]{background:linear-gradient(var(--c),var(--c)) 0 0/12px 2px,linear-gradient(var(--c),var(--c)) 0 0/2px 12px,linear-gradient(var(--c),var(--c)) 100% 0/12px 2px,linear-gradient(var(--c),var(--c)) 100% 0/2px 12px,linear-gradient(var(--c),var(--c)) 0 100%/12px 2px,linear-gradient(var(--c),var(--c)) 0 100%/2px 12px,linear-gradient(var(--c),var(--c)) 100% 100%/12px 2px,linear-gradient(var(--c),var(--c)) 100% 100%/2px 12px;background-repeat:no-repeat;filter:drop-shadow(0 0 2px var(--c))}
+.gi-rar[data-fs="ticks"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 45%,transparent);background:linear-gradient(var(--c),var(--c)) 50% 0/2px 6px,linear-gradient(var(--c),var(--c)) 50% 100%/2px 6px,linear-gradient(var(--c),var(--c)) 0 50%/6px 2px,linear-gradient(var(--c),var(--c)) 100% 50%/6px 2px;background-repeat:no-repeat}
+.gi-rar[data-fs="diamonds"]{background:conic-gradient(from 45deg at 3px 3px,var(--c) 0 25%,transparent 25%) 0 0/8px 8px no-repeat,conic-gradient(from 135deg at calc(100% - 3px) 3px,var(--c) 0 25%,transparent 25%) 100% 0/8px 8px no-repeat,conic-gradient(from -45deg at 3px calc(100% - 3px),var(--c) 0 25%,transparent 25%) 0 100%/8px 8px no-repeat,conic-gradient(from 225deg at calc(100% - 3px) calc(100% - 3px),var(--c) 0 25%,transparent 25%) 100% 100%/8px 8px no-repeat;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent)}
+.gi-rar[data-fs="stripe"]{padding:var(--w);background:repeating-linear-gradient(45deg,var(--c) 0 3px,rgba(0,0,0,.55) 3px 6px);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask-composite:exclude}
+.gi-rar[data-fs="duo"]{border:var(--w) solid;border-color:var(--c) #fff var(--c) #fff}
+.gi-rar[data-fs="frost"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c),#fff 60%),inset 0 0 8px 2px color-mix(in srgb,var(--c) 70%,transparent);animation:gi-rf-breath var(--d) ease-in-out infinite alternate}
+.gi-rar[data-fs="ripple"]{box-shadow:inset 0 0 0 1px var(--c)}
+.gi-rar[data-fs="ripple"]::after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;border:1px solid var(--c);border-radius:3px;animation:gi-rf-ripple var(--d) ease-out infinite}
+.gi-rar[data-fs="heart"]{box-shadow:inset 0 0 0 var(--w) var(--c),0 0 4px var(--c);animation:gi-rf-heart calc(var(--d)*.5) ease-in-out infinite}
+.gi-rar[data-fs="scan"]{box-shadow:inset 0 0 0 1px var(--c);overflow:hidden}
+.gi-rar[data-fs="scan"]::after{content:'';position:absolute;left:0;right:0;top:0;height:2px;background:var(--c);box-shadow:0 0 5px 1px var(--c);animation:gi-rf-scan var(--d) linear infinite alternate}
+.gi-rar[data-fs="ember"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent);overflow:hidden}
+.gi-rar[data-fs="ember"]::before,.gi-rar[data-fs="ember"]::after{content:'';position:absolute;left:18%;bottom:0;width:2px;height:2px;border-radius:50%;background:var(--c);box-shadow:9px -4px 0 var(--c),17px 3px 0 #fff,-2px -9px 0 var(--c);animation:gi-rf-rise var(--d) linear infinite}
+.gi-rar[data-fs="ember"]::after{left:52%;animation-delay:calc(var(--d)/-2)}
+.gi-rar[data-fs="lightning"]{box-shadow:inset 0 0 0 1px var(--c),0 0 6px var(--c),inset 0 0 6px var(--c);animation:gi-rf-flick calc(var(--d)*.45) steps(1) infinite}
+.gi-rar[data-fs="spin2"]{padding:var(--w);background:conic-gradient(from var(--giang),var(--c),color-mix(in srgb,var(--c),#fff 70%) 25%,var(--c) 50%,color-mix(in srgb,var(--c) 30%,#000) 75%,var(--c));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask-composite:exclude;animation:gi-rf-ang var(--d) linear infinite}
+.gi-rar[data-fs="hue"]{box-shadow:inset 0 0 0 var(--w) var(--c),0 0 4px var(--c);animation:gi-rf-hue calc(var(--d)*2) linear infinite}
 .gi-rar[data-fs="sweep"]{box-shadow:inset 0 0 0 1px var(--c);overflow:hidden}
 .gi-rar[data-fs="sweep"]::after{content:'';position:absolute;left:0;top:0;right:0;bottom:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.85) 50%,transparent 65%) 130% 0/250% 100%;animation:gi-rf-sweep var(--d) linear infinite}
 .gi-rar[data-fs="march"]{background:repeating-linear-gradient(90deg,var(--c) 0 4px,transparent 4px 8px) 0 0/100% 2px no-repeat,repeating-linear-gradient(90deg,var(--c) 0 4px,transparent 4px 8px) 0 100%/100% 2px no-repeat,repeating-linear-gradient(0deg,var(--c) 0 4px,transparent 4px 8px) 0 0/2px 100% no-repeat,repeating-linear-gradient(0deg,var(--c) 0 4px,transparent 4px 8px) 100% 0/2px 100% no-repeat;animation:gi-rf-march var(--d) linear infinite}
@@ -3830,6 +3853,13 @@
 .gi-up[data-bs="glow"]{animation:gi-up-glow 1.2s ease-in-out infinite alternate}
 .gi-up[data-bs="pill"]{background:var(--c);color:#111;border-radius:8px;padding:0 3px;box-shadow:0 0 2px #000}
 .gi-up[data-bs="shield"]{background:rgba(10,10,14,.85);border:1px solid var(--c);border-radius:50%;min-width:13px;height:13px;line-height:11px;text-align:center;box-sizing:border-box;padding:0 1px}
+.gi-up[data-pos="tc"]{left:50%;top:1px;transform:translateX(-50%)}.gi-up[data-pos="bc"]{left:50%;bottom:1px;transform:translateX(-50%)}
+.gi-up[data-bs="stars"],.gi-up[data-bs="dots"]{text-shadow:0 0 2px #000,0 0 2px #000,1px 1px 0 #000;letter-spacing:-1px}
+.gi-up[data-bs="bar"]{display:flex;gap:1px;padding:1px;background:rgba(0,0,0,.7);border-radius:2px}
+.gi-seg{width:4px;height:4px;background:#3a3a44}.gi-seg.on{background:var(--c);box-shadow:0 0 2px var(--c)}
+.gi-up[data-bs="hex"]{background:var(--c);color:#111;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);padding:1px 4px;min-width:14px;text-align:center}
+.gi-up[data-bs="tag"]{background:var(--c);color:#111;clip-path:polygon(0 0,100% 0,100% 100%,50% 75%,0 100%);padding:0 3px 4px;text-align:center;min-width:12px}
+.gi-up[data-bs="solid"]{background:var(--c);color:#111;border-radius:50%;min-width:13px;height:13px;line-height:13px;text-align:center;box-sizing:border-box;box-shadow:0 0 2px #000}
 .gi-up[data-bs="ribbon"]{left:0 !important;right:0 !important;top:auto !important;bottom:0 !important;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.75));text-shadow:0 0 2px #000}
 `;
   function buildItemFramesView() {
@@ -3837,14 +3867,21 @@
     const cfg = Object.assign({ where: { bag: true, eq: true, loot: true, other: false }, rar: {}, w: 2, spd: 50, hideGame: false, up: {}, eq: {} }, readLS(IF_CFG_KEY, {}));
     cfg.where = Object.assign({ bag: true, eq: true, loot: true, other: false }, cfg.where);
     IF_RAR.forEach(([k]) => { cfg.rar[k] = Object.assign({}, defRar[k], cfg.rar[k] || {}); });
-    cfg.up = Object.assign({ on: true, bs: 'pill', pos: 'br', tier: true, c: '#ffd54f', min: 1, size: 10 }, cfg.up);
+    cfg.up = Object.assign({ on: true, bs: 'pill', pos: 'br', tier: true, c: '#ffd54f', min: 0, size: 10 }, cfg.up);
+    if (!cfg.up.v2) { cfg.up.v2 = true; cfg.up.min = 0; }
     cfg.eq = Object.assign({ on: false, fe: 'shine', rar: true, c: '#ffffff' }, cfg.eq);
     let ver = 1, timer = 0;
     const cssEl = document.createElement('style'); cssEl.id = 'gi-if-css'; cssEl.textContent = IF_CSS; document.head.append(cssEl);
     const hideEl = document.createElement('style'); hideEl.id = 'gi-if-hide'; document.head.append(hideEl);
     const dur = () => (3.6 / Math.max(0.2, (Number(cfg.spd) || 50) / 50)).toFixed(2) + 's';
-    const tierCol = n => n >= 10 ? '#ff5252' : n >= 7 ? '#ffd54f' : n >= 4 ? '#cfd8dc' : '#cd7f32';
-    const upLvl = d => { const s = String((d && d.stat) || ''); const m = /(?:^|;)enhancement_upgrade_lvl=(\d+)/.exec(s) || /(?:^|;)(?:upgrade|upgr|ulepszenie)(?:_?lvl|_?level)?=(\d+)/.exec(s); return m ? Number(m[1]) : 0; };
+    const tierCol = n => ['#9e9e9e', '#cd7f32', '#cfd8dc', '#ffd54f', '#4dd0e1', '#ff5252'][Math.max(0, Math.min(5, n))];
+    const upLvl = d => { const s = String((d && d.stat) || ''); const m = /(?:^|;)enhancement_upgrade_lvl=(\d+)/.exec(s) || /(?:^|;)(?:upgrade|upgr|ulepszenie)(?:_?lvl|_?level)?=(\d+)/.exec(s); return m ? Number(m[1]) : null; };
+    const badgeNode = (bs, pos, lvl, col, fs) => {
+      const u = el('div', { className: 'gi-up' }); u.dataset.bs = bs; u.dataset.pos = pos; u.style.setProperty('--c', col); u.style.setProperty('--fs', (fs || 10) + 'px');
+      if (bs === 'bar') { for (let i = 0; i < 5; i++) u.append(el('span', { className: 'gi-seg' + (i < lvl ? ' on' : '') })); }
+      else u.textContent = bs === 'stars' ? (lvl > 0 ? '★'.repeat(Math.min(5, lvl)) : '☆') : bs === 'dots' ? (lvl > 0 ? '●'.repeat(Math.min(5, lvl)) : '○') : bs === 'star' ? '★' + lvl : '+' + lvl;
+      return u;
+    };
     const rarOf = (node, d) => {
       const h = node.querySelector(':scope > .highlight'); const m = /(?:^|\s)t-(leg|her|uni|upgraded)(?:\s|$)/.exec(h ? clsOf(h) : '');
       if (m) return m[1];
@@ -3862,7 +3899,7 @@
     function decorate(node) {
       const id = idOf(node); if (!id) return;
       const d = itemData(id) || {};
-      const ctx = ctxOf(node, d), rar = rarOf(node, d), lvl = upLvl(d), sig = [ctx, rar, lvl, ver].join('|');
+      const ctx = ctxOf(node, d), rar = rarOf(node, d), lvl = upLvl(d), sig = [ctx, rar, lvl == null ? '-' : lvl, ver].join('|');
       const cur = stt.get(node), have = node.querySelectorAll(':scope > .gi-rar,:scope > .gi-eqfx,:scope > .gi-up').length;
       if (cur && cur.sig === sig && cur.n === have) return;
       clean(node);
@@ -3872,8 +3909,8 @@
       const rc = cfg.rar[rar] || cfg.rar.normal;
       if (rc.on && rc.fs !== 'none') { const f = el('div', { className: 'gi-rar' }); f.dataset.fs = rc.fs; f.style.setProperty('--c', rc.c); f.style.setProperty('--w', (cfg.w || 2) + 'px'); f.style.setProperty('--d', dur()); node.append(f); }
       if (ctx === 'eq' && cfg.eq.on && cfg.eq.fe !== 'none') { const f = el('div', { className: 'gi-eqfx' }); f.dataset.fe = cfg.eq.fe; f.style.setProperty('--c', cfg.eq.rar ? (rc.c || cfg.eq.c) : cfg.eq.c); f.style.setProperty('--d', dur()); node.append(f); }
-      rec.n = (rc.on && rc.fs !== 'none' ? 1 : 0) + (ctx === 'eq' && cfg.eq.on && cfg.eq.fe !== 'none' ? 1 : 0) + (cfg.up.on && lvl >= (cfg.up.min || 1) ? 1 : 0);
-      if (cfg.up.on && lvl >= (cfg.up.min || 1)) { const u = el('div', { className: 'gi-up', textContent: (cfg.up.bs === 'star' ? '★' : '+') + lvl }); u.dataset.bs = cfg.up.bs; u.dataset.pos = cfg.up.pos; u.style.setProperty('--c', cfg.up.tier ? tierCol(lvl) : cfg.up.c); u.style.setProperty('--fs', (cfg.up.size || 10) + 'px'); node.append(u); }
+      rec.n = (rc.on && rc.fs !== 'none' ? 1 : 0) + (ctx === 'eq' && cfg.eq.on && cfg.eq.fe !== 'none' ? 1 : 0) + (cfg.up.on && lvl != null && lvl >= (cfg.up.min || 0) ? 1 : 0);
+      if (cfg.up.on && lvl != null && lvl >= (cfg.up.min || 0)) node.append(badgeNode(cfg.up.bs, cfg.up.pos, lvl, cfg.up.tier ? tierCol(lvl) : cfg.up.c, cfg.up.size));
     }
     function scan() {
       if (!ifEnabled) return;
@@ -3889,15 +3926,15 @@
       if (!ifEnabled) { document.querySelectorAll('.gi-rar,.gi-eqfx,.gi-up').forEach(n => { if (!n.closest('.gi-float')) n.remove(); }); return; }
       scan(); timer = setInterval(scan, 600);
     }
-    const save = () => { writeLS(IF_CFG_KEY, cfg); apply(); rebuildPrev(); };
+    const save = () => { writeLS(IF_CFG_KEY, cfg); apply(); };
     const mkR = (obj, key, label, min, max, step, fmt) => {
       const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' });
       const r = isolate(el('input', { type: 'range', min, max, step, value: obj[key] })); r.style.cssText = 'flex:1;min-width:90px';
       const show = () => { val.textContent = fmt(Number(r.value)); };
-      r.addEventListener('input', () => { obj[key] = Number(r.value); show(); save(); }); show();
+      r.addEventListener('input', () => { obj[key] = Number(r.value); show(); save(); }); r.addEventListener('change', () => rebuildPrev()); show();
       return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val);
     };
-    const mkC = (obj, key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!obj[key] })); c.addEventListener('change', () => { obj[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
+    const mkC = (obj, key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!obj[key] })); c.addEventListener('change', () => { obj[key] = c.checked; save(); rebuildPrev(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
     const prevBox = (inner) => el('div', { style: 'position:relative;width:34px;height:34px;margin:4px auto 15px;background:linear-gradient(135deg,#3a3a44,#1c1c22);border-radius:2px;box-shadow:inset 0 0 0 1px #0008' }, ...inner);
     const frTile = (key, label, col, selected, onPick) => {
       const f = el('div', { className: 'gi-rar' }); if (key !== 'none') { f.dataset.fs = key; f.style.setProperty('--c', col); f.style.setProperty('--w', (cfg.w || 2) + 'px'); f.style.setProperty('--d', dur()); }
@@ -3915,7 +3952,7 @@
       rarBar.replaceChildren(...IF_RAR.map(([k, l]) => { const b = el('button', { textContent: l, style: `padding:3px 8px;border-radius:10px;cursor:pointer;border:1px solid ${cfg.rar[k].c};background:${curR === k ? cfg.rar[k].c : '#0006'};color:${curR === k ? '#111' : '#fff'};font-weight:bold;font-size:11px` }); b.addEventListener('click', () => { curR = k; drawRar(); }); return b; }));
       const rc = cfg.rar[curR];
       const on = isolate(el('input', { type: 'checkbox', checked: !!rc.on })); on.addEventListener('change', () => { rc.on = on.checked; save(); });
-      const col = isolate(el('input', { type: 'color', value: rc.c })); col.addEventListener('input', () => { rc.c = col.value; save(); drawRar(); });
+      const col = isolate(el('input', { type: 'color', value: rc.c })); col.addEventListener('input', () => { rc.c = col.value; save(); }); col.addEventListener('change', () => drawRar());
       const sw = el('div', { style: 'display:flex;gap:3px;margin:3px 0;flex-wrap:wrap' }, ...swatches.map(c => { const s = el('div', { style: `width:18px;height:18px;border-radius:3px;cursor:pointer;background:${c};outline:${rc.c.toLowerCase() === c ? '2px solid #ffd54a' : '1px solid #fff4'}` }); s.addEventListener('click', () => { rc.c = c; save(); drawRar(); }); return s; }));
       const g = grid(4); IF_FRAMES.forEach(([k, l]) => g.append(frTile(k, l, rc.c, rc.fs === k, () => { rc.fs = k; rc.on = true; save(); drawRar(); })));
       const all = el('button', { textContent: 'Ten styl dla wszystkich rzadkości' }); all.addEventListener('click', () => { IF_RAR.forEach(([k]) => { cfg.rar[k].fs = rc.fs; cfg.rar[k].on = true; }); save(); drawRar(); });
@@ -3924,19 +3961,18 @@
     rebuilders.push(drawRar); drawRar();
     const upBody = el('div');
     const drawUp = () => {
-      const g = grid(3), sample = n => { const u = el('div', { className: 'gi-up', textContent: (cfg.up.bs === 'star' ? '★' : '+') + n }); return u; };
-      IF_BADGES.forEach(([k, l]) => { const u = el('div', { className: 'gi-up', textContent: (k === 'star' ? '★' : '+') + '7' }); u.dataset.bs = k; u.dataset.pos = cfg.up.pos; u.style.setProperty('--c', cfg.up.tier ? tierCol(7) : cfg.up.c); u.style.setProperty('--fs', (cfg.up.size || 10) + 'px'); const t = el('div', { title: l, style: 'position:relative;border-radius:5px;cursor:pointer;padding:4px 2px 2px;background:#0006;box-sizing:border-box;outline:' + (cfg.up.bs === k ? '2px solid #ffd54a' : '1px solid #fff3') }, prevBox([u]), el('span', { textContent: l, style: 'position:absolute;left:1px;right:1px;bottom:2px;text-align:center;font-size:9px;line-height:10px;color:#ddd' })); t.addEventListener('click', () => { cfg.up.bs = k; save(); drawUp(); }); g.append(t); });
-      void sample;
-      const pos = el('div', { style: 'display:flex;gap:4px;margin:4px 0' }, 'Miejsce: ', ...[['tl', '↖'], ['tr', '↗'], ['bl', '↙'], ['br', '↘']].map(([k, l]) => { const b = el('button', { textContent: l, style: `padding:2px 8px;cursor:pointer;${cfg.up.pos === k ? 'outline:2px solid #ffd54a' : ''}` }); b.addEventListener('click', () => { cfg.up.pos = k; save(); drawUp(); }); return b; }));
-      const col = isolate(el('input', { type: 'color', value: cfg.up.c })); col.addEventListener('input', () => { cfg.up.c = col.value; cfg.up.tier = false; save(); });
-      upBody.replaceChildren(mkC(cfg.up, 'on', 'Pokazuj poziom ulepszenia (np. +5) na przedmiotach'), g, pos, mkC(cfg.up, 'tier', 'Kolor zależny od poziomu (brąz → srebro → złoto → czerwień)'), el('div', {}, 'Własny kolor: ', col), mkR(cfg.up, 'min', 'Od poziomu', 1, 15, 1, v => '+' + v), mkR(cfg.up, 'size', 'Wielkość', 8, 16, 1, v => v + ' px'), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, 'Poziom czytam z danych przedmiotu. Jeśli nic się nie pojawia, użyj zakładki Diagnostyka i wklej mi wynik.'));
+      const g = grid(3);
+      IF_BADGES.forEach(([k, l]) => { const u = badgeNode(k, cfg.up.pos, 3, cfg.up.tier ? tierCol(3) : cfg.up.c, cfg.up.size); const t = el('div', { title: l, style: 'position:relative;border-radius:5px;cursor:pointer;padding:4px 2px 2px;background:#0006;box-sizing:border-box;outline:' + (cfg.up.bs === k ? '2px solid #ffd54a' : '1px solid #fff3') }, prevBox([u]), el('span', { textContent: l, style: 'position:absolute;left:1px;right:1px;bottom:2px;text-align:center;font-size:9px;line-height:10px;color:#ddd' })); t.addEventListener('click', () => { cfg.up.bs = k; save(); drawUp(); }); g.append(t); });
+      const pos = el('div', { style: 'display:flex;gap:4px;margin:4px 0' }, 'Miejsce: ', ...[['tl', '↖'], ['tc', '↑'], ['tr', '↗'], ['bl', '↙'], ['bc', '↓'], ['br', '↘']].map(([k, l]) => { const b = el('button', { textContent: l, style: `padding:2px 8px;cursor:pointer;${cfg.up.pos === k ? 'outline:2px solid #ffd54a' : ''}` }); b.addEventListener('click', () => { cfg.up.pos = k; save(); drawUp(); }); return b; }));
+      const col = isolate(el('input', { type: 'color', value: cfg.up.c })); col.addEventListener('input', () => { cfg.up.c = col.value; cfg.up.tier = false; save(); }); col.addEventListener('change', () => drawUp());
+      upBody.replaceChildren(mkC(cfg.up, 'on', 'Pokazuj poziom ulepszenia (+0 … +5) na przedmiotach'), g, pos, mkC(cfg.up, 'tier', 'Kolor zależny od poziomu (+0 szary, +1 brąz, +2 srebro, +3 złoto, +4 turkus, +5 czerwony)'), el('div', {}, 'Własny kolor: ', col), mkR(cfg.up, 'min', 'Od poziomu', 0, 5, 1, v => '+' + v), mkR(cfg.up, 'size', 'Wielkość', 8, 16, 1, v => v + ' px'), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, 'Poziom czytam z danych przedmiotu. Jeśli nic się nie pojawia, użyj zakładki Diagnostyka i wklej mi wynik.'));
     };
     rebuilders.push(drawUp); drawUp();
     const eqBody = el('div');
     const drawEq = () => {
       const g = grid(4), col0 = cfg.eq.rar ? (cfg.rar.her.c) : cfg.eq.c;
       IF_EQFX.forEach(([k, l]) => { const f = el('div', { className: 'gi-eqfx' }); if (k !== 'none') { f.dataset.fe = k; f.style.setProperty('--c', col0); f.style.setProperty('--d', dur()); } const t = el('div', { title: l, style: 'position:relative;border-radius:5px;cursor:pointer;padding:4px 2px 2px;background:#0006;box-sizing:border-box;outline:' + (cfg.eq.fe === k ? '2px solid #ffd54a' : '1px solid #fff3') }, prevBox([f]), el('span', { textContent: l.replace(/ co kilka sekund/, ''), style: 'position:absolute;left:1px;right:1px;bottom:2px;text-align:center;font-size:9px;line-height:10px;color:#ddd' })); t.addEventListener('click', () => { cfg.eq.fe = k; cfg.eq.on = k !== 'none'; save(); drawEq(); }); g.append(t); });
-      const col = isolate(el('input', { type: 'color', value: cfg.eq.c })); col.addEventListener('input', () => { cfg.eq.c = col.value; cfg.eq.rar = false; save(); });
+      const col = isolate(el('input', { type: 'color', value: cfg.eq.c })); col.addEventListener('input', () => { cfg.eq.c = col.value; cfg.eq.rar = false; save(); }); col.addEventListener('change', () => drawEq());
       eqBody.replaceChildren(mkC(cfg.eq, 'on', 'Ruchomy efekt na założonych przedmiotach (okno ekwipunku)'), g, mkC(cfg.eq, 'rar', 'Kolor efektu według rzadkości przedmiotu'), el('div', {}, 'Własny kolor: ', col), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, 'Podgląd pokazuje kolor heroika. Przy kolorach według rzadkości każdy przedmiot dostaje swój.'));
     };
     rebuilders.push(drawEq); drawEq();
@@ -4964,7 +5000,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.100.0');
+    log('Załadowano v2.100.1');
   }
 
   let tries = 0;
