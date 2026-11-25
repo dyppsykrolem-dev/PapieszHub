@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.99.1
+// @version      2.99.2
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3015,7 +3015,7 @@
     const gradChk = chk('Włącz gradient ramek (ramka łagodnie wygasa przy styku z inną ramką)', 'fgrad');
     const gCut = slide('Zapas wokół okrągłego paska życia', 0, 60, 1, 'gcut', x => x + ' px');
     const fPd = slide('Gęstość cząsteczek', 0.2, 3, 0.1, 'fpd', x => x.toFixed(1) + '×');
-    const ptBox = el('div', {}, ...PT.map(([k, l]) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg.fpt[k] })); c.addEventListener('change', () => { cfg.fpt[k] = c.checked; chg(); }); return el('label', { style: 'display:inline-block;margin:2px 10px 2px 0;cursor:pointer;white-space:nowrap' }, c, ' ' + l); }));
+    const ptBox = checkTiles(PT.map(([k, l]) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg.fpt[k] })); c.addEventListener('change', () => { cfg.fpt[k] = c.checked; chg(); }); return [c, l, k]; }), fxTile, 3);
     const fCol = isolate(el('select', {}));
     [['theme', 'Z koloru interfejsu gry (zakładka Kolory)'], ['fire', 'Ogień'], ['ice', 'Lód'], ['storm', 'Burza'], ['magic', 'Magia'], ['gold', 'Złoto'], ['blood', 'Krew'], ['green', 'Toksyczna zieleń'], ['custom', 'Własne (3 kolory)…']].forEach(([v, l]) => fCol.append(el('option', { value: v, textContent: l, selected: cfg.fpal === v })));
     const cc = k => { const i = isolate(el('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(cfg[k]) ? cfg[k] : '#ffffff' })); i.style.cssText = 'width:40px;height:22px;padding:0;border:0;background:none;vertical-align:middle;margin-right:6px'; i.addEventListener('input', () => { cfg[k] = i.value; chg(); }); return i; };
@@ -3032,7 +3032,6 @@
     const tgtBox = el('div', { style: grid2 }, tgt('Cały ekran gry', 'game'), tgt('Mapa', 'map'), tgt('Górny pasek', 'top'), tgt('Dolny pasek', 'bottom'), tgt('Czat', 'chat'), tgt('Prawa kolumna', 'right'), tgt('Siatka torby', 'grid'), tgt('Statystyki', 'stats'), tgt('Okna dodatków (minutnik, dropy…)', 'addons'), tgt('Okno łupów', 'gwins'), tgt('Okna innych dodatków (Lootlog…)', 'other'));
     const setAllT = v => { Object.keys(cfg.fT).forEach(k => { cfg.fT[k] = v; }); tgtBox.querySelectorAll('input').forEach(i => { i.checked = v; }); chg(); updWarn(); };
     const mkBtn = (t, f) => { const b = el('button', { textContent: t }); b.style.cssText = 'margin:2px 4px 2px 0;padding:1px 8px;font-size:11px'; b.addEventListener('click', f); return b; };
-    ptBox.style.cssText = grid2;
     const hidList = el('div', { style: 'margin:4px 0' });
     const pickInfo = el('div', { style: 'font-size:11px;color:#90a4ae;margin:4px 0' });
     const pickIn = isolate(el('input', { type: 'text', placeholder: 'wybrany element (selektor CSS)' })); pickIn.style.cssText = 'width:100%;box-sizing:border-box;margin:2px 0;display:none';
@@ -3387,7 +3386,7 @@
         el('div', { textContent: 'Aura otacza cały obszar z założonymi przedmiotami (widoczna, gdy okno ekwipunku jest otwarte). Efekty można łączyć.', style: 'color:#888;margin-bottom:4px' }),
         el('div', { style: 'font-weight:bold' }, 'Gotowe zestawy'), presetBox,
         el('div', { style: 'font-weight:bold;margin-top:4px' }, 'Efekty'),
-        ...AURA_FX.map(([k, l]) => mkFx(k, l))
+        checkTiles(AURA_FX.map(([k, l]) => [mkFx(k, l).querySelector('input'), l, k]), fxTile, 3)
       ]],
       ['Wygląd', [
         syncRow, el('div', {}, 'Kolor:'), tileify(colorSel, auraTile, 3), customRow,
@@ -3619,7 +3618,7 @@
     dbgBtn.addEventListener('click', () => { const E = PW.Engine, h = E && E.hero, m = E && E.map, gc = document.querySelector('#GAME_CANVAS'); dbg.value = JSON.stringify({ pozycja: info, rysowanie: cap ? { x: Math.round(cap.x), y: Math.round(cap.y), wiek: Math.round(performance.now() - capT) } : null, hookNaPostaci: !!hookedHero, mapD: m && m.d ? { x: m.d.x, y: m.d.y, keys: Object.keys(m.d).slice(0, 25) } : null, heroKeys: h ? Object.keys(h).filter(k => /^(x|y|rx|ry|px|py|offset|d)$/i.test(k)) : null, rx: h && h.rx, ry: h && h.ry, dx: h && h.d && h.d.x, dy: h && h.d && h.d.y, offset: m && (m.offset || m.cameraOffset), mapKeys: m ? Object.keys(m).filter(k => /off|size|scale|zoom/i.test(k)) : null, canvas: gc ? [gc.width, gc.height, Math.round(gc.getBoundingClientRect().width)] : null }, null, 1); });
     const root = el('div');
     root.settingsBox = setTabs([
-      ['Efekty', [el('div', { style: 'font-weight:bold' }, 'Gotowe zestawy'), presetBox, el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Warstwy (łącz dowolnie)'), ...HA_FX.map(([k, l]) => mkFx(k, l))]],
+      ['Efekty', [el('div', { style: 'font-weight:bold' }, 'Gotowe zestawy'), presetBox, el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Warstwy (łącz dowolnie)'), checkTiles(HA_FX.map(([k, l]) => [mkFx(k, l).querySelector('input'), l, k]), fxTile, 3)]],
       ['Wygląd', [
         el('label', { style: 'display:block;cursor:pointer;margin:2px 0 6px' }, syncCb, ' Synchronizuj z motywem (te same kolory co ramki motywu gry)'),
         el('div', {}, 'Kolor:'), tileify(colorSel, auraTile, 3), customRow,
@@ -3752,13 +3751,14 @@
     const col = (key, mode) => { const c = isolate(el('input', { type: 'color', value: cfg[key] })); c.addEventListener('input', () => { cfg[key] = c.value; cfg.mode = mode; paintMarks(); save(); }); return c; };
     const angR = mkR('ang', 'Kąt', 0, 360, 5, v => v + '°'); angR.querySelector('input').addEventListener('input', () => { cfg.mode = 'gradient'; paintMarks(); save(); });
     const fxSel = isolate(el('select', {})); BG_FX.forEach(([v, t]) => fxSel.append(el('option', { value: v, textContent: t }))); fxSel.value = cfg.fx; fxSel.addEventListener('change', () => { cfg.fx = fxSel.value; save(); });
+    const fxSelT = tileify(fxSel, v => fxTile(v), 3);
     const fxC = isolate(el('input', { type: 'color', value: cfg.fxC || BG_FXC[cfg.fx] || '#ffffff' })); fxC.addEventListener('input', () => { cfg.fxC = fxC.value; save(); });
     const fxRes = el('button', { textContent: 'Kolor domyślny' }); fxRes.addEventListener('click', () => { cfg.fxC = ''; fxC.value = BG_FXC[cfg.fx] || '#ffffff'; save(); });
     fxSel.addEventListener('change', () => { if (!cfg.fxC) fxC.value = BG_FXC[cfg.fx] || '#ffffff'; });
     const root0 = el('div');
     root0.settingsBox = setTabs([
       ['Tło', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:2px' }, 'Kliknij gotowe tło:'), grid, el('hr'), el('div', {}, 'Własny gradient: ', col('g1', 'gradient'), ' → ', col('g2', 'gradient')), angR, el('div', { style: 'margin-top:4px' }, 'Jeden kolor: ', col('color', 'color')), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, 'Tło widać tylko poza oknem gry (po bokach i nad nią na szerokim monitorze).')]],
-      ['Efekty', [el('div', {}, 'Efekt: ', fxSel), mkR('fxN', 'Ilość / siła', 5, 150, 5, v => v + '%'), mkR('fxS', 'Szybkość', 10, 200, 5, v => v + '%'), el('div', { style: 'margin:4px 0' }, 'Kolor efektu: ', fxC, ' ', fxRes), el('hr'), mkR('dim', 'Przyciemnienie', 0, 90, 1, v => v + '%'), mkR('vig', 'Winieta', 0, 100, 1, v => v + '%'), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, '„Płynący gradient” używa kolorów własnego gradientu z zakładki Tło.')]]
+      ['Efekty', [el('div', {}, 'Efekt:'), fxSelT, mkR('fxN', 'Ilość / siła', 5, 150, 5, v => v + '%'), mkR('fxS', 'Szybkość', 10, 200, 5, v => v + '%'), el('div', { style: 'margin:4px 0' }, 'Kolor efektu: ', fxC, ' ', fxRes), el('hr'), mkR('dim', 'Przyciemnienie', 0, 90, 1, v => v + '%'), mkR('vig', 'Winieta', 0, 100, 1, v => v + '%'), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, '„Płynący gradient” używa kolorów własnego gradientu z zakładki Tło.')]]
     ]);
     root0.test = () => apply(); root0.apply = apply; root0.stop = () => apply();
     apply();
@@ -4040,18 +4040,42 @@
     const tiles = []; let lastGroup = null;
     [...sel.querySelectorAll('option')].forEach(o => {
       if (o.value === '' && !o.textContent.trim().match(/\S/)) return;
-      const t0 = tileFn(o.value, o.textContent, o); if (!t0) return;
+      let t0 = tileFn(o.value, o.textContent, o); if (!t0) return;
+      const ic = typeof t0 === 'object' ? t0.icon : ''; if (typeof t0 === 'object') t0 = t0.css;
       const g = o.parentElement && o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : null;
       if (g && g !== lastGroup) { grid.append(el('div', { textContent: g, style: 'grid-column:1/-1;font-size:11px;color:#90a4ae;margin-top:4px' })); }
       lastGroup = g;
       const label = o.textContent.replace(/\s*\(.*\)\s*$/, '').replace(/…$/, '');
-      const t = el('div', { title: o.textContent, style: 'min-height:42px;border-radius:5px;cursor:pointer;position:relative;overflow:hidden;box-sizing:border-box;' + t0 }, el('span', { textContent: label, style: 'position:absolute;left:2px;right:2px;bottom:2px;text-align:center;font-size:10px;line-height:11px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000,0 0 2px #000' }));
+      const t = el('div', { title: o.textContent, style: 'min-height:42px;border-radius:5px;cursor:pointer;position:relative;overflow:hidden;box-sizing:border-box;' + t0 }, ic ? el('span', { textContent: ic, style: 'position:absolute;left:0;right:0;top:3px;text-align:center;font-size:17px;line-height:20px;animation:gitpulse 1.4s ease-in-out infinite alternate' }) : '', el('span', { textContent: label, style: 'position:absolute;left:2px;right:2px;bottom:2px;text-align:center;font-size:10px;line-height:11px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000,0 0 2px #000' }));
       t.addEventListener('click', () => { if (sel.disabled) return; sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); sync(); });
       tiles.push([t, o]); grid.append(t);
     });
     function sync() { tiles.forEach(([t, o]) => { const on = sel.value === o.value; t.style.outline = on ? '2px solid #ffd54a' : '1px solid #fff4'; t.style.opacity = sel.disabled ? '.45' : ''; }); }
     sync(); setInterval(() => { if (wrap.isConnected) sync(); }, 700);
     wrap.append(sel, grid); return wrap;
+  }
+  const FXV = {
+    none: ['⊘', '#202028'], sparks: ['✨', 'linear-gradient(160deg,#2a1505,#ff9800)'], embers: ['🔥', 'radial-gradient(circle at 50% 100%,#ff8a3a,#2a0a05 75%)'], snow: ['❄', 'linear-gradient(#0a2038,#5a8ab0)'],
+    stars: ['⭐', 'linear-gradient(#050818,#1a2050)'], magic: ['🔮', 'radial-gradient(circle,#b388ff,#1a0a33 75%)'], lightning: ['⚡', 'linear-gradient(160deg,#1a1040,#7a5cff 70%)'], orbit: ['🌀', 'radial-gradient(circle,#ffe082,#2a1f05 75%)'],
+    fireflies: ['✦', 'radial-gradient(circle,#d4ff6a,#0f200a 75%)'], bubbles: ['🫧', 'linear-gradient(#0a3a4a,#7fd8e6)'], leaves: ['🍂', 'linear-gradient(#2a1a08,#8a5a1c)'], rain: ['🌧', 'linear-gradient(#0c1a2a,#4a6a8a)'],
+    confetti: ['🎉', 'linear-gradient(135deg,#ff6fa8,#ffd54f,#69f0ae,#4fc3f7)'], runes: ['ᚱ', 'radial-gradient(circle,#6a4acf,#120a2a 75%)'], smoke: ['💨', 'linear-gradient(#222,#667)'], meteors: ['☄', 'linear-gradient(160deg,#050510,#2a3a7a)'],
+    aurora: ['🌌', 'linear-gradient(135deg,#052a22,#3a2a8a)'], flow: ['〰', 'linear-gradient(135deg,#1b2a5a,#7a2a6a,#1b2a5a)'], shift: ['🎨', 'linear-gradient(135deg,#d33,#dd3,#3d3,#33d)'],
+    fire: ['🔥', 'linear-gradient(160deg,#7a1608,#ff6d00,#ffd54f)'], ring: ['⭕', 'radial-gradient(circle,#0b1a30 40%,#4fc3f7 75%)'], glow: ['💡', 'radial-gradient(circle,#fff3b0,#3a2a05 75%)'], chaser: ['✦', 'linear-gradient(135deg,#1a1a40,#ffd54f)'],
+    mist: ['🌫', 'linear-gradient(#2a3036,#8a96a0)'], waves: ['🌊', 'linear-gradient(#073a5a,#3aa0d0)'], scan: ['📡', 'radial-gradient(circle,#0a3a1a,#2ecc40 80%)'], flames: ['🔥', 'linear-gradient(160deg,#7a1608,#ff6d00,#ffd54f)'], frost: ['❄', 'linear-gradient(#0a2540,#7ad0ff)'], dust: ['🌟', 'radial-gradient(circle at 30% 30%,#d2a8ff,#2a1450 75%)']
+  };
+  const fxTile = k => { const v = FXV[k]; return v ? { css: 'background:' + v[1], icon: v[0] } : { css: 'background:#222', icon: '' }; };
+  function checkTiles(list, tileFn, cols) {
+    const wrap = el('div'), hide = el('div', { style: 'display:none' }), grid = el('div', { style: `display:grid;grid-template-columns:repeat(${cols || 3},1fr);gap:5px;margin:4px 0` });
+    const items = list.map(([cb, label, key]) => {
+      let t0 = tileFn(key); const ic = t0.icon || ''; t0 = t0.css || t0;
+      hide.append(cb);
+      const t = el('div', { title: label, style: 'min-height:46px;border-radius:5px;cursor:pointer;position:relative;overflow:hidden;box-sizing:border-box;' + t0 }, ic ? el('span', { textContent: ic, style: 'position:absolute;left:0;right:0;top:3px;text-align:center;font-size:17px;line-height:20px;animation:gitpulse 1.4s ease-in-out infinite alternate' }) : '', el('span', { textContent: label.replace(/\s*\(.*\)\s*$/, ''), style: 'position:absolute;left:2px;right:2px;bottom:2px;text-align:center;font-size:10px;line-height:11px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000,0 0 2px #000' }));
+      t.addEventListener('click', () => { cb.click(); sync(); });
+      grid.append(t); return [t, cb];
+    });
+    function sync() { items.forEach(([t, cb]) => { t.style.outline = cb.checked ? '2px solid #ffd54a' : '1px solid #fff4'; t.style.filter = cb.checked ? '' : 'saturate(.55) brightness(.8)'; }); }
+    sync(); setInterval(() => { if (wrap.isConnected) sync(); }, 700);
+    wrap.append(hide, grid); return wrap;
   }
   const CONIC = 'conic-gradient(#f44,#fd4,#4f4,#4df,#44f,#f4f,#f44)';
   const auraTile = v => v === 'custom' ? `background:${CONIC}` : (AURA_COLORS[v] ? `background:linear-gradient(135deg,${AURA_COLORS[v][1]},${AURA_COLORS[v][2]},${AURA_COLORS[v][3]})` : null);
@@ -4650,7 +4674,7 @@
     syncTheme(getTheme());
     themeSel.addEventListener('change', () => { setTheme(themeSel.value); syncTheme(themeSel.value); });
     themeBtn.addEventListener('click', () => { const i = THEMES.findIndex(x => x[0] === getTheme()); const nt = THEMES[(i + 1) % THEMES.length][0]; setTheme(nt); syncTheme(nt); });
-    { const tb = el('div', { className: 'gi-rset' }, el('div', { style: 'font-weight:bold;margin-bottom:2px' }, 'Motyw okien'), themeSel, el('div', { style: 'color:#90a4ae;font-size:10px;margin-top:2px' }, 'Zmienia wygląd okien dodatków. Szybka zmiana: przycisk 🎨 w nagłówku.'), (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(gtView.getSync && gtView.getSync()) })); c.addEventListener('change', () => { if (gtView.setSync) gtView.setSync(c.checked); }); return el('label', { style: 'display:block;margin-top:6px;cursor:pointer' }, c, ' Kolor interfejsu gry („Motyw gry”) podąża za tym motywem'); })()); const first = [...menuView.children].find(c => c.className === 'gi-rset'); if (first) menuView.insertBefore(tb, first); else menuView.append(tb); }
+    { const tb = el('div', { className: 'gi-rset' }, el('div', { style: 'font-weight:bold;margin-bottom:2px' }, 'Motyw okien'), tileify(themeSel, v => { const P = { game: ['#ffffff', '#d9b13a', '#8f8f8f'], fantasy: ['#f1e3a6', '#c9b25a', '#2f6a37'], classic: ['#e1f5fe', '#4fc3f7', '#1565c0'], crimson: ['#ff8a80', '#e0524a', '#6d2a2a'], violet: ['#cdb8ff', '#9575ff', '#4a3a85'], gold: ['#ffe082', '#d4af37', '#6e5a1e'], mono: ['#ffffff', '#9a9a9a', '#444444'] }[v]; return P ? `background:linear-gradient(135deg,${P[2]},${P[1]},${P[0]})` : null; }, 4), el('div', { style: 'color:#90a4ae;font-size:10px;margin-top:2px' }, 'Zmienia wygląd okien dodatków. Szybka zmiana: przycisk 🎨 w nagłówku.'), (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(gtView.getSync && gtView.getSync()) })); c.addEventListener('change', () => { if (gtView.setSync) gtView.setSync(c.checked); }); return el('label', { style: 'display:block;margin-top:6px;cursor:pointer' }, c, ' Kolor interfejsu gry („Motyw gry”) podąża za tym motywem'); })()); const first = [...menuView.children].find(c => c.className === 'gi-rset'); if (first) menuView.insertBefore(tb, first); else menuView.append(tb); }
     const head = el('div', { id: 'gi-head', title: 'Przeciągnij, aby przesunąć okno. Dwuklik = pozycja i rozmiar domyślne.' }, backBtn, titleEl, themeBtn, closeBtn);
     panel = el('div', { id: 'gi-panel' }, head, menuView, ...ADDONS.map(a => a.view));
     showView(null);
@@ -4727,7 +4751,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.99.1');
+    log('Załadowano v2.99.2');
   }
 
   let tries = 0;
