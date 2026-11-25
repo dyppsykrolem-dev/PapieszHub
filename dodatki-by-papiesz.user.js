@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.97.3
+// @version      2.97.4
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2415,6 +2415,16 @@
       if (sig === tipSig) return; tipSig = sig; tipHoles = h;
       Object.keys(frs).forEach(k => holeNode(frs[k]));
     }
+    let winScanT = 0;
+    function scanWinHoles() {
+      const out = [], seen = new Set(), gp = document.querySelector('.game-window-positioner');
+      const ok = n => { if (seen.has(n) || n.nodeType !== 1 || n.closest(OURS) || n.matches('script,style,canvas,svg,link,iframe,.interface-layer,.game-layer,[id^="gi-"]')) return false; seen.add(n); const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.3 || !/fixed|absolute/.test(cs.position)) return false; const r = n.getBoundingClientRect(); if (r.width < 50 || r.height < 24 || r.width * r.height > innerWidth * innerHeight * 0.6) return false; if (!(n.textContent || '').trim() && !n.querySelector('img,canvas,svg')) return false; out.push({ l: r.left, t: r.top, r: r.right, b: r.bottom }); return true; };
+      const walk = (n, d) => { if (n.nodeType !== 1 || n === gp || n.closest(OURS)) return; if (ok(n)) return; if (d < 3) [...n.children].forEach(c => walk(c, d + 1)); };
+      for (const c of document.body.children) { if (c === gp || (gp && c.contains(gp)) || /^(SCRIPT|STYLE|LINK|NOSCRIPT)$/.test(c.tagName)) continue; walk(c, 0); }
+      if (gp) [...gp.children].forEach(c => { if (!c.matches('.interface-layer,.game-layer') && !c.querySelector('.interface-layer.layer')) walk(c, 1); });
+      document.querySelectorAll('.border-window').forEach(n => { if (!n.closest('.interface-layer') && !(n.parentElement && n.parentElement.closest('.border-window'))) ok(n); });
+      return out;
+    }
     function holeNode(o) {
       if (!o || !o.node || o.node.style.display === 'none') return;
       const x = parseFloat(o.node.style.left) || 0, y = parseFloat(o.node.style.top) || 0, w = parseFloat(o.node.style.width) || 0, hh = parseFloat(o.node.style.height) || 0;
@@ -2609,7 +2619,7 @@
           }
         }
       });
-      winHoles = (otherCache.l || []).filter(n => n.isConnected).map(n => n.getBoundingClientRect()).filter(r => r.width > 40 && r.height > 20 && r.width * r.height < innerWidth * innerHeight * 0.6).map(r => ({ l: r.left, t: r.top, r: r.right, b: r.bottom }));
+      { const nw = performance.now(); if (!winScanT || nw - winScanT > 500) { winScanT = nw; winHoles = scanWinHoles(); } }
       for (const key of Object.keys(R)) {
         const q = R[key], r = { left: q.l, top: q.t, width: q.r - q.l, height: q.b - q.t };
         if (r.width < 30 || r.height < 14) { delete frRects[key]; if (frs[key]) frs[key].node.style.display = 'none'; continue; }
@@ -4590,7 +4600,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.97.3');
+    log('Załadowano v2.97.4');
   }
 
   let tries = 0;
