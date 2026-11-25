@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.98.2
+// @version      2.99.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3633,54 +3633,106 @@
   }
 
   const BG_ON_KEY = 'gi_bg_on_v1', BG_CFG_KEY = 'gi_bg_cfg_v1', BG_IMG_KEY = 'gi_bg_img_v1';
+  try { localStorage.removeItem(BG_IMG_KEY); } catch (e) {  }
   let bgEnabled = (() => { try { return localStorage.getItem(BG_ON_KEY) === '1'; } catch (e) { return false; } })();
   const BG_PRESETS = [
     ['Noc', 'linear-gradient(160deg,#0b1026,#1b2a5a 55%,#3b1d5a)'],
+    ['Północ', 'linear-gradient(180deg,#020410,#0a1a3a)'],
     ['Las', 'linear-gradient(160deg,#071a10,#14452a 60%,#2d5a1d)'],
+    ['Mech', 'linear-gradient(135deg,#0f2b14,#3a5a1e)'],
     ['Ogień', 'radial-gradient(circle at 50% 100%,#ff6a1a,#7a1608 45%,#1a0505)'],
+    ['Żar', 'linear-gradient(180deg,#1a0505,#7a1608 70%,#ff6a1a)'],
     ['Lód', 'linear-gradient(170deg,#0a2540,#2a7ab0 55%,#cfeeff)'],
+    ['Głębia', 'linear-gradient(180deg,#012a4a,#013a63 50%,#001d33)'],
     ['Fiolet', 'radial-gradient(circle at 30% 20%,#5b2a9a,#1a0a33 65%,#05020d)'],
     ['Zachód', 'linear-gradient(180deg,#1a0f3a,#7a2a6a 45%,#ff8a3a)'],
+    ['Świt', 'linear-gradient(180deg,#2b1055,#7597de 70%,#ffd9a0)'],
+    ['Wiśnia', 'linear-gradient(135deg,#2a0a1a,#8a1c4a)'],
+    ['Złoto', 'linear-gradient(135deg,#1a1405,#6b5210 60%,#d4a72c)'],
+    ['Miedź', 'linear-gradient(160deg,#1c0e08,#7a3b1c 60%,#c8793a)'],
+    ['Pustynia', 'linear-gradient(180deg,#3a2410,#b9803a 60%,#f0d08a)'],
+    ['Bagno', 'linear-gradient(160deg,#10200f,#2c3a1a 55%,#4a4020)'],
+    ['Mgła', 'linear-gradient(180deg,#202830,#586470)'],
+    ['Burza', 'linear-gradient(180deg,#0e1218,#2a3442 60%,#46566a)'],
+    ['Krew', 'radial-gradient(circle at 50% 0%,#6b0a0a,#1a0303 70%)'],
+    ['Smok', 'linear-gradient(135deg,#150505,#4a0f0f 40%,#2a1a05)'],
+    ['Morze', 'linear-gradient(180deg,#0b3a4a,#128099 60%,#7fd8e6)'],
+    ['Neon', 'linear-gradient(135deg,#12002b,#5a0a8a 50%,#00c8ff)'],
+    ['Cukierek', 'linear-gradient(135deg,#ff9ac8,#9a8cff 60%,#6fd8ff)'],
     ['Węgiel', 'linear-gradient(180deg,#16161a,#050507)'],
-    ['Gwiazdy', 'radial-gradient(1.5px 1.5px at 20px 30px,#fff,transparent 60%),radial-gradient(1px 1px at 90px 70px,#cde,transparent 60%),radial-gradient(1.5px 1.5px at 150px 120px,#fff,transparent 60%),linear-gradient(#05050f,#0d1030)', '180px 160px,180px 160px,180px 160px,100% 100%']
+    ['Gwiazdy', 'radial-gradient(1.5px 1.5px at 20px 30px,#fff,transparent 60%),radial-gradient(1px 1px at 90px 70px,#cde,transparent 60%),radial-gradient(1.5px 1.5px at 150px 120px,#fff,transparent 60%),linear-gradient(#05050f,#0d1030)', '180px 160px,180px 160px,180px 160px,100% 100%'],
+    ['Kratka', 'linear-gradient(#ffffff10 1px,transparent 1px),linear-gradient(90deg,#ffffff10 1px,transparent 1px),linear-gradient(#0c1220,#0c1220)', '32px 32px,32px 32px,100% 100%'],
+    ['Paski', 'repeating-linear-gradient(45deg,#14101c 0 18px,#1c1628 18px 36px)'],
+    ['Kropki', 'radial-gradient(#ffffff18 1.5px,transparent 2px),linear-gradient(#10141c,#10141c)', '22px 22px,100% 100%']
   ];
+  const BG_FX = [['none', 'Brak'], ['stars', 'Migające gwiazdy'], ['snow', 'Śnieg'], ['rain', 'Deszcz'], ['embers', 'Unoszący się żar'], ['fireflies', 'Świetliki'], ['bubbles', 'Bąbelki'], ['meteors', 'Spadające gwiazdy'], ['aurora', 'Zorza polarna'], ['flow', 'Płynący gradient'], ['shift', 'Zmiana barw']];
+  const BG_FXC = { stars: '#ffffff', snow: '#ffffff', rain: '#9cc7ff', embers: '#ff8a3a', fireflies: '#d4ff6a', bubbles: '#bfe8ff', meteors: '#ffffff' };
+  const BG_FXN = { stars: 170, snow: 120, rain: 150, embers: 70, fireflies: 40, bubbles: 35, meteors: 1 };
   function buildBgView() {
-    const cfg = Object.assign({ src: 'preset', preset: 0, color: '#101020', g1: '#0b1026', g2: '#3b1d5a', ang: 160, urls: '', fit: 'cover', blur: 0, dim: 0, vig: 0, anim: 'none', slide: false, every: 5, rnd: false }, readLS(BG_CFG_KEY, {}));
-    let idx = 0, slideT = 0, status = null;
+    const cfg = Object.assign({ mode: 'preset', preset: 0, color: '#101020', g1: '#0b1026', g2: '#3b1d5a', ang: 160, dim: 0, vig: 0, fx: 'none', fxN: 50, fxS: 50, fxC: '' }, readLS(BG_CFG_KEY, {}));
     const save = () => { writeLS(BG_CFG_KEY, cfg); apply(); };
+    let root = null, lay = null, au = null, cv = null, ovl = null, ctx = null, W = 0, H = 0, raf = 0, parts = [], meteors = [], lastT = 0, fxBuilt = '';
     const styleEl = document.createElement('style'); styleEl.id = 'gi-bg-css'; document.head.append(styleEl);
-    let root = null, lay = null, ovl = null;
     const ensure = () => {
       if (root && root.isConnected) return;
       root = document.createElement('div'); root.id = 'gi-bgfx'; root.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:-1;pointer-events:none;overflow:hidden';
-      lay = document.createElement('div'); lay.style.cssText = 'position:absolute;left:-3%;top:-3%;width:106%;height:106%';
-      ovl = document.createElement('div'); ovl.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%';
-      root.append(lay, ovl); document.body.prepend(root);
+      lay = document.createElement('div'); au = document.createElement('div'); cv = document.createElement('canvas'); ovl = document.createElement('div');
+      [au, cv, ovl].forEach(n => { n.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%'; });
+      root.append(lay, au, cv, ovl); document.body.prepend(root); ctx = cv.getContext('2d'); fxBuilt = '';
     };
-    const urlList = () => cfg.urls.split(/\n+/).map(s => s.trim()).filter(s => /^(https?:\/\/|data:image\/)/i.test(s));
-    const safeUrl = u => u.replace(/["\\\n\r()]/g, c => encodeURIComponent(c));
-    const fileImg = () => { try { return localStorage.getItem(BG_IMG_KEY) || ''; } catch (e) { return ''; } };
-    const imgCss = u => { const fit = cfg.fit === 'tile' ? 'repeat' : 'no-repeat'; const sz = cfg.fit === 'tile' ? 'auto' : cfg.fit; return `background:#000 url("${safeUrl(u)}") center/${sz} ${fit}`; };
-    const bgStyle = () => {
-      if (cfg.src === 'color') return `background:${cfg.color}`;
-      if (cfg.src === 'gradient') return `background:linear-gradient(${Number(cfg.ang) || 0}deg,${cfg.g1},${cfg.g2})`;
-      if (cfg.src === 'url') { const l = urlList(); if (l.length) return imgCss(l[idx % l.length]); }
-      if (cfg.src === 'file') { const f = fileImg(); if (f) return imgCss(f); }
+    const baseCss = () => {
+      if (cfg.fx === 'flow') return `background:linear-gradient(135deg,${cfg.g1},${cfg.g2},${cfg.g1},${cfg.g2});background-size:400% 400%`;
+      if (cfg.mode === 'color') return `background:${cfg.color}`;
+      if (cfg.mode === 'gradient') return `background:linear-gradient(${Number(cfg.ang) || 0}deg,${cfg.g1},${cfg.g2})`;
       const p = BG_PRESETS[cfg.preset] || BG_PRESETS[0]; return `background:${p[1]}` + (p[2] ? `;background-size:${p[2]}` : '');
     };
+    const sp = () => Math.max(0.1, (Number(cfg.fxS) || 50) / 50);
+    const fxColor = () => cfg.fxC || BG_FXC[cfg.fx] || '#ffffff';
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    function resize() { if (!cv) return; W = cv.width = Math.max(1, innerWidth); H = cv.height = Math.max(1, innerHeight); fxBuilt = ''; }
+    function build() {
+      const n = Math.round((BG_FXN[cfg.fx] || 0) * (Number(cfg.fxN) || 50) / 50);
+      parts = []; meteors = [];
+      for (let i = 0; i < n && cfg.fx !== 'meteors'; i++) parts.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(0.6, 1.9), ph: rnd(0, 6.28), v: rnd(0.6, 1.4) });
+      fxBuilt = cfg.fx + '|' + cfg.fxN + '|' + W + 'x' + H;
+    }
+    function frame(ts) {
+      raf = 0; if (!bgEnabled || !root || !BG_FXN[cfg.fx]) return;
+      raf = requestAnimationFrame(frame);
+      if (document.hidden || ts - lastT < 33) return;
+      const dt = Math.min(0.1, (ts - lastT) / 1000 || 0.033); lastT = ts;
+      if (W !== innerWidth || H !== innerHeight) resize();
+      if (fxBuilt !== cfg.fx + '|' + cfg.fxN + '|' + W + 'x' + H) build();
+      const c = ctx, t = ts / 1000, s = sp(), col = fxColor(), fx = cfg.fx;
+      c.clearRect(0, 0, W, H); c.fillStyle = col; c.strokeStyle = col;
+      if (fx === 'stars') { parts.forEach(p => { c.globalAlpha = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * s * p.v * 2 + p.ph)); c.beginPath(); c.arc(p.x, p.y, p.r, 0, 6.283); c.fill(); }); }
+      else if (fx === 'snow') { parts.forEach(p => { p.y += (18 + p.r * 16) * s * dt; p.x += Math.sin(t * s + p.ph) * 14 * dt; if (p.y > H + 4) { p.y = -4; p.x = rnd(0, W); } c.globalAlpha = 0.5 + p.r / 5; c.beginPath(); c.arc(p.x, p.y, p.r * 1.4, 0, 6.283); c.fill(); }); }
+      else if (fx === 'rain') { c.lineWidth = 1; parts.forEach(p => { p.y += 560 * p.v * s * dt; p.x -= 70 * s * dt; if (p.y > H + 20) { p.y = -20; p.x = rnd(0, W + 80); } c.globalAlpha = 0.18 + p.r / 8; c.beginPath(); c.moveTo(p.x, p.y); c.lineTo(p.x + 3.5, p.y - 16 * p.v); c.stroke(); }); }
+      else if (fx === 'embers') { parts.forEach(p => { p.y -= (18 + p.r * 22) * s * dt; p.x += Math.sin(t * s * 1.3 + p.ph) * 22 * dt; if (p.y < -6) { p.y = H + 6; p.x = rnd(0, W); } const k = Math.max(0, Math.min(1, p.y / H)); c.globalAlpha = 0.15 + 0.7 * (1 - k * 0.6) * (0.6 + 0.4 * Math.sin(t * 3 + p.ph)); c.beginPath(); c.arc(p.x, p.y, p.r * 1.3, 0, 6.283); c.fill(); }); }
+      else if (fx === 'fireflies') { parts.forEach(p => { p.x += Math.cos(p.ph + t * 0.4 * s) * 22 * s * dt * p.v; p.y += Math.sin(p.ph * 1.7 + t * 0.5 * s) * 18 * s * dt * p.v; if (p.x < -10) p.x = W + 10; if (p.x > W + 10) p.x = -10; if (p.y < -10) p.y = H + 10; if (p.y > H + 10) p.y = -10; const a = 0.5 + 0.5 * Math.sin(t * 1.6 * s * p.v + p.ph); const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, 7 + p.r * 3); g.addColorStop(0, col); g.addColorStop(1, 'transparent'); c.globalAlpha = 0.15 + 0.75 * a; c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, 7 + p.r * 3, 0, 6.283); c.fill(); }); c.fillStyle = col; }
+      else if (fx === 'bubbles') { c.lineWidth = 1.2; parts.forEach(p => { p.y -= (10 + p.r * 9) * s * dt; p.x += Math.sin(t * s + p.ph) * 12 * dt; if (p.y < -30) { p.y = H + 30; p.x = rnd(0, W); } c.globalAlpha = 0.35; c.beginPath(); c.arc(p.x, p.y, 3 + p.r * 5, 0, 6.283); c.stroke(); c.globalAlpha = 0.18; c.beginPath(); c.arc(p.x - p.r, p.y - p.r, 1 + p.r, 0, 6.283); c.fill(); }); }
+      else if (fx === 'meteors') {
+        if (Math.random() < dt * 0.5 * s * (Number(cfg.fxN) || 50) / 50) meteors.push({ x: rnd(W * 0.2, W * 1.1), y: rnd(-20, H * 0.3), l: rnd(90, 220), v: rnd(500, 800), a: 1 });
+        c.lineWidth = 1.6; meteors = meteors.filter(m => { m.x -= m.v * 0.8 * dt * s; m.y += m.v * 0.55 * dt * s; m.a -= dt * 0.55; if (m.a <= 0 || m.y > H + 50) return false; const g = c.createLinearGradient(m.x, m.y, m.x + m.l * 0.8, m.y - m.l * 0.55); g.addColorStop(0, col); g.addColorStop(1, 'transparent'); c.globalAlpha = m.a; c.strokeStyle = g; c.beginPath(); c.moveTo(m.x, m.y); c.lineTo(m.x + m.l * 0.8, m.y - m.l * 0.55); c.stroke(); return true; });
+      }
+      c.globalAlpha = 1;
+    }
     const apply = () => {
-      clearInterval(slideT); slideT = 0;
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
       if (!bgEnabled) { styleEl.textContent = ''; if (root) root.remove(); root = null; return; }
       ensure();
-      const anim = cfg.anim === 'drift' ? 'gibgdrift 70s ease-in-out infinite alternate' : cfg.anim === 'pulse' ? 'gibgpulse 45s ease-in-out infinite alternate' : 'none';
-      styleEl.textContent = `@keyframes gibgdrift{from{transform:scale(1) translate(0,0)}to{transform:scale(1.06) translate(-2%,-1.5%)}}@keyframes gibgpulse{from{filter:blur(var(--gi-bgb,0px)) hue-rotate(0deg)}to{filter:blur(var(--gi-bgb,0px)) hue-rotate(55deg)}}` +
-        `html .game-window-positioner{background:transparent !important}`;
-      lay.style.cssText = 'position:absolute;left:-3%;top:-3%;width:106%;height:106%;' + bgStyle() + `;--gi-bgb:${Number(cfg.blur) || 0}px;filter:blur(${Number(cfg.blur) || 0}px);animation:${anim}`;
+      const d = Math.max(6, 40 / sp());
+      styleEl.textContent = `html .game-window-positioner{background:transparent !important}` +
+        `@keyframes gibgflow{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}@keyframes gibgshift{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(70deg)}}` +
+        `@keyframes gibgaur{0%{transform:translate(-6%,2%) scale(1.05)}50%{transform:translate(5%,-3%) scale(1.2)}100%{transform:translate(-2%,3%) scale(1.1)}}`;
+      lay.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;' + baseCss() + ';' + (cfg.fx === 'flow' ? `animation:gibgflow ${d}s ease-in-out infinite` : cfg.fx === 'shift' ? `animation:gibgshift ${d}s ease-in-out infinite alternate` : '');
+      au.style.cssText = 'position:absolute;left:-10%;top:-10%;width:120%;height:120%;' + (cfg.fx === 'aurora' ? `background:radial-gradient(ellipse 45% 30% at 20% 85%,rgba(80,255,170,.5),transparent),radial-gradient(ellipse 40% 28% at 70% 75%,rgba(130,90,255,.45),transparent),radial-gradient(ellipse 50% 25% at 50% 95%,rgba(60,200,255,.4),transparent),radial-gradient(ellipse 35% 22% at 85% 30%,rgba(80,255,200,.3),transparent);filter:blur(28px);mix-blend-mode:screen;animation:gibgaur ${Math.max(8, 26 / sp())}s ease-in-out infinite alternate` : 'display:none');
       const dim = Math.max(0, Math.min(0.9, (Number(cfg.dim) || 0) / 100)), vig = Math.max(0, Math.min(1, (Number(cfg.vig) || 0) / 100));
       ovl.style.cssText = `position:absolute;left:0;top:0;width:100%;height:100%;background:${vig ? `radial-gradient(ellipse at center,rgba(0,0,0,0) ${Math.round(55 - vig * 25)}%,rgba(0,0,0,${(0.35 + vig * 0.6).toFixed(2)}) 100%),` : ''}rgba(0,0,0,${dim})`;
-      if (cfg.src === 'url' && cfg.slide && urlList().length > 1) slideT = setInterval(() => { const n = urlList().length; idx = cfg.rnd ? Math.floor(Math.random() * n) : (idx + 1) % n; apply2(); }, Math.max(1, Number(cfg.every) || 5) * 60000);
+      resize(); if (cv) cv.style.display = BG_FXN[cfg.fx] ? '' : 'none';
+      if (BG_FXN[cfg.fx]) { lastT = 0; raf = requestAnimationFrame(frame); } else if (ctx) ctx.clearRect(0, 0, W, H);
     };
-    const apply2 = () => { if (!lay) return; lay.style.cssText = 'position:absolute;left:-3%;top:-3%;width:106%;height:106%;' + bgStyle() + `;--gi-bgb:${Number(cfg.blur) || 0}px;filter:blur(${Number(cfg.blur) || 0}px);animation:${cfg.anim === 'drift' ? 'gibgdrift 70s ease-in-out infinite alternate' : cfg.anim === 'pulse' ? 'gibgpulse 45s ease-in-out infinite alternate' : 'none'}`; };
+    addEventListener('resize', () => { if (bgEnabled && root) resize(); });
     const mkR = (key, label, min, max, step, fmt) => {
       const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' });
       const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:90px';
@@ -3688,42 +3740,25 @@
       r.addEventListener('input', () => { cfg[key] = Number(r.value); show(); save(); }); show();
       return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val);
     };
-    const mkC = (key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
-    const mkSel = (key, opts, after) => { const s = isolate(el('select', {})); opts.forEach(([v, t]) => s.append(el('option', { value: v, textContent: t }))); s.value = cfg[key]; s.addEventListener('change', () => { cfg[key] = s.value; save(); if (after) after(); }); return s; };
-    const srcSel = mkSel('src', [['preset', 'Gotowe tło'], ['color', 'Jeden kolor'], ['gradient', 'Gradient (2 kolory)'], ['url', 'Obraz z linku (lub kilka)'], ['file', 'Obraz z mojego pliku']]);
-    const presetSel = mkSel('preset', BG_PRESETS.map((p, i) => [String(i), p[0]]));
-    presetSel.value = String(cfg.preset); presetSel.addEventListener('change', () => { cfg.preset = Number(presetSel.value); cfg.src = 'preset'; srcSel.value = 'preset'; save(); });
-    const col = (key) => { const c = isolate(el('input', { type: 'color', value: cfg[key] })); c.addEventListener('input', () => { cfg[key] = c.value; save(); }); return c; };
-    const colorC = col('color'); colorC.addEventListener('input', () => { cfg.src = 'color'; srcSel.value = 'color'; });
-    const g1 = col('g1'), g2 = col('g2'); [g1, g2].forEach(c => c.addEventListener('input', () => { cfg.src = 'gradient'; srcSel.value = 'gradient'; }));
-    const urlTa = isolate(el('textarea', { rows: 4, placeholder: 'Jeden link do obrazu w wierszu (https://…jpg/png/webp). Kilka linków = pokaz slajdów.', value: cfg.urls })); urlTa.style.cssText = 'width:100%;box-sizing:border-box;font-size:11px';
-    urlTa.addEventListener('change', () => { cfg.urls = urlTa.value; cfg.src = 'url'; srcSel.value = 'url'; idx = 0; save(); });
-    status = el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:4px' }, fileImg() ? 'Wczytany plik jest zapisany w przeglądarce.' : 'Brak wczytanego pliku.');
-    const fileIn = isolate(el('input', { type: 'file', accept: 'image/*' }));
-    fileIn.addEventListener('change', () => {
-      const f = fileIn.files && fileIn.files[0]; if (!f) return;
-      const fr = new FileReader();
-      fr.onload = () => {
-        const im = new Image();
-        im.onload = () => {
-          try {
-            const k = Math.min(1, 2560 / Math.max(im.width, im.height)), cv = document.createElement('canvas'); cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k);
-            cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
-            const data = cv.toDataURL('image/jpeg', 0.85); localStorage.setItem(BG_IMG_KEY, data);
-            cfg.src = 'file'; srcSel.value = 'file'; status.textContent = 'Zapisano obraz (' + Math.round(data.length / 1024) + ' KB).'; save();
-          } catch (e) { status.textContent = 'Nie udało się zapisać obrazu (za duży?). Spróbuj mniejszego pliku albo użyj linku.'; }
-        };
-        im.onerror = () => { status.textContent = 'Nie mogę odczytać tego pliku jako obrazu.'; };
-        im.src = fr.result;
-      };
-      fr.readAsDataURL(f);
+    const grid = el('div', { style: 'display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0' });
+    const marks = [];
+    const paintMarks = () => marks.forEach((m, i) => { m.style.outline = cfg.mode === 'preset' && cfg.preset === i ? '2px solid #ffd54a' : '1px solid #fff4'; });
+    BG_PRESETS.forEach((p, i) => {
+      const b = el('div', { title: p[0], style: `height:38px;border-radius:4px;cursor:pointer;position:relative;background:${p[1]};${p[2] ? 'background-size:' + p[2] + ';' : ''}` }, el('span', { textContent: p[0], style: 'position:absolute;left:0;right:0;bottom:1px;text-align:center;font-size:10px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000' }));
+      b.addEventListener('click', () => { cfg.mode = 'preset'; cfg.preset = i; paintMarks(); save(); });
+      marks.push(b); grid.append(b);
     });
-    const clearBtn = el('button', { textContent: 'Usuń wczytany plik' }); clearBtn.addEventListener('click', () => { try { localStorage.removeItem(BG_IMG_KEY); } catch (e) {} if (cfg.src === 'file') { cfg.src = 'preset'; srcSel.value = 'preset'; } status.textContent = 'Usunięto.'; save(); });
-    const angR = mkR('ang', 'Kąt gradientu', 0, 360, 5, v => v + '°');
+    paintMarks();
+    const col = (key, mode) => { const c = isolate(el('input', { type: 'color', value: cfg[key] })); c.addEventListener('input', () => { cfg[key] = c.value; cfg.mode = mode; paintMarks(); save(); }); return c; };
+    const angR = mkR('ang', 'Kąt', 0, 360, 5, v => v + '°'); angR.querySelector('input').addEventListener('input', () => { cfg.mode = 'gradient'; paintMarks(); save(); });
+    const fxSel = isolate(el('select', {})); BG_FX.forEach(([v, t]) => fxSel.append(el('option', { value: v, textContent: t }))); fxSel.value = cfg.fx; fxSel.addEventListener('change', () => { cfg.fx = fxSel.value; save(); });
+    const fxC = isolate(el('input', { type: 'color', value: cfg.fxC || BG_FXC[cfg.fx] || '#ffffff' })); fxC.addEventListener('input', () => { cfg.fxC = fxC.value; save(); });
+    const fxRes = el('button', { textContent: 'Kolor domyślny' }); fxRes.addEventListener('click', () => { cfg.fxC = ''; fxC.value = BG_FXC[cfg.fx] || '#ffffff'; save(); });
+    fxSel.addEventListener('change', () => { if (!cfg.fxC) fxC.value = BG_FXC[cfg.fx] || '#ffffff'; });
     const root0 = el('div');
     root0.settingsBox = setTabs([
-      ['Tło', [el('div', {}, 'Źródło: ', srcSel), el('hr'), el('div', {}, 'Gotowe: ', presetSel), el('div', { style: 'margin-top:4px' }, 'Kolor: ', colorC), el('div', { style: 'margin-top:4px' }, 'Gradient: ', g1, ' → ', g2), angR, el('hr'), el('div', { textContent: 'Obraz z linku:' }), urlTa, mkC('slide', 'Pokaz slajdów (zmiana co kilka minut)'), mkC('rnd', 'Losowa kolejność'), mkR('every', 'Zmiana co', 1, 60, 1, v => v + ' min'), el('hr'), el('div', { textContent: 'Obraz z pliku:' }), fileIn, clearBtn, status]],
-      ['Wygląd', [el('div', {}, 'Dopasowanie obrazu: ', mkSel('fit', [['cover', 'Wypełnij (przytnij)'], ['contain', 'Cały obraz'], ['tile', 'Kafelki']])), mkR('blur', 'Rozmycie', 0, 30, 1, v => v + ' px'), mkR('dim', 'Przyciemnienie', 0, 90, 1, v => v + '%'), mkR('vig', 'Winieta', 0, 100, 1, v => v + '%'), el('div', {}, 'Ruch tła: ', mkSel('anim', [['none', 'brak'], ['drift', 'powolne dryfowanie'], ['pulse', 'płynna zmiana barw']])), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, 'Tło widać tylko poza oknem gry (po bokach i nad nim, jeśli masz duży monitor). Nie wpływa na samą grę.')]]
+      ['Tło', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:2px' }, 'Kliknij gotowe tło:'), grid, el('hr'), el('div', {}, 'Własny gradient: ', col('g1', 'gradient'), ' → ', col('g2', 'gradient')), angR, el('div', { style: 'margin-top:4px' }, 'Jeden kolor: ', col('color', 'color')), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, 'Tło widać tylko poza oknem gry (po bokach i nad nią na szerokim monitorze).')]],
+      ['Efekty', [el('div', {}, 'Efekt: ', fxSel), mkR('fxN', 'Ilość / siła', 5, 150, 5, v => v + '%'), mkR('fxS', 'Szybkość', 10, 200, 5, v => v + '%'), el('div', { style: 'margin:4px 0' }, 'Kolor efektu: ', fxC, ' ', fxRes), el('hr'), mkR('dim', 'Przyciemnienie', 0, 90, 1, v => v + '%'), mkR('vig', 'Winieta', 0, 100, 1, v => v + '%'), el('div', { style: 'color:#90a4ae;font-size:11px;margin-top:6px' }, '„Płynący gradient” używa kolorów własnego gradientu z zakładki Tło.')]]
     ]);
     root0.test = () => apply(); root0.apply = apply; root0.stop = () => apply();
     apply();
@@ -3732,73 +3767,30 @@
 
   const CH_ON_KEY = 'gi_chat_on_v1', CH_CFG_KEY = 'gi_chat_cfg_v1';
   let chEnabled = (() => { try { return localStorage.getItem(CH_ON_KEY) === '1'; } catch (e) { return false; } })();
-  const CH_CHANNELS = [['global', 'Ogólny / lokalny', '#e0e0e0', /global|general|ogoln|local|lokaln|map\b/i], ['clan', 'Klan', '#8bc34a', /clan|klan/i], ['group', 'Drużyna', '#4fc3f7', /party|group|team|dru[zż]yn/i], ['private', 'Prywatne', '#ff80ab', /priv|whisper|szept|prywat|\bpm\b/i], ['trade', 'Handel', '#ffd54f', /trade|commercial|handel|market|aukcj/i], ['system', 'System / informacje', '#b0bec5', /system|server|serwer|info|notice/i]];
-  const CH_FONTS = ['', 'Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'Consolas', 'Segoe UI', 'Comic Sans MS', 'Impact'];
+  const CH_FONTS = {
+    sys: ['Arial', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Georgia', 'Times New Roman', 'Courier New', 'Consolas', 'Segoe UI', 'Calibri', 'Cambria', 'Candara', 'Palatino Linotype', 'Lucida Console', 'Comic Sans MS', 'Impact'],
+    web: ['Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Nunito', 'PT Sans', 'Ubuntu', 'Oswald', 'Merriweather', 'Lora', 'Playfair Display', 'Cinzel', 'MedievalSharp', 'Pirata One', 'Uncial Antiqua', 'Almendra', 'Caveat', 'Kalam', 'Lobster', 'Fira Code', 'Source Code Pro', 'JetBrains Mono', 'VT323', 'Press Start 2P']
+  };
   function buildChatView() {
-    const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
-    const cfg = Object.assign({ font: '', size: 0, bold: false, lh: 0, outline: false, recolor: false, colors: {}, hiOwn: false, ownColor: '#ffeb3b', ownBg: true, nick: false, rules: [] }, readLS(CH_CFG_KEY, {}));
-    cfg.colors = Object.assign({}, cfg.colors);
+    const cfg = Object.assign({ font: '', size: 0, bold: false, lh: 0, outline: false }, readLS(CH_CFG_KEY, {}));
     const save = () => { writeLS(CH_CFG_KEY, cfg); apply(); };
     const style = document.createElement('style'); style.id = 'gi-chat-css'; document.head.append(style);
-    const WR = '.chat-message-wrapper';
-    const msgRe = /(^|[\s_-])message([\s_-]|$)/i, badRe = /wrapper|section|window|scroll|container|input|channel|card/i;
-    const clsOf = n => String(n.className && n.className.baseVal === undefined ? n.className : '');
-    const own = () => { try { const h = PW.Engine && PW.Engine.hero && PW.Engine.hero.d; return h && h.nick || ''; } catch (e) { return ''; } };
+    const WR = '.chat-message-wrapper', PFX = 'html body .new-chat-window.new-chat-window';
+    const isWeb = f => CH_FONTS.web.includes(f);
+    const loadWeb = f => { if (!isWeb(f)) return; const id = 'gi-chat-font-' + f.replace(/\W+/g, ''); if (document.getElementById(id)) return; const l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@400;700&subset=latin-ext&display=swap'; document.head.append(l); };
     const css = () => {
       if (!chEnabled) return '';
       let o = '';
       const f = [];
-      if (cfg.font) f.push(`font-family:${cfg.font.replace(/[;{}]/g, '')},sans-serif !important`);
+      if (cfg.font) f.push(`font-family:"${cfg.font.replace(/["';{}\\]/g, '')}",sans-serif !important`);
       if (cfg.size) f.push(`font-size:${cfg.size}px !important`);
       if (cfg.bold) f.push('font-weight:bold !important');
       if (cfg.outline) f.push('text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000 !important');
-      if (f.length) o += `html body .new-chat-window.new-chat-window ${WR},html body .new-chat-window.new-chat-window ${WR} *:not(img):not(svg):not(i){${f.join(';')}}\n`;
-      if (cfg.lh) o += `html body .new-chat-window.new-chat-window ${WR} [data-gi-m]{line-height:${cfg.lh}px !important}\n`;
-      if (cfg.recolor) CH_CHANNELS.forEach(([k, , d0]) => { const c = cfg.colors[k] || d0; if (c) o += `html body .new-chat-window.new-chat-window [data-gi-ch="${k}"],html body .new-chat-window.new-chat-window [data-gi-ch="${k}"] *:not([class*="nick" i]):not([class*="time" i]):not([class*="date" i]){color:${c} !important}\n`; });
-      o += `html body .new-chat-window.new-chat-window [data-gi-c],html body .new-chat-window.new-chat-window [data-gi-c] *:not([class*="time" i]){color:var(--gi-c) !important}\n`;
-      o += `html body .new-chat-window.new-chat-window [data-gi-bg]{background:linear-gradient(90deg,var(--gi-bg),transparent) !important;border-radius:3px}\n`;
+      if (f.length) o += `${PFX} ${WR},${PFX} ${WR} *:not(img):not(svg):not(i){${f.join(';')}}\n`;
+      if (cfg.lh) o += `${PFX} ${WR} .new-chat-message{line-height:${cfg.lh}px !important}\n`;
       return o;
     };
-    function classify(m) {
-      const own0 = clsOf(m), tk = /chat-([A-Za-z]+)-message/.exec(own0) || /(?:^|\s)([A-Za-z]+)-channel-in-/.exec(own0);
-      if (tk) { for (const [k, , , re] of CH_CHANNELS) if (re.test(tk[1])) return k; return 'global'; }
-      let s = own0.replace(/-channel-in-[A-Za-z]+-channel/gi, ' '); m.querySelectorAll('*').forEach((c, i) => { if (i < 30) s += ' ' + clsOf(c).replace(/-channel-in-[A-Za-z]+-channel/gi, ' '); });
-      for (const [k, , , re] of CH_CHANNELS) if (re.test(s)) return k;
-      return '';
-    }
-    function mark(m) {
-      if (!m || m.nodeType !== 1 || m.closest(GI_OWN)) return;
-      m.setAttribute('data-gi-m', '1');
-      const txt = (m.textContent || '').trim(); if (!txt) return;
-      const ch = classify(m); if (ch) m.setAttribute('data-gi-ch', ch); else m.removeAttribute('data-gi-ch');
-      let col = '', bg = '';
-      for (const r of cfg.rules) { if (!r || !r.re) continue; let ok = false; try { ok = new RegExp(r.re, 'i').test(txt); } catch (e) {  } if (ok) { col = r.color; break; } }
-      const me = own(); if (!col && cfg.hiOwn && me && txt.toLowerCase().includes(me.toLowerCase())) { col = cfg.ownColor; if (cfg.ownBg) bg = cfg.ownColor + '44'; }
-      if (col) { m.setAttribute('data-gi-c', '1'); m.style.setProperty('--gi-c', col); } else { m.removeAttribute('data-gi-c'); m.style.removeProperty('--gi-c'); }
-      if (bg) { m.setAttribute('data-gi-bg', '1'); m.style.setProperty('--gi-bg', bg); } else { m.removeAttribute('data-gi-bg'); m.style.removeProperty('--gi-bg'); }
-    }
-    function msgOf(n, w) {
-      let best = null, c = n.nodeType === 1 ? n : n.parentElement;
-      while (c && c !== w && w.contains(c)) { const cl = clsOf(c); if (msgRe.test(cl) && !badRe.test(cl)) best = c; c = c.parentElement; }
-      if (!best && n.nodeType === 1 && n.parentElement && w.contains(n.parentElement)) best = n;
-      return best;
-    }
-    function scanAll() {
-      document.querySelectorAll(WR).forEach(w => {
-        const set = new Set(); w.querySelectorAll('[class*="message" i]').forEach(n => { const m = msgOf(n, w); if (m) set.add(m); });
-        set.forEach(mark);
-      });
-    }
-    let pend = new Set(), tm = 0;
-    const flush = () => { tm = 0; const l = [...pend]; pend = new Set(); l.forEach(([n, w]) => { if (n.isConnected) mark(msgOf(n, w)); }); };
-    const mo = new MutationObserver(ms => {
-      if (!chEnabled) return;
-      for (const m of ms) for (const n of m.addedNodes) { if (n.nodeType !== 1 || n.closest(GI_OWN)) continue; const w = n.closest(WR); if (w) pend.add([n, w]); }
-      if (pend.size && !tm) tm = setTimeout(flush, 60);
-    });
-    function apply() { style.textContent = css(); if (chEnabled) { scanAll(); } else document.querySelectorAll('[data-gi-m]').forEach(n => { ['data-gi-m', 'data-gi-ch', 'data-gi-c', 'data-gi-bg'].forEach(a => n.removeAttribute(a)); }); }
-    mo.observe(document.body, { childList: true, subtree: true });
-    setInterval(() => { try { apply.last !== chEnabled && ((apply.last = chEnabled), apply()); if (chEnabled) scanAll(); } catch (e) {  } }, 3000);
+    function apply() { if (chEnabled && cfg.font) loadWeb(cfg.font); style.textContent = css(); updPrev(); }
     const mkR = (key, label, min, max, step, fmt) => {
       const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' });
       const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:90px';
@@ -3807,38 +3799,21 @@
       return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val);
     };
     const mkC = (key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
-    const fontSel = isolate(el('select', {})); CH_FONTS.forEach(f => fontSel.append(el('option', { value: f, textContent: f || 'Domyślna (z gry)', selected: cfg.font === f }))); fontSel.addEventListener('change', () => { cfg.font = fontSel.value; fontIn.value = ''; save(); });
-    const fontIn = isolate(el('input', { type: 'text', placeholder: 'lub wpisz własną nazwę czcionki', value: CH_FONTS.includes(cfg.font) ? '' : cfg.font })); fontIn.style.cssText = 'width:100%;box-sizing:border-box;margin:3px 0'; fontIn.addEventListener('change', () => { if (fontIn.value.trim()) { cfg.font = fontIn.value.trim(); fontSel.value = ''; } save(); });
-    const prev = el('div', { style: 'margin:6px 0;padding:6px;background:#0008;border:1px solid #fff3;border-radius:4px' }, 'Podgląd: Jan Papiesz: Dobry drop na Kryształowej Jaskini!');
-    const chanRows = CH_CHANNELS.map(([k, l, d]) => {
-      const c = isolate(el('input', { type: 'color', value: cfg.colors[k] || d })); c.addEventListener('input', () => { cfg.colors[k] = c.value; save(); });
-      return el('div', { style: 'margin:3px 0' }, c, ' ' + l);
-    });
-    const ownC = isolate(el('input', { type: 'color', value: cfg.ownColor })); ownC.addEventListener('input', () => { cfg.ownColor = ownC.value; save(); });
-    const rulesBox = el('div');
-    const drawRules = () => {
-      rulesBox.replaceChildren(...cfg.rules.map((r, i) => {
-        const re = isolate(el('input', { type: 'text', value: r.re, placeholder: 'tekst lub wyrażenie, np. legend|heroik' })); re.style.width = '55%'; re.addEventListener('change', () => { r.re = re.value; save(); });
-        const c = isolate(el('input', { type: 'color', value: r.color || '#ffeb3b' })); c.addEventListener('input', () => { r.color = c.value; save(); });
-        const x = el('button', { textContent: '×' }); x.addEventListener('click', () => { cfg.rules.splice(i, 1); save(); drawRules(); });
-        return el('div', { style: 'margin:3px 0' }, re, ' ', c, ' ', x);
-      }));
-    };
-    const addRule = el('button', { textContent: '+ Dodaj regułę' }); addRule.addEventListener('click', () => { cfg.rules.push({ re: '', color: '#ffeb3b' }); save(); drawRules(); });
-    drawRules();
-    const dbg = isolate(el('textarea', { rows: 8, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
-    const dbgBtn = el('button', { textContent: 'Zbierz dane o czacie' });
-    dbgBtn.addEventListener('click', () => {
-      const w = document.querySelector(WR), out = { wrapper: !!w, okna: [...document.querySelectorAll('.new-chat-window,[class*="chat" i]')].slice(0, 8).map(n => n.tagName + '.' + clsOf(n).slice(0, 60)), wiadomosci: [] };
-      if (w) { const set = new Set(); w.querySelectorAll('[class*="message" i]').forEach(n => { const m = msgOf(n, w); if (m) set.add(m); }); [...set].slice(-6).forEach(m => out.wiadomosci.push({ cls: clsOf(m).slice(0, 80), kanal: m.getAttribute('data-gi-ch') || '?', dzieci: [...m.children].slice(0, 4).map(c => c.tagName + '.' + clsOf(c).slice(0, 40)), tekst: (m.textContent || '').trim().slice(0, 60) })); }
-      dbg.value = JSON.stringify(out, null, 1);
-    });
+    const fontSel = isolate(el('select', {}));
+    fontSel.append(el('option', { value: '', textContent: 'Domyślna (z gry)' }));
+    const g1 = el('optgroup', { label: 'Systemowe' }), g2 = el('optgroup', { label: 'Z internetu (Google Fonts, ładują się po wyborze)' });
+    CH_FONTS.sys.forEach(f => g1.append(el('option', { value: f, textContent: f }))); CH_FONTS.web.forEach(f => g2.append(el('option', { value: f, textContent: f })));
+    fontSel.append(g1, g2);
+    const known = [...CH_FONTS.sys, ...CH_FONTS.web];
+    fontSel.value = known.includes(cfg.font) ? cfg.font : '';
+    const fontIn = isolate(el('input', { type: 'text', placeholder: 'lub wpisz własną nazwę czcionki', value: known.includes(cfg.font) ? '' : cfg.font })); fontIn.style.cssText = 'width:100%;box-sizing:border-box;margin:3px 0';
+    fontSel.addEventListener('change', () => { cfg.font = fontSel.value; fontIn.value = ''; save(); });
+    fontIn.addEventListener('change', () => { if (fontIn.value.trim()) { cfg.font = fontIn.value.trim(); fontSel.value = ''; } save(); });
+    const prev = el('div', { style: 'margin:6px 0;padding:6px;background:#0008;border:1px solid #fff3;border-radius:4px' }, 'Podgląd: Jan Papiesz: Dobry drop na Kryształowej Jaskini! ąęśćżźółń');
+    function updPrev() { prev.style.fontFamily = cfg.font ? `"${cfg.font.replace(/["';{}\\]/g, '')}",sans-serif` : ''; prev.style.fontSize = cfg.size ? cfg.size + 'px' : ''; prev.style.fontWeight = cfg.bold ? 'bold' : ''; prev.style.textShadow = cfg.outline ? '1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000' : ''; }
     const root = el('div');
     root.settingsBox = setTabs([
-      ['Czcionka', [el('div', {}, 'Czcionka: ', fontSel), fontIn, mkR('size', 'Rozmiar tekstu', 0, 22, 1, v => v ? v + ' px' : 'z gry'), mkR('lh', 'Odstęp wierszy', 0, 30, 1, v => v ? v + ' px' : 'z gry'), mkC('bold', 'Pogrubiony tekst'), mkC('outline', 'Czarny obrys liter (lepsza czytelność)'), prev]],
-      ['Kolory', [mkC('recolor', 'Koloruj wiadomości według kanału'), ...chanRows, el('hr'), mkC('hiOwn', 'Wyróżnij wiadomości z moim nickiem'), el('div', {}, 'Kolor wyróżnienia: ', ownC), mkC('ownBg', 'Dodatkowo podświetl tło')]],
-      ['Reguły', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Wiadomość zawierająca podany tekst (lub wyrażenie regularne) dostaje wybrany kolor. Reguły mają pierwszeństwo przed kolorami kanałów. Przykład: „legend|heroik” albo nick znajomego.'), rulesBox, addRule]],
-      ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli kolory kanałów nie działają, kliknij i wklej mi wynik – dopasuję rozpoznawanie kanałów do Twojej gry.'), dbgBtn, dbg]]
+      ['Czcionka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Kolory czatu ustawisz w samej grze. Tu zmieniasz tylko wygląd liter.'), el('div', {}, 'Czcionka: ', fontSel), fontIn, mkR('size', 'Rozmiar tekstu', 0, 28, 1, v => v ? v + ' px' : 'z gry'), mkR('lh', 'Odstęp wierszy', 0, 36, 1, v => v ? v + ' px' : 'z gry'), mkC('bold', 'Pogrubiony tekst'), mkC('outline', 'Czarny obrys liter (lepsza czytelność)'), prev]]
     ]);
     root.test = () => apply(); root.apply = apply; root.stop = () => apply();
     apply();
@@ -4497,11 +4472,11 @@
         settings: () => haSetWin.toggle(),
         isOn: () => haEnabled,
         setOn: v => { haEnabled = v; try { localStorage.setItem(HA_ON_KEY, v ? '1' : '0'); } catch (e) {} if (!v) { if (haView.stop) haView.stop(); haSetWin.setOpen(false); } else if (haView.test) haView.test(); } },
-      { id: 'chat', icon: '💬', title: 'Zmieniacz czatu', desc: 'Własna czcionka, rozmiar i obrys tekstu czatu, kolory kanałów (klan, drużyna, prywatne, handel…), wyróżnianie wiadomości z Twoim nickiem oraz własne reguły kolorów dla wybranych słów.', view: el('div'), action: () => { if (chEnabled) chSetWin.toggle(); },
+      { id: 'chat', icon: '💬', title: 'Zmieniacz czatu', desc: 'Własna czcionka (systemowe i z internetu, także z polskimi znakami), rozmiar, odstęp wierszy, pogrubienie i obrys tekstu czatu. Kolory czatu ustawiasz w samej grze.', view: el('div'), action: () => { if (chEnabled) chSetWin.toggle(); },
         settings: () => chSetWin.toggle(),
         isOn: () => chEnabled,
         setOn: v => { chEnabled = v; try { localStorage.setItem(CH_ON_KEY, v ? '1' : '0'); } catch (e) {} if (chView.apply) chView.apply(); if (!v) chSetWin.setOpen(false); } },
-      { id: 'bg', icon: '🌄', title: 'Zmieniacz tła', desc: 'Własne tło za grą: gotowe motywy, kolor, gradient, obraz z linku lub z Twojego pliku, z rozmyciem, przyciemnieniem, winietą, powolnym ruchem i pokazem slajdów.', view: el('div'), action: () => { if (bgEnabled) bgSetWin.toggle(); },
+      { id: 'bg', icon: '🌄', title: 'Zmieniacz tła', desc: 'Własne tło za grą: 28 gotowych gradientów i wzorów, własny gradient lub kolor oraz efekty w tle (gwiazdy, śnieg, deszcz, żar, świetliki, bąbelki, spadające gwiazdy, zorza, płynący gradient), z przyciemnieniem i winietą.', view: el('div'), action: () => { if (bgEnabled) bgSetWin.toggle(); },
         settings: () => bgSetWin.toggle(),
         isOn: () => bgEnabled,
         setOn: v => { bgEnabled = v; try { localStorage.setItem(BG_ON_KEY, v ? '1' : '0'); } catch (e) {} if (bgView.apply) bgView.apply(); if (!v) bgSetWin.setOpen(false); } },
@@ -4730,7 +4705,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.98.2');
+    log('Załadowano v2.99.0');
   }
 
   let tries = 0;
