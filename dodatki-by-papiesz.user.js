@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.97.9
+// @version      2.97.11
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2302,6 +2302,7 @@
       if (cfg.hideIn) o += `html .left-column.main-column::before,html .left-column.main-column::after,html .right-column.main-column::before,html .right-column.main-column::after,html .game-layer::before,html .game-layer::after{background:none !important;border-color:transparent !important;box-shadow:none !important}html .game-layer{outline:none !important;box-shadow:none !important}\n`;
       (cfg.hideSel || []).forEach(h => { if (!h || !h.s || /[{},<>;]/.test(h.s)) return; o += h.f ? `html ${h.s}{visibility:hidden !important}\n` : `html ${h.s},html ${h.s}::before,html ${h.s}::after{background:none !important;border-color:transparent !important;box-shadow:none !important;outline:none !important;border-image:none !important}\n`; });
       o += `html [data-gi-rd] *{filter:none !important;mix-blend-mode:normal !important;background-blend-mode:normal !important;opacity:1 !important}html [data-gi-rd] :is(button,.button,[class*="btn" i],[class*="button" i],[class*="answer" i],[class*="option" i],[class*="tile" i],[class*="choice" i]){color:#fff !important;font-weight:700 !important;text-shadow:0 1px 2px #000,0 0 3px #000 !important;background-color:#2b1f52 !important}html [data-gi-rd] :is(button,.button,[class*="btn" i],[class*="button" i]):is(.active,.selected,.checked,[class*="active" i],[class*="select" i],[class*="check" i]){background-color:#6a4fd0 !important;outline:2px solid #ffd54a !important}\n`;
+      o += `html .tip-layer.layer{z-index:100500 !important}\n`;
       if (rc && cfg.frame) o += `html .positioner>.bg,html .bottom-panel-graphic,html .hud-container{filter:${fil} !important}\n`;
       if (rc && cfg.panels) o += `
         html .left-column.main-column,html .new-chat-window,html .chat-input-wrapper{background-color:${c(.35, 12)} !important}
@@ -4623,7 +4624,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.97.9');
+    log('Załadowano v2.97.11');
   }
 
   let tries = 0;
