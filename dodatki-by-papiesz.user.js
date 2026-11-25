@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.96.2
+// @version      2.96.3
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2301,7 +2301,7 @@
       if (cfg.hideBars) o += `html .positioner>.bg{background-image:none !important}\n`;
       if (cfg.hideIn) o += `html .left-column.main-column::before,html .left-column.main-column::after,html .right-column.main-column::before,html .right-column.main-column::after,html .game-layer::before,html .game-layer::after{background:none !important;border-color:transparent !important;box-shadow:none !important}html .game-layer{outline:none !important;box-shadow:none !important}\n`;
       (cfg.hideSel || []).forEach(h => { if (!h || !h.s || /[{},<>;]/.test(h.s)) return; o += h.f ? `html ${h.s}{visibility:hidden !important}\n` : `html ${h.s},html ${h.s}::before,html ${h.s}::after{background:none !important;border-color:transparent !important;box-shadow:none !important;outline:none !important;border-image:none !important}\n`; });
-      if (rc && cfg.frame) o += `html .top.positioner>.bg,html .bottom-panel-graphic,html .hud-container{filter:${fil} !important}\n`;
+      if (rc && cfg.frame) o += `html .top.positioner>.bg,html .bottom-panel-graphic,html .hud-container,html [data-gi-bb]{filter:${fil} !important}\n`;
       if (rc && cfg.panels) o += `
         html .left-column.main-column,html .new-chat-window,html .chat-input-wrapper{background-color:${c(.35, 12)} !important}
         html .left-column.main-column,html .scroll-wrapper.chat-message-wrapper{border-color:${c(.45, 40)} !important}
@@ -2788,13 +2788,30 @@
       });
       document.querySelectorAll('[data-gi-bd]').forEach(n => { if (!bd.has(n)) n.removeAttribute('data-gi-bd'); });
       bd.forEach(n => n.setAttribute('data-gi-bd', '1'));
+      const bb = new Set();
+      if (cfg.theme !== 'none' && cfg.frame) {
+        const VH = innerHeight, VW = innerWidth;
+        root.querySelectorAll('*').forEach(n => {
+          if (n.closest(OURS + ',.new-chat-window,.game-layer,.bottom-panel-graphic,.hud-container,.top.positioner,.border-window,.exp-progress')) return;
+          const r = n.getBoundingClientRect();
+          if (r.width < VW * .3 || r.height < 14 || r.height > 260 || r.bottom < VH - 40 || r.top < VH - 300) return;
+          if (n.children.length > 3 || n.querySelector('img,canvas,button,input,select')) return;
+          const cls = String(n.className && n.className.baseVal === undefined ? n.className : '') + ' ' + n.id;
+          if (/exp|progress|slider|scroll|chat|input|cursor/i.test(cls)) return;
+          const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return;
+          if (/url\(/.test(cs.backgroundImage) || n.tagName === 'IMG' || (cs.borderImageSource !== 'none' && /url\(/.test(cs.borderImageSource))) bb.add(n);
+        });
+        bb.forEach(n => { for (let a = n.parentElement; a; a = a.parentElement) if (bb.has(a)) { bb.delete(n); break; } });
+      }
+      document.querySelectorAll('[data-gi-bb]').forEach(n => { if (!bb.has(n)) n.removeAttribute('data-gi-bb'); });
+      bb.forEach(n => n.setAttribute('data-gi-bb', '1'));
       document.querySelectorAll('[data-gi-thin]').forEach(n => { if (!mark.has(n)) n.removeAttribute('data-gi-thin'); });
       mark.forEach(n => n.setAttribute('data-gi-thin', '1'));
     }
     function thinSync() {
       clearInterval(thinTimer); thinTimer = 0;
       if (gtEnabled && (cfg.hideThin || cfg.theme !== 'none')) { thinScan(); thinTimer = setInterval(() => { if (!inBattle()) thinScan(); }, 2500); }
-      else document.querySelectorAll('[data-gi-thin],[data-gi-bd],[data-gi-gi],[data-gi-gc]').forEach(n => { n.removeAttribute('data-gi-thin'); n.removeAttribute('data-gi-bd'); n.removeAttribute('data-gi-gw'); n.removeAttribute('data-gi-gi'); n.removeAttribute('data-gi-gc'); });
+      else document.querySelectorAll('[data-gi-thin],[data-gi-bd],[data-gi-gi],[data-gi-gc],[data-gi-bb]').forEach(n => { n.removeAttribute('data-gi-bb'); n.removeAttribute('data-gi-thin'); n.removeAttribute('data-gi-bd'); n.removeAttribute('data-gi-gw'); n.removeAttribute('data-gi-gi'); n.removeAttribute('data-gi-gc'); });
     }
     const chg = () => { save(); apply(); thinSync(); };
 
@@ -4570,7 +4587,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.96.2');
+    log('Załadowano v2.96.3');
   }
 
   let tries = 0;
