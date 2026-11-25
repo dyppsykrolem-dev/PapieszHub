@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.96.3
+// @version      2.97.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2301,7 +2301,7 @@
       if (cfg.hideBars) o += `html .positioner>.bg{background-image:none !important}\n`;
       if (cfg.hideIn) o += `html .left-column.main-column::before,html .left-column.main-column::after,html .right-column.main-column::before,html .right-column.main-column::after,html .game-layer::before,html .game-layer::after{background:none !important;border-color:transparent !important;box-shadow:none !important}html .game-layer{outline:none !important;box-shadow:none !important}\n`;
       (cfg.hideSel || []).forEach(h => { if (!h || !h.s || /[{},<>;]/.test(h.s)) return; o += h.f ? `html ${h.s}{visibility:hidden !important}\n` : `html ${h.s},html ${h.s}::before,html ${h.s}::after{background:none !important;border-color:transparent !important;box-shadow:none !important;outline:none !important;border-image:none !important}\n`; });
-      if (rc && cfg.frame) o += `html .top.positioner>.bg,html .bottom-panel-graphic,html .hud-container,html [data-gi-bb]{filter:${fil} !important}\n`;
+      if (rc && cfg.frame) o += `html .positioner>.bg,html .bottom-panel-graphic,html .hud-container{filter:${fil} !important}\n`;
       if (rc && cfg.panels) o += `
         html .left-column.main-column,html .new-chat-window,html .chat-input-wrapper{background-color:${c(.35, 12)} !important}
         html .left-column.main-column,html .scroll-wrapper.chat-message-wrapper{border-color:${c(.45, 40)} !important}
@@ -2750,10 +2750,13 @@
     window.addEventListener('resize', () => frSync(false));
     let thinTimer = 0;
     const THIN_SKIP = /scroll|bar|progress|slider|handle|track|thumb|cursor|resize|hp|exp|timer|cooldown|loader/i;
+    const RIDDLE_RE = /zagadk|riddle|puzzle/i;
     function thinScan() {
       const root = document.querySelector('.interface-layer.layer') || document.body, mark = new Set();
+      const riddle = [...document.querySelectorAll('.border-window')].filter(w => RIDDLE_RE.test(((w.querySelector('.header-label,.header-label-positioner,.text') || {}).textContent || '') + ' ' + (w.className || '')));
+      const inRiddle = n => riddle.some(w => w.contains(n));
       root.querySelectorAll('*').forEach(n => {
-        if (n.closest(OURS + ',.new-chat-window')) return;
+        if (n.closest(OURS + ',.new-chat-window') || (riddle.length && inRiddle(n))) return;
         const r = n.getBoundingClientRect(), tv = r.width > 0 && r.width <= 16 && r.height >= 60, th = r.height > 0 && r.height <= 16 && r.width >= 60;
         if (!tv && !th) return;
         if (n.children.length > 2 || (n.textContent || '').trim()) return;
@@ -2764,7 +2767,7 @@
       });
       const gwi = new Set(), gwc = new Set();
       if (cfg.theme !== 'none' && cfg.panels) [...document.querySelectorAll('.border-window'), ...(cfg.themeOther ? otherCache.l.filter(n => n.isConnected) : [])].forEach(w => {
-        if (w.closest(OURS) || w.offsetParent === null && getComputedStyle(w).position !== 'fixed') return;
+        if (w.closest(OURS) || riddle.includes(w) || w.offsetParent === null && getComputedStyle(w).position !== 'fixed') return;
         [w, ...w.querySelectorAll('*')].forEach(n => {
           const r = n.getBoundingClientRect(); if (r.width < 30 || r.height < 18) return;
           if (/item-id|icon|npc|avatar|portrait|outfit|canvas|slot|button|btn|checkbox|close/i.test(String(n.className && n.className.baseVal === undefined ? n.className : ''))) return;
@@ -2779,7 +2782,7 @@
       gwi.forEach(n => n.setAttribute('data-gi-gi', '1')); gwc.forEach(n => n.setAttribute('data-gi-gc', '1'));
       const bd = new Set();
       root.querySelectorAll('*').forEach(n => {
-        if (mark.has(n) || n.closest(OURS + ',.new-chat-window')) return;
+        if (mark.has(n) || n.closest(OURS + ',.new-chat-window') || (riddle.length && inRiddle(n))) return;
         const r = n.getBoundingClientRect(); if (r.width < 150 && r.height < 150) return;
         if (r.width < 8 || r.height < 8) return;
         const cs = getComputedStyle(n); if (cs.display === 'none') return;
@@ -2788,30 +2791,13 @@
       });
       document.querySelectorAll('[data-gi-bd]').forEach(n => { if (!bd.has(n)) n.removeAttribute('data-gi-bd'); });
       bd.forEach(n => n.setAttribute('data-gi-bd', '1'));
-      const bb = new Set();
-      if (cfg.theme !== 'none' && cfg.frame) {
-        const VH = innerHeight, VW = innerWidth;
-        root.querySelectorAll('*').forEach(n => {
-          if (n.closest(OURS + ',.new-chat-window,.game-layer,.bottom-panel-graphic,.hud-container,.top.positioner,.border-window,.exp-progress')) return;
-          const r = n.getBoundingClientRect();
-          if (r.width < VW * .3 || r.height < 14 || r.height > 260 || r.bottom < VH - 40 || r.top < VH - 300) return;
-          if (n.children.length > 3 || n.querySelector('img,canvas,button,input,select')) return;
-          const cls = String(n.className && n.className.baseVal === undefined ? n.className : '') + ' ' + n.id;
-          if (/exp|progress|slider|scroll|chat|input|cursor/i.test(cls)) return;
-          const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return;
-          if (/url\(/.test(cs.backgroundImage) || n.tagName === 'IMG' || (cs.borderImageSource !== 'none' && /url\(/.test(cs.borderImageSource))) bb.add(n);
-        });
-        bb.forEach(n => { for (let a = n.parentElement; a; a = a.parentElement) if (bb.has(a)) { bb.delete(n); break; } });
-      }
-      document.querySelectorAll('[data-gi-bb]').forEach(n => { if (!bb.has(n)) n.removeAttribute('data-gi-bb'); });
-      bb.forEach(n => n.setAttribute('data-gi-bb', '1'));
       document.querySelectorAll('[data-gi-thin]').forEach(n => { if (!mark.has(n)) n.removeAttribute('data-gi-thin'); });
       mark.forEach(n => n.setAttribute('data-gi-thin', '1'));
     }
     function thinSync() {
       clearInterval(thinTimer); thinTimer = 0;
       if (gtEnabled && (cfg.hideThin || cfg.theme !== 'none')) { thinScan(); thinTimer = setInterval(() => { if (!inBattle()) thinScan(); }, 2500); }
-      else document.querySelectorAll('[data-gi-thin],[data-gi-bd],[data-gi-gi],[data-gi-gc],[data-gi-bb]').forEach(n => { n.removeAttribute('data-gi-bb'); n.removeAttribute('data-gi-thin'); n.removeAttribute('data-gi-bd'); n.removeAttribute('data-gi-gw'); n.removeAttribute('data-gi-gi'); n.removeAttribute('data-gi-gc'); });
+      else document.querySelectorAll('[data-gi-thin],[data-gi-bd],[data-gi-gi],[data-gi-gc]').forEach(n => { n.removeAttribute('data-gi-thin'); n.removeAttribute('data-gi-bd'); n.removeAttribute('data-gi-gw'); n.removeAttribute('data-gi-gi'); n.removeAttribute('data-gi-gc'); });
     }
     const chg = () => { save(); apply(); thinSync(); };
 
@@ -4079,7 +4065,7 @@
       html.gi-fantasy .gi-mitem:hover{border-color:#d8c36a !important}
       html.gi-fantasy .gi-mgear{background:linear-gradient(#2a5a30,#16381d) !important;border-color:#9a8236 !important}
       html.gi-fantasy .gi-dsep{background:linear-gradient(#0000,#c9b25a,#0000)}
-      #gi-ask{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:99997;display:flex;flex-direction:column;gap:8px;align-items:center;cursor:move;touch-action:none}
+      #gi-ask{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:var(--gi-za,99997);display:flex;flex-direction:column;gap:8px;align-items:center;cursor:move;touch-action:none}
       .gi-askc{min-width:260px;max-width:420px;text-align:center;background:#0a1820;border:2px solid #4fc3f7;border-radius:8px;padding:10px 16px;color:#e6f4fb;font:13px/1.4 Arial,sans-serif;box-shadow:0 6px 22px rgba(0,0,0,.85)}
       .gi-askt{font-weight:bold;font-size:15px;color:#ffd54f}
       .gi-asks{margin:2px 0 8px}
@@ -4194,7 +4180,7 @@
       .gi-add{display:block;width:100%;background:#000 !important;border:1px solid #8c6d1f !important;color:#ddd;border-radius:4px;font-size:18px;line-height:20px;cursor:pointer;margin:4px 0 0 !important;padding:0}
       .gi-rform{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px}
       .gi-rset{margin-top:6px;padding-top:6px;border-top:1px solid #333;font-size:11px}
-      #gi-panel{position:fixed;left:8px;bottom:48px;z-index:99999;width:300px;min-width:260px;min-height:140px;max-width:98vw;max-height:92vh;resize:both;overflow:auto;display:none;
+      #gi-panel{position:fixed;left:8px;bottom:48px;z-index:var(--gi-zp,99999);width:300px;min-width:260px;min-height:140px;max-width:98vw;max-height:92vh;resize:both;overflow:auto;display:none;
         background:rgba(10,24,32,.97);color:#e6f4fb;border:2px solid #4fc3f7;border-radius:6px;padding:8px;font:12px/1.5 Arial,sans-serif}
       #gi-panel h4{margin:6px 0 4px;color:#81d4fa;font-size:13px;border-bottom:1px solid #2b6c8a}
       #gi-head{position:sticky;top:-8px;z-index:5;display:flex;align-items:center;gap:6px;margin:-8px -8px 6px;padding:6px 8px;
@@ -4443,13 +4429,24 @@
       return r.width > 20 && r.height > 20 && r.width * r.height < innerWidth * innerHeight * 0.85 && /absolute|fixed/.test(cs.position) && /^-?\d+$/.test(cs.zIndex);
     });
     let layerMsg = '';
+    const setZ = z => { const r = document.documentElement.style; if (z == null) { ['--gi-z', '--gi-zp', '--gi-za'].forEach(k => r.removeProperty(k)); return; } if (r.getPropertyValue('--gi-z') !== String(z)) { r.setProperty('--gi-z', String(z)); r.setProperty('--gi-zp', String(z + 1)); r.setProperty('--gi-za', String(Math.max(1, z - 1))); } };
+    function otherAddonZ() {
+      const gp = document.querySelector('.game-window-positioner'), gz = gp ? parseInt(getComputedStyle(gp).zIndex, 10) : NaN, base = isNaN(gz) ? 0 : gz;
+      let zo = Infinity;
+      for (const c of document.body.children) {
+        if (c === gp || /^(SCRIPT|STYLE|IFRAME|LINK|NOSCRIPT)$/.test(c.tagName) || c.matches(OURS_SEL + ',[id^="gi-"],[class^="gi-"],.gi-gtf') || c.contains(gp)) continue;
+        const cs = getComputedStyle(c); if (cs.display === 'none' || !/fixed|absolute/.test(cs.position) || !/^\d+$/.test(cs.zIndex)) continue;
+        if (!c.childElementCount && !c.textContent) continue;
+        const z = Number(cs.zIndex); if (z > base + 1) zo = Math.min(zo, z);
+      }
+      return zo === Infinity ? null : zo;
+    }
     function layerApply() {
-      const root = document.documentElement;
-      if (layerCfg.mode !== 'under') { root.style.removeProperty('--gi-z'); return; }
+      if (layerCfg.mode !== 'under') { const zo = otherAddonZ(); if (zo != null && zo - 2 < 99997) setZ(Math.max(3, zo - 2)); else setZ(null); return; }
       const zs = gameWins().map(n => Number(getComputedStyle(n).zIndex)).filter(z => isFinite(z));
       if (!zs.length) return;
       const z = Math.max(1, Math.min(...zs) - 1);
-      if (root.style.getPropertyValue('--gi-z') !== String(z)) { root.style.setProperty('--gi-z', String(z)); setTimeout(layerVerify, 500); }
+      if (document.documentElement.style.getPropertyValue('--gi-z') !== String(z)) { setZ(z); setTimeout(layerVerify, 500); }
     }
     function layerVerify() {
       if (layerCfg.mode !== 'under') return;
@@ -4469,7 +4466,7 @@
     const layerSel = isolate(el('select', {}));
     [['top', 'Nad wszystkim (domyślnie)'], ['under', 'Pod oknami gry (ekwipunek, sklep itp.)']].forEach(([v, l]) => layerSel.append(el('option', { value: v, textContent: l, selected: layerCfg.mode === v })));
     const layerNote = el('div', { style: 'color:#ffd54f;font-size:10px;margin-top:2px' });
-    layerSel.addEventListener('change', () => { layerCfg.mode = layerSel.value; writeLS(LAYER_KEY, layerCfg); layerNote.textContent = ''; document.documentElement.style.removeProperty('--gi-z'); layerApply(); });
+    layerSel.addEventListener('change', () => { layerCfg.mode = layerSel.value; writeLS(LAYER_KEY, layerCfg); layerNote.textContent = ''; setZ(null); layerApply(); });
     const layerDbg = isolate(el('textarea', { rows: 6, readOnly: true, placeholder: 'Diagnostyka warstw' })); layerDbg.style.fontSize = '10px';
     const layerBtn = el('button', { textContent: 'Diagnostyka warstw' });
     layerBtn.addEventListener('click', () => {
@@ -4587,7 +4584,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.96.3');
+    log('Załadowano v2.97.0');
   }
 
   let tries = 0;
