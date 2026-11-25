@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.97.1
+// @version      2.97.2
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -4430,24 +4430,24 @@
     });
     let layerMsg = '';
     const setZ = z => { const r = document.documentElement.style; if (z == null) { ['--gi-z', '--gi-zp', '--gi-za'].forEach(k => r.removeProperty(k)); return; } if (r.getPropertyValue('--gi-z') !== String(z)) { r.setProperty('--gi-z', String(z)); r.setProperty('--gi-zp', String(z + 1)); r.setProperty('--gi-za', String(Math.max(1, z - 1))); } };
-    function otherAddonZ() {
-      const gp = document.querySelector('.game-window-positioner'), gz = gp ? parseInt(getComputedStyle(gp).zIndex, 10) : NaN, base = isNaN(gz) ? 0 : gz;
-      let zo = Infinity;
+    const Z_OTHERS = 100000;
+    function otherRoots() {
+      const gp = document.querySelector('.game-window-positioner'), out = [];
       for (const c of document.body.children) {
-        if (c === gp || /^(SCRIPT|STYLE|IFRAME|LINK|NOSCRIPT)$/.test(c.tagName) || c.matches(OURS_SEL + ',[id^="gi-"],[class^="gi-"],.gi-gtf') || c.contains(gp)) continue;
-        const cs = getComputedStyle(c); if (cs.display === 'none' || !/fixed|absolute/.test(cs.position) || !/^\d+$/.test(cs.zIndex)) continue;
-        if (!c.childElementCount && !c.textContent) continue;
-        const z = Number(cs.zIndex); if (z > base + 1) zo = Math.min(zo, z);
+        if (c === gp || /^(SCRIPT|STYLE|IFRAME|LINK|NOSCRIPT|CANVAS)$/.test(c.tagName) || c.matches(OURS_SEL + ',[id^="gi-"],[class^="gi-"],.gi-gtf') || (gp && c.contains(gp))) continue;
+        const cs = getComputedStyle(c); if (cs.display === 'none' || !/fixed|absolute/.test(cs.position)) continue;
+        if (!c.childElementCount) continue;
+        out.push([c, cs]);
       }
-      return zo === Infinity ? null : zo;
+      return out;
+    }
+    function raiseOthers(on) {
+      if (on) otherRoots().forEach(([c, cs]) => { const z = /^-?\d+$/.test(cs.zIndex) ? Number(cs.zIndex) : 0; if (z < Z_OTHERS) { if (!c.hasAttribute('data-gi-z0')) c.setAttribute('data-gi-z0', c.style.zIndex || '-'); c.style.setProperty('z-index', String(Z_OTHERS), 'important'); } });
+      else document.querySelectorAll('[data-gi-z0]').forEach(c => { const o = c.getAttribute('data-gi-z0'); if (o === '-') c.style.removeProperty('z-index'); else c.style.zIndex = o; c.removeAttribute('data-gi-z0'); });
     }
     function layerApply() {
-      if (layerCfg.mode !== 'under') {
-        const gp = document.querySelector('.game-window-positioner'), gz = gameWins().filter(n => !gp || gp.contains(n)).map(n => Number(getComputedStyle(n).zIndex)).filter(z => isFinite(z)), gmax = gz.length ? Math.max(...gz) : 0, zo = otherAddonZ();
-        let z = 99997; if (zo != null) { const cap = zo - 2; z = cap > gmax ? cap : gmax + 1; } else if (gmax >= 99997) z = gmax + 1;
-        if (z >= 99997 && gmax < 99997) setZ(null); else setZ(Math.max(3, z));
-        return;
-      }
+      if (layerCfg.mode !== 'under') { setZ(null); raiseOthers(true); return; }
+      raiseOthers(false);
       const zs = gameWins().map(n => Number(getComputedStyle(n).zIndex)).filter(z => isFinite(z));
       if (!zs.length) return;
       const z = Math.max(1, Math.min(...zs) - 1);
@@ -4589,7 +4589,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.97.1');
+    log('Załadowano v2.97.2');
   }
 
   let tries = 0;
