@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.97.4
+// @version      2.97.6
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -2301,6 +2301,7 @@
       if (cfg.hideBars) o += `html .positioner>.bg{background-image:none !important}\n`;
       if (cfg.hideIn) o += `html .left-column.main-column::before,html .left-column.main-column::after,html .right-column.main-column::before,html .right-column.main-column::after,html .game-layer::before,html .game-layer::after{background:none !important;border-color:transparent !important;box-shadow:none !important}html .game-layer{outline:none !important;box-shadow:none !important}\n`;
       (cfg.hideSel || []).forEach(h => { if (!h || !h.s || /[{},<>;]/.test(h.s)) return; o += h.f ? `html ${h.s}{visibility:hidden !important}\n` : `html ${h.s},html ${h.s}::before,html ${h.s}::after{background:none !important;border-color:transparent !important;box-shadow:none !important;outline:none !important;border-image:none !important}\n`; });
+      o += `html [data-gi-rd] *{filter:none !important;mix-blend-mode:normal !important;background-blend-mode:normal !important;opacity:1 !important}html [data-gi-rd] :is(button,.button,[class*="btn" i],[class*="button" i],[class*="answer" i],[class*="option" i],[class*="tile" i],[class*="choice" i]){color:#fff !important;font-weight:700 !important;text-shadow:0 1px 2px #000,0 0 3px #000 !important;background-color:#2b1f52 !important}html [data-gi-rd] :is(button,.button,[class*="btn" i],[class*="button" i]):is(.active,.selected,.checked,[class*="active" i],[class*="select" i],[class*="check" i]){background-color:#6a4fd0 !important;outline:2px solid #ffd54a !important}\n`;
       if (rc && cfg.frame) o += `html .positioner>.bg,html .bottom-panel-graphic,html .hud-container{filter:${fil} !important}\n`;
       if (rc && cfg.panels) o += `
         html .left-column.main-column,html .new-chat-window,html .chat-input-wrapper{background-color:${c(.35, 12)} !important}
@@ -2411,7 +2412,8 @@
       return out;
     }
     function updTips() {
-      const h = findTips(), sig = h.map(q => [q.l | 0, q.t | 0, q.r | 0, q.b | 0].join(',')).join('|');
+      const nw = performance.now(); if (nw - winScanT > 120) { winScanT = nw; winHoles = scanWinHoles(); }
+      const h = findTips(), sig = h.concat(winHoles).map(q => [q.l | 0, q.t | 0, q.r | 0, q.b | 0].join(',')).join('|');
       if (sig === tipSig) return; tipSig = sig; tipHoles = h;
       Object.keys(frs).forEach(k => holeNode(frs[k]));
     }
@@ -2419,7 +2421,7 @@
     function scanWinHoles() {
       const out = [], seen = new Set(), gp = document.querySelector('.game-window-positioner');
       const ok = n => { if (seen.has(n) || n.nodeType !== 1 || n.closest(OURS) || n.matches('script,style,canvas,svg,link,iframe,.interface-layer,.game-layer,[id^="gi-"]')) return false; seen.add(n); const cs = getComputedStyle(n); if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.3 || !/fixed|absolute/.test(cs.position)) return false; const r = n.getBoundingClientRect(); if (r.width < 50 || r.height < 24 || r.width * r.height > innerWidth * innerHeight * 0.6) return false; if (!(n.textContent || '').trim() && !n.querySelector('img,canvas,svg')) return false; out.push({ l: r.left, t: r.top, r: r.right, b: r.bottom }); return true; };
-      const walk = (n, d) => { if (n.nodeType !== 1 || n === gp || n.closest(OURS)) return; if (ok(n)) return; if (d < 3) [...n.children].forEach(c => walk(c, d + 1)); };
+      const walk = (n, d) => { if (n.nodeType !== 1 || n === gp || n.closest(OURS)) return; ok(n); if (d < 4) [...n.children].forEach(c => walk(c, d + 1)); };
       for (const c of document.body.children) { if (c === gp || (gp && c.contains(gp)) || /^(SCRIPT|STYLE|LINK|NOSCRIPT)$/.test(c.tagName)) continue; walk(c, 0); }
       if (gp) [...gp.children].forEach(c => { if (!c.matches('.interface-layer,.game-layer') && !c.querySelector('.interface-layer.layer')) walk(c, 1); });
       document.querySelectorAll('.border-window').forEach(n => { if (!n.closest('.interface-layer') && !(n.parentElement && n.parentElement.closest('.border-window'))) ok(n); });
@@ -2428,7 +2430,7 @@
     function holeNode(o) {
       if (!o || !o.node || o.node.style.display === 'none') return;
       const x = parseFloat(o.node.style.left) || 0, y = parseFloat(o.node.style.top) || 0, w = parseFloat(o.node.style.width) || 0, hh = parseFloat(o.node.style.height) || 0;
-      const hs = (o.k && /^[agx]_/.test(o.k) && o.k[0] !== 'a' ? tipHoles : tipHoles.concat(o.k && o.k[0] === 'x' ? [] : winHoles)).filter(q => q.r > x && q.l < x + w && q.b > y && q.t < y + hh);
+      const fa = w * hh, hs = tipHoles.concat(winHoles.filter(q => { if (!(o.k && o.k[0] !== 'a' && /^[gx]_/.test(o.k))) return true; const ix = Math.max(0, Math.min(q.r, x + w) - Math.max(q.l, x)) * Math.max(0, Math.min(q.b, y + hh) - Math.max(q.t, y)); return ix < fa * 0.7; })).filter(q => q.r > x && q.l < x + w && q.b > y && q.t < y + hh);
       const v = hs.length ? 'path(evenodd, "M0 0H' + w + 'V' + hh + 'H0Z' + hs.map(q => { const a = Math.max(0, q.l - x), b = Math.max(0, q.t - y), c = Math.min(w, q.r - x), d = Math.min(hh, q.b - y); return ' M' + a + ' ' + b + 'H' + c + 'V' + d + 'H' + a + 'Z'; }).join('') + '")' : 'none';
       if (o.clip !== v) { o.clip = v; o.node.style.clipPath = v; }
     }
@@ -2766,6 +2768,7 @@
       const root = document.querySelector('.interface-layer.layer') || document.body, mark = new Set();
       const riddle = [...document.querySelectorAll('.border-window')].filter(w => RIDDLE_RE.test(((w.querySelector('.header-label,.header-label-positioner,.text') || {}).textContent || '') + ' ' + (w.className || '')));
       const inRiddle = n => riddle.some(w => w.contains(n));
+      document.querySelectorAll('[data-gi-rd]').forEach(w => { if (!riddle.includes(w)) w.removeAttribute('data-gi-rd'); }); riddle.forEach(w => w.setAttribute('data-gi-rd', '1'));
       root.querySelectorAll('*').forEach(n => {
         if (n.closest(OURS + ',.new-chat-window') || (riddle.length && inRiddle(n))) return;
         const r = n.getBoundingClientRect(), tv = r.width > 0 && r.width <= 16 && r.height >= 60, th = r.height > 0 && r.height <= 16 && r.width >= 60;
@@ -4600,7 +4603,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.97.4');
+    log('Załadowano v2.97.6');
   }
 
   let tries = 0;
