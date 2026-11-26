@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.104.1
+// @version      2.104.2
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3776,72 +3776,28 @@
   const SC_ON_KEY = 'gi_sc_on_v1', SC_CFG_KEY = 'gi_sc_cfg_v1';
   let scEnabled = (() => { try { return localStorage.getItem(SC_ON_KEY) === '1'; } catch (e) { return false; } })();
   function buildScaleView() {
-    const cfg = Object.assign({ addons: 100, game: 100, gameOn: false }, readLS(SC_CFG_KEY, {}));
-    const save = () => writeLS(SC_CFG_KEY, cfg);
+    const cfg = Object.assign({ addons: 100 }, readLS(SC_CFG_KEY, {}));
+    const save = () => writeLS(SC_CFG_KEY, { addons: cfg.addons });
     const style = document.createElement('style'); style.id = 'gi-scale-css'; document.head.append(style);
-    let handle = null;
-    function syncHandle() {
-      const want = scEnabled && cfg.gameOn && cfg.handle !== false;
-      if (!want) { if (handle) handle.style.display = 'none'; return; }
-      if (!handle) {
-        handle = el('div', { id: 'gi-sc-handle', title: 'Przeciągnij: w dół/w prawo = większy interfejs gry, w górę/w lewo = mniejszy. Dwuklik = 100%.', textContent: '⤡', style: 'position:fixed;right:110px;bottom:110px;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2b6c8a,#0b2230);border:2px solid #81d4fa;color:#fff;font:bold 18px/30px Arial;text-align:center;cursor:nwse-resize;z-index:100600;box-shadow:0 0 8px #000a;user-select:none;touch-action:none' });
-        let d = null;
-        handle.addEventListener('pointerdown', e => { if (e.button !== 0) return; d = { x: e.clientX, y: e.clientY, k: cfg.game }; try { handle.setPointerCapture(e.pointerId); } catch (er) {  } e.preventDefault(); });
-        handle.addEventListener('pointermove', e => { if (!d) return; const m = ((e.clientX - d.x) + (e.clientY - d.y)) / 2; cfg.game = Math.round(Math.min(150, Math.max(70, d.k * Math.exp(m / 400)))); apply(); });
-        handle.addEventListener('pointerup', () => { if (!d) return; d = null; save(); if (gameLbl) gameLbl.update(); });
-        handle.addEventListener('dblclick', () => { cfg.game = 100; save(); apply(); if (gameLbl) gameLbl.update(); });
-        document.body.append(handle);
-      }
-      handle.style.display = ''; handle.title = 'Interfejs gry: ' + cfg.game + '%. Przeciągnij: w dół/w prawo = większy, w górę/w lewo = mniejszy. Dwuklik = 100%.';
-    }
-    let gameLbl = null;
     function apply() {
-      if (!scEnabled) { style.textContent = ''; syncHandle(); return; }
-      const a = Math.max(.5, Math.min(2.5, cfg.addons / 100)), g = Math.max(.7, Math.min(1.6, cfg.game / 100));
-      let css = '';
-      if (Math.abs(a - 1) > .001) css += `html .gi-float{transform:scale(${a});transform-origin:0 0;max-height:calc(92vh / ${a}) !important;max-width:calc(98vw / ${a}) !important}\nhtml #gi-panel{transform:scale(${a});transform-origin:0 100%;max-height:calc((100vh - 60px) / ${a}) !important;max-width:calc(98vw / ${a}) !important}\nhtml #gi-btn{transform:scale(${Math.min(a, 1.6)});transform-origin:0 100%}\n`;
-      if (cfg.gameOn && Math.abs(g - 1) > .001) css += `html .interface-layer.layer{transform:scale(${g}) !important;transform-origin:0 0 !important;width:calc(100% / ${g}) !important;height:calc(100% / ${g}) !important;right:auto !important;bottom:auto !important}\n`;
-      syncHandle();
-      style.textContent = css;
+      if (!scEnabled) { style.textContent = ''; return; }
+      const a = Math.max(.5, Math.min(2.5, cfg.addons / 100));
+      style.textContent = Math.abs(a - 1) > .001 ? `html .gi-float{transform:scale(${a});transform-origin:0 0;max-height:calc(92vh / ${a}) !important;max-width:calc(98vw / ${a}) !important}\nhtml #gi-panel{transform:scale(${a});transform-origin:0 100%;max-height:calc((100vh - 60px) / ${a}) !important;max-width:calc(98vw / ${a}) !important}\nhtml #gi-btn{transform:scale(${Math.min(a, 1.6)});transform-origin:0 100%}\n` : '';
     }
-    const mkR = (key, label, min, max, step) => {
-      const val = el('span', { style: 'display:inline-block;min-width:48px;text-align:right;color:#aaa' });
-      const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:110px';
-      const show = () => { val.textContent = r.value + '%'; }; show();
-      r.addEventListener('input', () => { show(); cfg[key] = Number(r.value); save(); apply(); });
-      return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:4px 0' }, el('span', { textContent: label, style: 'min-width:120px' }), r, val);
-    };
-    const presets = (key) => el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 6px' }, ...[80, 100, 120, 150, 175, 200].filter(v => key !== 'game' || v <= 150).map(v => { const b = el('button', { textContent: v + '%' }); b.addEventListener('click', () => { cfg[key] = v; save(); apply(); rebuild(); }); return b; }));
-    const dbgBox = isolate(el('textarea', { rows: 10, readOnly: true })); dbgBox.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px;display:none;margin-top:4px';
-    const dbgBtn = el('button', { textContent: 'Diagnostyka skalowania' });
-    const dbgCopy = el('button', { textContent: 'Kopiuj', style: 'margin-left:4px' });
-    const cs = (e, props) => { if (!e) return null; const c = getComputedStyle(e), r = e.getBoundingClientRect(), o = { rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)], inline: (e.getAttribute('style') || '').slice(0, 200) }; props.forEach(k => { o[k] = c[k]; }); return o; };
-    dbgBtn.addEventListener('click', () => {
-      const il = document.querySelector('.interface-layer.layer'), pos = document.querySelector('.game-window-positioner'), gl = document.querySelector('.game-layer');
-      const P = ['position', 'transform', 'transformOrigin', 'width', 'height', 'left', 'top', 'right', 'bottom', 'zoom', 'zIndex', 'overflow'];
-      const hd = document.getElementById('gi-sc-handle');
-      dbgBox.value = JSON.stringify({ wersja: 'skalowanie', okno: [innerWidth, innerHeight, devicePixelRatio], cfg, styleCss: (document.getElementById('gi-scale-css') || {}).textContent, interfejs: cs(il, P), pozycjoner: cs(pos, P), warstwaGry: cs(gl, P), dzieciInterfejsu: il ? [...il.children].slice(0, 12).map(c => c.tagName + '.' + String(c.className).slice(0, 40) + ' ' + JSON.stringify(cs(c, ['position', 'left', 'top', 'right', 'bottom', 'width', 'height', 'transform']))) : null, uchwyt: hd ? cs(hd, ['display', 'zIndex', 'position']) : 'brak elementu', body: cs(document.body, ['transform', 'zoom', 'overflow']) }, null, 1);
-      dbgBox.style.display = 'block'; dbgBox.select();
-    });
-    dbgCopy.addEventListener('click', () => { dbgBox.select(); try { navigator.clipboard.writeText(dbgBox.value); } catch (e) { document.execCommand('copy'); } });
     const holder = el('div');
     function rebuild() {
-      const hOn = isolate(el('input', { type: 'checkbox', checked: cfg.handle !== false })); hOn.addEventListener('change', () => { cfg.handle = hOn.checked; save(); apply(); });
-      const gOn = isolate(el('input', { type: 'checkbox', checked: !!cfg.gameOn })); gOn.addEventListener('change', () => { cfg.gameOn = gOn.checked; save(); apply(); });
+      const val = el('span', { style: 'display:inline-block;min-width:48px;text-align:right;color:#aaa' });
+      const r = isolate(el('input', { type: 'range', min: 50, max: 250, step: 5, value: cfg.addons })); r.style.cssText = 'flex:1;min-width:110px';
+      const show = () => { val.textContent = r.value + '%'; }; show();
+      r.addEventListener('input', () => { show(); cfg.addons = Number(r.value); save(); apply(); });
       holder.replaceChildren(
         el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Okna i przyciski dodatków'),
-        mkR('addons', 'Wielkość', 50, 250, 5), presets('addons'),
-        el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:8px' }, 'Powiększa lub zmniejsza wszystkie okna dodatków i panel z przyciskiem 🅿. Okna powiększają się od lewego górnego rogu.'),
-        el('hr'),
-        el('label', { style: 'display:block;cursor:pointer;margin:4px 0' }, gOn, ' Skaluj też interfejs gry (eksperymentalne)'),
-        el('label', { style: 'display:block;cursor:pointer;margin:4px 0' }, hOn, ' Pokaż uchwyt ⤡ do skalowania przeciąganiem (prawy dolny róg ekranu)'),
-        mkR('game', 'Interfejs gry', 70, 150, 5), presets('game'),
-        el('div', { style: 'color:#ffcc80;font-size:11px' }, 'Uwaga: ta opcja zmienia rozmiar okien samej gry (metodą przekształcenia, a nie „zoom”). Przy niektórych oknach przeciąganie lub dymki mogą być lekko przesunięte, a kliknięcie w mapę może trafiać obok — jeśli tak będzie, daj znać. Jeśli coś będzie działać dziwnie, odznacz opcję albo wróć do 100%.'),
-        el('div', { style: 'margin-top:8px' }, dbgBtn, dbgCopy), dbgBox,
-        el('div', { style: 'margin-top:8px' }, (() => { const b = el('button', { textContent: 'Przywróć 100%' }); b.addEventListener('click', () => { cfg.addons = 100; cfg.game = 100; cfg.gameOn = false; save(); apply(); rebuild(); }); return b; })())
+        el('div', { style: 'display:flex;align-items:center;gap:6px;margin:4px 0' }, el('span', { textContent: 'Wielkość', style: 'min-width:80px' }), r, val),
+        el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 6px' }, ...[80, 100, 120, 150, 175, 200].map(v => { const b = el('button', { textContent: v + '%' }); b.addEventListener('click', () => { cfg.addons = v; save(); apply(); rebuild(); }); return b; })),
+        el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:8px' }, 'Powiększa lub zmniejsza wszystkie okna dodatków i panel z przyciskiem 🅿. Okna powiększają się od lewego górnego rogu. Interfejsu samej gry nie da się bezpiecznie skalować z poziomu dodatku — jego rozmiar ustawisz w opcjach gry.')
       );
     }
-    rebuild(); gameLbl = { update: rebuild };
+    rebuild();
     const root0 = el('div');
     root0.settingsBox = el('div', {}, holder);
     root0.apply = apply; root0.stop = apply; root0.test = apply;
@@ -4857,7 +4813,7 @@
         settings: () => ifSetWin.toggle(),
         isOn: () => ifEnabled,
         setOn: v => { ifEnabled = v; try { localStorage.setItem(IF_ON_KEY, v ? '1' : '0'); } catch (e) {} if (ifView.apply) ifView.apply(); if (!v) ifSetWin.setOpen(false); } },
-      { id: 'scale', icon: '🔍', title: 'Skalowanie interfejsu', desc: 'Powiększa lub zmniejsza okna i przyciski dodatków (50–250%), z gotowymi wartościami. Opcjonalnie, eksperymentalnie, także interfejs samej gry.', view: el('div'), action: () => { if (scEnabled) scSetWin.toggle(); },
+      { id: 'scale', icon: '🔍', title: 'Skalowanie interfejsu', desc: 'Powiększa lub zmniejsza okna i przyciski dodatków (50–250%), z gotowymi wartościami.', view: el('div'), action: () => { if (scEnabled) scSetWin.toggle(); },
         settings: () => scSetWin.toggle(),
         isOn: () => scEnabled,
         setOn: v => { scEnabled = v; try { localStorage.setItem(SC_ON_KEY, v ? '1' : '0'); } catch (e) {} if (scView.apply) scView.apply(); if (!v) scSetWin.setOpen(false); } },
@@ -5090,7 +5046,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.104.1');
+    log('Załadowano v2.104.2');
   }
 
   let tries = 0;
