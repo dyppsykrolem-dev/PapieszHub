@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.101.1
+// @version      2.101.2
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3769,7 +3769,7 @@
   let mmEnabled = (() => { try { return localStorage.getItem(MM_ON_KEY) === '1'; } catch (e) { return false; } })();
   function buildMinimapView() {
     const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
-    const cfg = Object.assign({ players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: true, btn: true, cols: {} }, readLS(MM_CFG_KEY, {}));
+    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: true, btn: true, cols: {} }, readLS(MM_CFG_KEY, {}));
     cfg.cols = Object.assign({ hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' }, cfg.cols);
     const COL_DEF = JSON.parse(JSON.stringify(cfg.cols)); Object.assign(COL_DEF, { hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' });
     const marks = readLS(MM_MARK_KEY, {});
@@ -3799,8 +3799,18 @@
       const key0 = md.id + '|' + md.name;
       const nd = { w: 0, h: 0, col: null, mapId: md.id, name: md.name || '', hero: { x: h.x, y: h.y, nick: h.nick }, npcs: [], others: [], gates: [], dimsOk: false };
       let w = md.x || m.x || m.width || md.w, hh = md.y || m.y || m.height || md.h;
-      const cands = [m.col, md.col, m.collision, md.collision, m.mapCol, m.d && m.d.mapcol];
-      for (const c of cands) { if (c == null) continue; const L = c.length; if (!L) continue; if (num(w) && num(hh) && L === w * hh) { nd.col = c; break; } if (num(hh) && hh > 0 && L % hh === 0 && !num(w)) { w = L / hh; nd.col = c; break; } if (num(w) && w > 0 && L % w === 0 && !num(hh)) { hh = L / w; nd.col = c; break; } }
+      const isArr = c => c != null && typeof c === 'object' && (Array.isArray(c) || ArrayBuffer.isView(c)) && !(c instanceof Node);
+      const lenOf = c => (typeof c === 'string' || isArr(c)) ? c.length : 0;
+      const cands = []; const seen = new Set();
+      const scan = (o, path, depth) => { if (!o || typeof o !== 'object' || seen.has(o) || o instanceof Node) return; seen.add(o); let ks = []; try { ks = Object.keys(o); } catch (e) { return; } ks.slice(0, 80).forEach(k => { let v; try { v = o[k]; } catch (e) { return; } const n = lenOf(v); if (n >= 200) cands.push({ path: path + k, v, n }); else if (depth < 2 && v && typeof v === 'object' && !isArr(v) && !(v instanceof Node) && k !== 'parent' && k !== 'engine') scan(v, path + k + '.', depth + 1); }); };
+      scan(m, 'map.', 0); scan(md, 'map.d.', 0);
+      const nums = []; [m, md].forEach(o => { try { Object.keys(o).forEach(k => { const v = o[k]; if (num(v) && v >= 8 && v <= 1500 && v === Math.floor(v)) nums.push(v); else if (v && typeof v === 'object' && !(v instanceof Node) && !isArr(v)) { const a = v.x != null ? v.x : v.w != null ? v.w : v.width, b = v.y != null ? v.y : v.h != null ? v.h : v.height; if (num(a) && num(b)) { nums.push(a, b); } } }); } catch (e) {  } });
+      if (!(num(w) && num(hh))) { const a = md.x || m.x, b = md.y || m.y; if (num(a) && num(b)) { w = a; hh = b; } }
+      const pref = c => (/col|coll|block|walk|pass|mask/i.test(c.path) ? 0 : 1);
+      cands.sort((a, b) => pref(a) - pref(b));
+      for (const c of cands) { const L = c.n; if (num(w) && num(hh) && L === w * hh) { nd.col = c.v; nd.colPath = c.path; break; } }
+      if (!nd.col) for (const c of cands) { const L = c.n; let f = null; for (const a of nums) { if (L % a === 0 && nums.includes(L / a)) { f = [a, L / a]; break; } } if (f) { w = f[0]; hh = f[1]; if (num(md.x) && num(md.y) && md.x * md.y === L) { w = md.x; hh = md.y; } nd.col = c.v; nd.colPath = c.path; break; } }
+      nd.cands = cands.map(c => c.path + ':' + typeof c.v + ':' + c.n).slice(0, 12);
       if (num(w) && num(hh) && w > 4 && hh > 4) { nd.w = w; nd.h = hh; nd.dimsOk = true; }
       safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y)) nd.npcs.push({ x: d.x, y: d.y, nick: d.nick || d.name || '', lvl: d.lvl || 0, wt: Number(d.wt) || 0 }); });
       safeG(() => Object.values(E.others.check() || E.others.list || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y) && d.nick) nd.others.push({ x: d.x, y: d.y, nick: d.nick, lvl: d.lvl || 0 }); });
@@ -3837,10 +3847,10 @@
       const R = Math.max(1.5, cfg.dot * Math.min(1.6, .6 + cfg.zoom / 3)), q = search.value.trim().toLowerCase();
       const dot = (x, y, col, r) => { const p = toS(x, y); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 6.283); ctx.fill(); return p; };
       const label = (p, t, col) => { ctx.font = '10px Arial'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(t, p[0] + R + 2, p[1] + 3); ctx.fillStyle = col || cfg.cols.text; ctx.fillText(t, p[0] + R + 2, p[1] + 3); };
-      if (cfg.gates) data.gates.forEach(g => { const p = toS(g.x, g.y); ctx.fillStyle = cfg.cols.gates; ctx.fillRect(p[0] - R, p[1] - R, R * 2, R * 2); if (cfg.labels && g.name && cfg.zoom >= 2) label(p, g.name, '#bbdefb'); });
+      if (cfg.gates) data.gates.forEach(g => { const p = toS(g.x, g.y); ctx.fillStyle = cfg.cols.gates; ctx.fillRect(p[0] - R, p[1] - R, R * 2, R * 2); });
       if (cfg.mobs) data.npcs.filter(n => n.wt === 0).forEach(n => dot(n.x, n.y, cfg.cols.mobs, Math.max(1.5, R * .6)));
-      if (cfg.elites) data.npcs.filter(n => n.wt >= 1).forEach(n => { const p = dot(n.x, n.y, colOf(n), R * 1.25); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p[0], p[1], R * 1.25 + 1, 0, 6.283); ctx.stroke(); if (cfg.labels) label(p, n.nick + (n.lvl ? ' (' + n.lvl + ')' : ''), cfg.cols.text); });
-      if (cfg.players) data.others.forEach(n => { const p = dot(n.x, n.y, cfg.cols.players, R); if (cfg.labels && cfg.zoom >= 2.5) label(p, n.nick, '#b3e5fc'); });
+      if (cfg.elites) data.npcs.filter(n => n.wt >= 1).forEach(n => { const p = dot(n.x, n.y, colOf(n), R * 1.25); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p[0], p[1], R * 1.25 + 1, 0, 6.283); ctx.stroke(); });
+      if (cfg.players) data.others.forEach(n => { const p = dot(n.x, n.y, cfg.cols.players, R); });
       if (cfg.marks) (marks[data.mapId] || []).forEach(m => { const p = toS(m.x, m.y); ctx.fillStyle = cfg.cols.marks; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] - 4, p[1] - 10); ctx.lineTo(p[0] + 4, p[1] - 10); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(p[0], p[1] - 12, 4, 0, 6.283); ctx.fill(); if (m.t) label([p[0] + 2, p[1] - 12], m.t, '#fff59d'); });
       if (q) [...data.npcs, ...data.others].filter(n => (n.nick || '').toLowerCase().includes(q)).forEach(n => { const p = toS(n.x, n.y), t = (performance.now() % 1000) / 1000; ctx.strokeStyle = cfg.cols.search; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], R + 3 + t * 8, 0, 6.283); ctx.globalAlpha = 1 - t; ctx.stroke(); ctx.globalAlpha = 1; label(p, n.nick, cfg.cols.search); });
       if (data.hero) { const p = dot(data.hero.x, data.hero.y, cfg.cols.hero, R * 1.2); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], R * 1.2 + 1.5, 0, 6.283); ctx.stroke(); }
@@ -3868,7 +3878,7 @@
     drawMarks(); setInterval(() => { if (marksBox.isConnected && marksBox._m !== data.mapId) { marksBox._m = data.mapId; drawMarks(); } }, 1500);
     const dbg = isolate(el('textarea', { rows: 9, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
     const dbgBtn = el('button', { textContent: 'Zbierz dane o mapie' });
-    dbgBtn.addEventListener('click', () => { const E = PW.Engine, m = safeG(() => E.map, {}), md = m.d || {}; dbg.value = JSON.stringify({ mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3) }, null, 1); });
+    dbgBtn.addEventListener('click', () => { const E = PW.Engine, m = safeG(() => E.map, {}), md = m.d || {}; dbg.value = JSON.stringify({ mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, kandydaciNaSciany: data.cands, uzyty: data.colPath, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3) }, null, 1); });
     const WKEY = 'gi_win_mm_v1';
     function setWinSize(w, h) {
       const st = readLS(WKEY, {}) || {}; st.w = Math.round(w); st.h = Math.round(h); writeLS(WKEY, st);
@@ -3888,6 +3898,18 @@
     rstSz.addEventListener('click', () => { const st = readLS(WKEY, {}) || {}; writeLS(WKEY, { open: st.open }); const b = document.getElementById('gi-mm-win'); if (b) { b.style.width = '340px'; b.style.height = ''; b.style.left = Math.max(0, innerWidth - 360) + 'px'; b.style.top = '100px'; } });
     const rstCol = el('button', { textContent: 'Przywróć domyślne kolory' });
     rstCol.addEventListener('click', () => { Object.assign(cfg.cols, COL_DEF); colKey = ''; save(); cv.style.background = cfg.cols.bg; if (rstCol.parentElement) rstCol.parentElement.parentElement.querySelectorAll('input[type=color]').forEach((c, i) => { const k = Object.keys(COL_DEF)[i]; }); document.querySelectorAll('#gi-mm-set input[type=color]').forEach(c => { const k = c.dataset.k; if (k && COL_DEF[k]) c.value = COL_DEF[k]; }); });
+    const keyName = k => k ? (k === ' ' ? 'Spacja' : k.length === 1 ? k.toUpperCase() : k) : 'brak';
+    const keyBtn = el('button', { textContent: 'Skrót: ' + keyName(cfg.key), style: 'min-width:140px' });
+    let capturing = false;
+    keyBtn.addEventListener('click', () => { capturing = true; keyBtn.textContent = 'Naciśnij klawisz… (Esc = anuluj)'; });
+    const clrKey = el('button', { textContent: 'Usuń skrót' });
+    clrKey.addEventListener('click', () => { cfg.key = ''; save(); keyBtn.textContent = 'Skrót: brak'; });
+    document.addEventListener('keydown', e => {
+      if (capturing) { e.preventDefault(); e.stopImmediatePropagation(); capturing = false; if (e.key !== 'Escape' && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) { cfg.key = e.key; save(); } keyBtn.textContent = 'Skrót: ' + keyName(cfg.key); return; }
+      if (!cfg.key || !mmEnabled || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+      const t = e.target, tg = t && t.tagName; if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT' || (t && t.isContentEditable)) return;
+      if (e.key.toLowerCase() === cfg.key.toLowerCase()) { if (root.toggleWin) root.toggleWin(); }
+    }, true);
     const PKEY = 'gi_mm_btn_v1'; let launcher = null;
     function syncLauncher() {
       const want = mmEnabled && cfg.btn;
@@ -3907,8 +3929,8 @@
     const root = el('div');
     root.body = body;
     root.settingsBox = setTabs([
-      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('labels', 'Podpisy przy punktach (przy większym przybliżeniu)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
-      ['Okno', [el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Rozmiar okna minimapy'), el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px' }, ...[['Mała', 260, 230], ['Średnia', 380, 330], ['Duża', 560, 470], ['Bardzo duża', 760, 620]].map(([n, w, h]) => { const b = el('button', { textContent: n }); b.addEventListener('click', () => setWinSize(w, h)); return b; })), szW, szH, el('div', { style: 'margin-top:4px' }, rstSz), el('div', { style: 'color:#90a4ae;font-size:11px;margin:4px 0 8px' }, 'Rozmiar możesz też zmieniać, ciągnąc prawy dolny róg okna.'), el('hr'), mkC('btn', 'Pokazuj przycisk 🗺 do otwierania i zamykania minimapy'), el('div', { style: 'color:#90a4ae;font-size:11px' }, 'Przycisk możesz przeciągnąć w dowolne miejsce ekranu.')]],
+      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
+      ['Okno', [el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Rozmiar okna minimapy'), el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px' }, ...[['Mała', 260, 230], ['Średnia', 380, 330], ['Duża', 560, 470], ['Bardzo duża', 760, 620]].map(([n, w, h]) => { const b = el('button', { textContent: n }); b.addEventListener('click', () => setWinSize(w, h)); return b; })), szW, szH, el('div', { style: 'margin-top:4px' }, rstSz), el('div', { style: 'color:#90a4ae;font-size:11px;margin:4px 0 8px' }, 'Rozmiar możesz też zmieniać, ciągnąc prawy dolny róg okna.'), el('hr'), el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Klawisz otwierający minimapę'), el('div', { style: 'display:flex;gap:4px;align-items:center;margin-bottom:3px' }, keyBtn, clrKey), el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:6px' }, 'Wybierz klawisz, który nie jest używany w grze. Nie działa podczas pisania na czacie.'), el('hr'), mkC('btn', 'Pokazuj przycisk 🗺 do otwierania i zamykania minimapy'), el('div', { style: 'color:#90a4ae;font-size:11px' }, 'Przycisk możesz przeciągnąć w dowolne miejsce ekranu.')]],
       ['Kolory', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Punkty na mapie'), mkCol('hero', 'Ty'), mkCol('players', 'Gracze'), mkCol('mobs', 'Zwykłe potwory i NPC'), mkCol('e1', 'Elita II'), mkCol('e2', 'Heros'), mkCol('e3', 'Tytan'), mkCol('gates', 'Przejścia'), mkCol('marks', 'Znaczniki'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0 3px' }, 'Mapa i napisy'), mkCol('wall', 'Ściany'), mkCol('free', 'Teren'), mkCol('bg', 'Tło poza mapą'), mkCol('text', 'Napisy przy punktach'), mkCol('search', 'Wyróżnienie wyszukiwania'), el('div', { style: 'margin-top:6px' }, rstCol)]],
       ['Znaczniki', [marksBox]],
       ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli brakuje ścian, przejść albo rozmiar mapy się nie zgadza, kliknij i wklej mi wynik.'), dbgBtn, dbg]]
@@ -5166,7 +5188,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.101.1');
+    log('Załadowano v2.101.2');
   }
 
   let tries = 0;
