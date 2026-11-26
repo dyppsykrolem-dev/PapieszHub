@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.101.11
+// @version      2.103.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3080,7 +3080,6 @@
     const hideAllChk = (() => { const c = isolate(el('input', { type: 'checkbox', checked: !!(cfg.hideOrig && cfg.hideIn && cfg.hideThin) })); c.addEventListener('change', () => { cfg.hideOrig = c.checked; cfg.hideIn = c.checked; cfg.hideThin = c.checked; chg(); }); return el('label', { style: 'display:block;margin:2px 0;cursor:pointer' }, c, ' Ukryj oryginalne ramki gry (zewnętrzną, wewnętrzne i cienkie linie)'); })();
     const tabs = setTabs([
       ['Zestawy', [el('div', { style: 'font-size:11px;color:#90a4ae;margin:2px 0 4px' }, 'Jeden klik ustawia kolory, ramkę i efekty. Potem możesz poprawić szczegóły w pozostałych zakładkach.'), tileify(pSel, v => { if (v === '') return null; const pr = PRESETS[Number(v)]; const c = pr && PAL[pr.fpal]; return c ? `background:linear-gradient(135deg,${c[2]},${c[1]},${c[0]})` : 'background:#222'; }, 3), offNote, el('div', { style: 'font-weight:bold;margin-top:10px' }, 'Co ma zmieniać zestaw'), chk('Zachowaj moje tempo (prędkość, jasność, gęstość, grubość ramki) przy zmianie zestawu', 'keepTempo'), chk('Zestaw zmienia tylko efekty – zostaw kolory motywu bez zmian', 'keepColors')]],
-      ['Kształty', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Wybierz, jak ma wyglądać każdy rodzaj obiektu na mapie.'), mkShape('hero', 'Ty'), mkShape('players', 'Gracze'), mkShape('mobs', 'Zwykłe potwory i NPC'), mkShape('e1', 'Elity (I, II, III)'), mkShape('e2', 'Heros'), mkShape('e3', 'Tytan'), mkShape('gates', 'Przejścia')]],
       ['Kolory', [h5('Interfejs gry'), ...syncNote, tileify(sel, v => { if (v === 'none') return 'background:repeating-linear-gradient(45deg,#2a2a2a 0 6px,#1d1d1d 6px 12px)'; if (v === 'custom') return 'background:' + CONIC; const q = PRE.find(x => x[0] === v); return q ? `background:linear-gradient(135deg,hsl(${q[2]} ${Math.max(q[3], 8)}% 22%),hsl(${q[2]} ${Math.max(q[3], 8)}% 52%))` : null; }, 4), colRow, sS.row, sL.row, h5('Okna dodatków'), addonChk, otherChk]],
       ['Ramki', [warn, tileify(fSel, v => { const c = frColors()[1] || '#fff', an = ['plasma', 'rainbow', 'prism', 'aurora'].includes(v) ? ';animation:gitHue 6s linear infinite' : ['pulse', 'heartbeat', 'flicker', 'glitch', 'energy'].includes(v) ? ';animation:gitpulse 1.1s ease-in-out infinite alternate' : ''; return v === 'none' ? 'background:#15151c' : `background:#15151c;box-shadow:inset 0 0 0 2px ${c},0 0 7px ${c}${an}`; }, 3),
         el('div', { style: 'font-weight:bold;margin-top:6px' }, 'Gdzie rysować (dotyczy też efektów):'), tgtBox, el('div', {}, mkBtn('Zaznacz wszystko', () => setAllT(true)), mkBtn('Odznacz wszystko', () => setAllT(false))),
@@ -3449,7 +3448,7 @@
     let P = [], bolts = [], raf = 0, last = 0, T = 0, boltT = 0, hue = 0, info = '';
     const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
     let smooth = null, coverT = 0, covered = false;
-    let capOn = false, capBox = null, cap = null, capT = 0, hookedHero = null;
+    let capOn = false, capBox = null, cap = null, capT = 0, hookedHero = null, lastR = null;
     try {
       const CP = PW.CanvasRenderingContext2D && PW.CanvasRenderingContext2D.prototype;
       if (CP && !CP.drawImage.__giHA) {
@@ -3467,10 +3466,17 @@
         nd.__giHA = true; CP.drawImage = nd;
       }
     } catch (e) {  }
+    function quickPos() {
+      try {
+        if (!haEnabled || cfg.pos !== 'auto' || !lastR || !cap || !(cap.cw > 0) || cv.style.display !== 'block' || !cv.width) return;
+        const sc = lastR.width / cap.cw, x = lastR.left + cap.x * sc + cfg.ox, y = lastR.top + (cap.y - 4) * sc + cfg.oy;
+        cv.style.left = Math.round(x - cv.width / 2) + 'px'; cv.style.top = Math.round(y - cv.height * .72) + 'px';
+      } catch (e) {  }
+    }
     function hookHero(h) {
       if (!h || hookedHero === h || typeof h.draw !== 'function' || h.draw.__giHA) return;
       const orig = h.draw;
-      const wr = function () { capOn = true; capBox = null; try { return orig.apply(this, arguments); } finally { capOn = false; if (capBox) { cap = capBox; capT = performance.now(); } } };
+      const wr = function () { capOn = true; capBox = null; try { return orig.apply(this, arguments); } finally { capOn = false; if (capBox) { cap = capBox; capT = performance.now(); quickPos(); } } };
       wr.__giHA = true; try { h.draw = wr; hookedHero = h; } catch (e) {  }
     }
     (window.__giShared = window.__giShared || {}).heroScreen = () => {
@@ -3503,7 +3509,8 @@
       }
       info = how + ' @' + Math.round(x) + ',' + Math.round(y);
       x += cfg.ox; y += cfg.oy;
-      if (!smooth || Math.abs(smooth.x - x) > 260 || Math.abs(smooth.y - y) > 260) smooth = { x, y }; else { const k = 1 - Math.exp(-14 * (dt || .016)); smooth.x += (x - smooth.x) * k; smooth.y += (y - smooth.y) * k; }
+      lastR = r;
+      if (how === 'rysowanie' || !smooth || Math.abs(smooth.x - x) > 260 || Math.abs(smooth.y - y) > 260) smooth = { x, y }; else { const k = 1 - Math.exp(-14 * (dt || .016)); smooth.x += (x - smooth.x) * k; smooth.y += (y - smooth.y) * k; }
       return { x: smooth.x, y: smooth.y, r };
     }
     const E1 = (a, b, k) => a + (b - a) * k;
@@ -3766,289 +3773,48 @@
     return root0;
   }
 
-  const MM_ON_KEY = 'gi_mm_on_v1', MM_CFG_KEY = 'gi_mm_cfg_v1', MM_MARK_KEY = 'gi_mm_marks_v1';
-  let mmEnabled = (() => { try { return localStorage.getItem(MM_ON_KEY) === '1'; } catch (e) { return false; } })();
-  function buildMinimapView() {
-    const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
-    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: false, lockpan: true, shapes: {}, click: true, tile: true, autowin: false, nolvl: false, fit: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
-    cfg.cols = Object.assign({ hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' }, cfg.cols);
-    cfg.shapes = Object.assign({ hero: 'circle', players: 'circle', mobs: 'circle', e1: 'circle', e2: 'circle', e3: 'circle', gates: 'square' }, cfg.shapes);
-    const COL_DEF = JSON.parse(JSON.stringify(cfg.cols)); Object.assign(COL_DEF, { hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' });
-    if (cfg.fitMig2 !== 1) { cfg.fitMig2 = 1; cfg.autowin = false; writeLS(MM_CFG_KEY, cfg); }
-    if (cfg.fitMig !== 1) { cfg.fitMig = 1; cfg.fit = true; cfg.follow = false; writeLS(MM_CFG_KEY, cfg); }
-    const marks = readLS(MM_MARK_KEY, {});
-    const save = () => { writeLS(MM_CFG_KEY, cfg); dirty = true; }, saveM = () => writeLS(MM_MARK_KEY, marks);
-    const safeG = (f, d) => { try { const v = f(); return v == null ? d : v; } catch (e) { return d; } };
-    const num = v => typeof v === 'number' && isFinite(v);
-    const cv = document.createElement('canvas'); cv.style.cssText = 'display:block;width:100%;height:100%;background:#0b0b10;cursor:grab;touch-action:none';
-    cv.style.background = cfg.cols.bg;
-    const ctx = cv.getContext('2d');
-    const info = el('div', { style: 'position:absolute;left:4px;bottom:3px;font:10px Arial;color:#cfd8dc;text-shadow:0 0 3px #000;pointer-events:none' });
-    const bar = el('div', { style: 'position:absolute;right:4px;top:4px;display:flex;gap:3px' });
-    const mkB = (t, ti, fn) => { const b = el('button', { textContent: t, title: ti, style: 'padding:1px 7px;font-weight:bold;cursor:pointer;background:#0b2230cc;color:#fff;border:1px solid #2b6c8a;border-radius:4px' }); b.addEventListener('click', e => { e.stopPropagation(); fn(); }); return b; };
-    const search = isolate(el('input', { type: 'text', placeholder: 'szukaj…', style: 'width:84px;font-size:11px;padding:1px 4px;background:#0b2230cc;color:#fff;border:1px solid #2b6c8a;border-radius:4px' }));
-    const body = el('div', { style: 'position:relative;width:100%;height:100%;min-height:200px' }, cv, info, bar);
-    const view = { cx: 0, cy: 0 };
-    let data = { w: 0, h: 0, col: null, mapId: null, name: '', hero: null, npcs: [], others: [], gates: [], dimsOk: false };
-    let stat = { id: 0, tries: 0, t: 0 };
-    let colCache = { id: 0, w: 0, h: 0, arr: null, path: '', tries: 0 };
-    let lastSig = '', colCv = null, colKey = '', hover = null, mouse = null, drag = null, dirty = true;
-    const gatherXY = (src, out, depth) => {
-      if (!src || depth > 2) return;
-      const arr = Array.isArray(src) ? src : (typeof src === 'object' ? Object.values(src) : []);
-      arr.forEach(o => { const d = o && o.d ? o.d : o; if (d && num(d.x) && num(d.y)) out.push({ x: d.x, y: d.y, name: d.name || d.nick || d.mapname || '' }); else if (d && typeof d === 'object' && depth < 2 && !(d instanceof Node)) gatherXY(d, out, depth + 1); });
+  const SC_ON_KEY = 'gi_sc_on_v1', SC_CFG_KEY = 'gi_sc_cfg_v1';
+  let scEnabled = (() => { try { return localStorage.getItem(SC_ON_KEY) === '1'; } catch (e) { return false; } })();
+  function buildScaleView() {
+    const cfg = Object.assign({ addons: 100, game: 100, gameOn: false }, readLS(SC_CFG_KEY, {}));
+    const save = () => writeLS(SC_CFG_KEY, cfg);
+    const style = document.createElement('style'); style.id = 'gi-scale-css'; document.head.append(style);
+    function apply() {
+      if (!scEnabled) { style.textContent = ''; return; }
+      const a = Math.max(.5, Math.min(2.5, cfg.addons / 100)), g = Math.max(.7, Math.min(1.6, cfg.game / 100));
+      let css = '';
+      if (Math.abs(a - 1) > .001) css += `html .gi-float{transform:scale(${a});transform-origin:0 0;max-height:calc(92vh / ${a}) !important;max-width:calc(98vw / ${a}) !important}\nhtml #gi-panel{transform:scale(${a});transform-origin:0 100%;max-height:calc((100vh - 60px) / ${a}) !important;max-width:calc(98vw / ${a}) !important}\nhtml #gi-btn{transform:scale(${Math.min(a, 1.6)});transform-origin:0 100%}\n`;
+      if (cfg.gameOn && Math.abs(g - 1) > .001) css += `html .interface-layer.layer{zoom:${g}}\n`;
+      style.textContent = css;
+    }
+    const mkR = (key, label, min, max, step) => {
+      const val = el('span', { style: 'display:inline-block;min-width:48px;text-align:right;color:#aaa' });
+      const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:110px';
+      const show = () => { val.textContent = r.value + '%'; }; show();
+      r.addEventListener('input', () => { show(); cfg[key] = Number(r.value); save(); apply(); });
+      return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:4px 0' }, el('span', { textContent: label, style: 'min-width:120px' }), r, val);
     };
-    const tgt = (o, d, y) => { const kx = y ? 'ry' : 'rx', kd = y ? 'y' : 'x'; const v = o && o[kx]; return (num(v) && Math.abs(v - d[kd]) < 1.5) ? v : d[kd]; };
-    let lastT = 0, anim = false;
-    function refresh() {
-      const E = PW.Engine; if (!E) return;
-      const m = safeG(() => E.map, null), md = m && m.d, h = safeG(() => E.hero.d, null);
-      if (!md || !h || !num(h.x)) return;
-      const key0 = md.id + '|' + md.name;
-      const nd = { w: 0, h: 0, col: null, mapId: md.id, name: md.name || '', hero: { k: 'h', x: h.x, y: h.y, tx: tgt(E.hero, h), ty: tgt(E.hero, h, 1), nick: h.nick }, npcs: [], others: [], gates: [], dimsOk: false };
-      let w = md.x || m.x || m.width || md.w, hh = md.y || m.y || m.height || md.h;
-      const useCache = stat.id === md.id && (stat.col || stat.tries >= 3 || Date.now() - stat.t < 2500);
-      if (useCache) { nd.col = stat.col; nd.colPath = stat.colPath; nd.cands = stat.cands; if (stat.w) { w = stat.w; hh = stat.h; } }
-      else {
-      const isArr = c => c != null && typeof c === 'object' && (Array.isArray(c) || ArrayBuffer.isView(c)) && !(c instanceof Node);
-      const lenOf = c => (typeof c === 'string' || isArr(c)) ? c.length : 0;
-      const cands = []; const seen = new Set();
-      const scan = (o, path, depth) => { if (!o || typeof o !== 'object' || seen.has(o) || o instanceof Node) return; seen.add(o); let ks = []; try { ks = Object.keys(o); } catch (e) { return; } ks.slice(0, 80).forEach(k => { let v; try { v = o[k]; } catch (e) { return; } const n = lenOf(v); if (n >= 200) cands.push({ path: path + k, v, n }); else if (depth < 2 && v && typeof v === 'object' && !isArr(v) && !(v instanceof Node) && k !== 'parent' && k !== 'engine') scan(v, path + k + '.', depth + 1); }); };
-      scan(m, 'map.', 0); scan(md, 'map.d.', 0);
-      const nums = []; [m, md].forEach(o => { try { Object.keys(o).forEach(k => { const v = o[k]; if (num(v) && v >= 8 && v <= 1500 && v === Math.floor(v)) nums.push(v); else if (v && typeof v === 'object' && !(v instanceof Node) && !isArr(v)) { const a = v.x != null ? v.x : v.w != null ? v.w : v.width, b = v.y != null ? v.y : v.h != null ? v.h : v.height; if (num(a) && num(b)) { nums.push(a, b); } } }); } catch (e) {  } });
-      if (!(num(w) && num(hh))) { const a = md.x || m.x, b = md.y || m.y; if (num(a) && num(b)) { w = a; hh = b; } }
-      const pref = c => (/col|coll|block|walk|pass|mask/i.test(c.path) ? 0 : 1);
-      cands.sort((a, b) => pref(a) - pref(b));
-      for (const c of cands) { const L = c.n; if (num(w) && num(hh) && L === w * hh) { nd.col = c.v; nd.colPath = c.path; break; } }
-      if (!nd.col) for (const c of cands) { const L = c.n; let f = null; for (const a of nums) { if (L % a === 0 && nums.includes(L / a)) { f = [a, L / a]; break; } } if (f) { w = f[0]; hh = f[1]; if (num(md.x) && num(md.y) && md.x * md.y === L) { w = md.x; hh = md.y; } nd.col = c.v; nd.colPath = c.path; break; } }
-      if (!nd.col && num(w) && num(hh) && w > 4 && hh > 4) {
-        if (colCache.id === md.id && colCache.w === w && colCache.h === hh && colCache.arr) { nd.col = colCache.arr; nd.colPath = colCache.path; }
-        else if (colCache.id !== md.id || colCache.w !== w || colCache.tries < 3) {
-          if (colCache.id !== md.id) colCache = { id: md.id, w, h: hh, arr: null, path: '', tries: 0 };
-          colCache.tries++;
-          const owners = [['col', m.col], ['collider', m.collider], ['col', md.col]];
-          outer: for (const [on, ob] of owners) {
-            if (!ob || (typeof ob !== 'object' && typeof ob !== 'function')) continue;
-            let names = []; try { names = Object.getOwnPropertyNames(Object.getPrototypeOf(ob) || {}).concat(Object.keys(ob)); } catch (e) {  }
-            names = [...new Set(names)].filter(k => { try { return typeof ob[k] === 'function' && k !== 'constructor' && !/^(set|add|remove|delete|clear|destroy|init|draw|update|on[A-Z])/i.test(k); } catch (e) { return false; } });
-            names.sort((a, b) => (/check|get|block|coll|wall|pass|is/i.test(a) ? 0 : 1) - (/check|get|block|coll|wall|pass|is/i.test(b) ? 0 : 1));
-            for (const fn of names.slice(0, 14)) {
-              let ok = false, seenV = new Set(); const arr = new Uint8Array(w * hh);
-              try { for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) { const r = ob[fn](x, y); const v = typeof r === 'boolean' ? (r ? 1 : 0) : (typeof r === 'number' ? (r > 0 ? 1 : 0) : -1); if (v < 0) throw 0; arr[y * w + x] = v; seenV.add(v); } ok = seenV.size > 1; } catch (e) { ok = false; }
-              if (ok) { colCache.arr = arr; colCache.path = on + '.' + fn + '(x,y)'; nd.col = arr; nd.colPath = colCache.path; break outer; }
-            }
-          }
-        }
-      }
-      nd.cands = cands.map(c => c.path + ':' + typeof c.v + ':' + c.n).slice(0, 12);
-      stat = { id: md.id, col: nd.col, colPath: nd.colPath, cands: nd.cands, w, h: hh, tries: (stat.id === md.id ? stat.tries : 0) + 1, t: Date.now() };
-      }
-      if (num(w) && num(hh) && w > 4 && hh > 4) { nd.w = w; nd.h = hh; nd.dimsOk = true; }
-      safeG(() => Object.entries(E.npcs.check() || {}), []).forEach(([id, n]) => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y) && (d.lvl > 0 || cfg.nolvl)) nd.npcs.push({ k: 'n' + id, id, x: d.x, y: d.y, tx: tgt(n, d), ty: tgt(n, d, 1), nick: d.nick || d.name || '', lvl: d.lvl || 0, wt: Number(d.wt) || 0, type: d.type }); });
-      safeG(() => Object.entries(E.others.check() || E.others.list || {}), []).forEach(([id, n]) => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y) && d.nick) nd.others.push({ k: 'o' + id, id, x: d.x, y: d.y, tx: tgt(n, d), ty: tgt(n, d, 1), nick: d.nick, lvl: d.lvl || 0 }); });
-      const gw = safeG(() => m.gateways, null);
-      let gl = safeG(() => gw && typeof gw.getList === 'function' ? gw.getList() : null, null);
-      if (gl instanceof Map || gl instanceof Set) gl = Array.from(gl.values());
-      else if (gl && !Array.isArray(gl) && typeof gl === 'object') gl = Object.values(gl);
-      if (Array.isArray(gl)) gl.forEach(g => {
-        if (!g) return; const d = g.d && typeof g.d === 'object' ? g.d : g;
-        let x = d.x, y = d.y;
-        if (!num(x) && Array.isArray(g) && num(g[0])) { x = g[0]; y = g[1]; }
-        if (!num(x) && d.pos && num(d.pos.x)) { x = d.pos.x; y = d.pos.y; }
-        if (!num(x) && num(g.x)) { x = g.x; y = g.y; }
-        if (!num(x) || !num(y)) return;
-        let nm = d.name || d.nick || g.name || ''; if (!nm) nm = safeG(() => { const tn = gw.townnames; const id = d.id != null ? d.id : (d.tid != null ? d.tid : g.id); const v = tn && tn[id]; return v == null ? '' : (v.name || v); }, '');
-        nd.gates.push({ x, y, name: typeof nm === 'string' ? nm : '' });
-      });
-      if (!nd.gates.length) Object.keys(m).filter(k => /gat|gtw|exit|door|portal/i.test(k)).forEach(k => { if (typeof m[k] !== 'function') gatherXY(m[k], nd.gates, 0); });
-      if (!nd.dimsOk) { const all = [nd.hero, ...nd.npcs, ...nd.others, ...nd.gates]; nd.w = Math.max(64, ...all.map(p => p.x + 2)); nd.h = Math.max(64, ...all.map(p => p.y + 2)); }
-      if (nd.mapId !== data.mapId) { colKey = ''; view.cx = nd.hero.x; view.cy = nd.hero.y; setTimeout(() => fitWindow(document.getElementById('gi-mm-win')), 60); }
-      const sig = JSON.stringify([nd.mapId, nd.w, nd.h, !!nd.col, nd.hero.tx, nd.hero.ty, nd.npcs.map(n => n.tx + ',' + n.ty), nd.others.map(n => n.tx + ',' + n.ty), nd.gates.length]);
-      if (sig !== lastSig) { lastSig = sig; dirty = true; }
-      const pm = data.pm || new Map(), all2 = [nd.hero, ...nd.npcs, ...nd.others];
-      all2.forEach(e => { const p = pm.get(e.k); if (p && Math.hypot(p.x - e.tx, p.y - e.ty) < 8) { e.x = p.x; e.y = p.y; } else { e.x = e.tx; e.y = e.ty; } });
-      nd.pm = new Map(all2.map(e => [e.k, e]));
-      data = nd; if (all2.some(e => Math.abs(e.x - e.tx) > .01 || Math.abs(e.y - e.ty) > .01)) anim = true;
+    const presets = (key) => el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 6px' }, ...[80, 100, 120, 150, 175, 200].filter(v => key !== 'game' || v <= 150).map(v => { const b = el('button', { textContent: v + '%' }); b.addEventListener('click', () => { cfg[key] = v; save(); apply(); rebuild(); }); return b; }));
+    const holder = el('div');
+    function rebuild() {
+      const gOn = isolate(el('input', { type: 'checkbox', checked: !!cfg.gameOn })); gOn.addEventListener('change', () => { cfg.gameOn = gOn.checked; save(); apply(); });
+      holder.replaceChildren(
+        el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Okna i przyciski dodatków'),
+        mkR('addons', 'Wielkość', 50, 250, 5), presets('addons'),
+        el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:8px' }, 'Powiększa lub zmniejsza wszystkie okna dodatków i panel z przyciskiem 🅿. Okna powiększają się od lewego górnego rogu.'),
+        el('hr'),
+        el('label', { style: 'display:block;cursor:pointer;margin:4px 0' }, gOn, ' Skaluj też interfejs gry (eksperymentalne)'),
+        mkR('game', 'Interfejs gry', 70, 150, 5), presets('game'),
+        el('div', { style: 'color:#ffcc80;font-size:11px' }, 'Uwaga: ta opcja zmienia rozmiar okien samej gry. Przy niektórych oknach przeciąganie lub dymki mogą być przesunięte. Jeśli coś będzie działać dziwnie, odznacz opcję albo wróć do 100%.'),
+        el('div', { style: 'margin-top:8px' }, (() => { const b = el('button', { textContent: 'Przywróć 100%' }); b.addEventListener('click', () => { cfg.addons = 100; cfg.game = 100; cfg.gameOn = false; save(); apply(); rebuild(); }); return b; })())
+      );
     }
-    function colImg() {
-      const k = data.mapId + '|' + data.w + 'x' + data.h + '|' + cfg.cols.wall + cfg.cols.free;
-      if (k === colKey) return colCv; colKey = k; colCv = null;
-      if (!data.col) return null;
-      const c = document.createElement('canvas'); c.width = data.w; c.height = data.h; const g = c.getContext('2d'), im = g.createImageData(data.w, data.h);
-      const hex = s => { const n = parseInt(s.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }, W_ = hex(cfg.cols.wall), F_ = hex(cfg.cols.free);
-      for (let i = 0; i < data.w * data.h; i++) { const v = data.col[i], blocked = typeof v === 'string' ? v !== '0' : v > 0, q = blocked ? W_ : F_; im.data[i * 4] = q[0]; im.data[i * 4 + 1] = q[1]; im.data[i * 4 + 2] = q[2]; im.data[i * 4 + 3] = 255; }
-      g.putImageData(im, 0, 0); colCv = c; return c;
-    }
-    let imgState = { id: 0, im: null };
-    function mapImg() {
-      if (cfg.img === false) return null;
-      const E = PW.Engine, m = safeG(() => E.map, null); if (!m || !m.d) return null;
-      if (imgState.id !== m.d.id) { imgState = { id: m.d.id, im: null, t: 0 }; }
-      const s0 = m.src; let im = imgState.im;
-      const ok = i => i && ((i.naturalWidth > 0) || (i.width > 0 && i.getContext));
-      if (!im) {
-        if (s0 && typeof s0 === 'object' && (s0 instanceof HTMLImageElement || s0 instanceof HTMLCanvasElement)) im = s0;
-        else if (typeof s0 === 'string' && s0 && !imgState.t) { imgState.t = 1; const i = new Image(); i.onload = () => { imgState.im = i; }; i.src = s0; }
-        imgState.im = im || imgState.im;
-      }
-      return ok(imgState.im) ? imgState.im : null;
-    }
-    const sc = () => (cfg.fit && data.w && data.h && cv.width > 20 && cv.height > 20) ? Math.max(1, Math.min((cv.width - 12) / data.w, (cv.height - 12) / data.h)) : Math.max(1, 3 * cfg.zoom);
-    const setZoom = f => { if (cfg.fit) { cfg.zoom = sc() / 3; cfg.fit = false; } cfg.zoom = Math.min(10, Math.max(.3, cfg.zoom * f)); save(); };
-    const toS = (x, y) => [cv.width / 2 + (x + .5 - view.cx) * sc(), cv.height / 2 + (y + .5 - view.cy) * sc()];
-    const toW = (px, py) => [Math.floor((px - cv.width / 2) / sc() + view.cx), Math.floor((py - cv.height / 2) / sc() + view.cy)];
-    const rk = n => n.wt > 99 ? 3 : n.wt > 79 ? 2 : n.wt > 9 ? 1 : 0;
-    const rkName = n => n.wt > 99 ? 'Tytan' : n.wt > 79 ? 'Heros' : n.wt > 29 ? 'Elita III' : n.wt > 19 ? 'Elita II' : n.wt > 9 ? 'Elita' : '';
-    const colOf = n => ({ 3: cfg.cols.e3, 2: cfg.cols.e2, 1: cfg.cols.e1 })[rk(n)] || cfg.cols.mobs;
-    function draw() {
-      const W_ = cv.clientWidth, H_ = cv.clientHeight; if (!W_ || !H_) return;
-      if (cv.width !== W_ || cv.height !== H_) { cv.width = W_; cv.height = H_; }
-      { const now = performance.now(), f = 1 - Math.exp(-Math.min(100, now - (lastT || now)) / 70); lastT = now; let mv = false;
-        const st = e => { const dx = e.tx - e.x, dy = e.ty - e.y; if (Math.abs(dx) > .01 || Math.abs(dy) > .01) { e.x += dx * f; e.y += dy * f; mv = true; } else { e.x = e.tx; e.y = e.ty; } };
-        if (data.hero) st(data.hero); data.npcs.forEach(st); data.others.forEach(st); anim = mv; }
-      if (cfg.fit && data.w) { view.cx = data.w / 2 - .5; view.cy = data.h / 2 - .5; }
-      else if (cfg.follow && data.hero) { view.cx = data.hero.x; view.cy = data.hero.y; }
-      ctx.globalAlpha = 1; ctx.fillStyle = cfg.cols.bg; ctx.fillRect(0, 0, cv.width, cv.height);
-      if (!data.mapId) { ctx.fillStyle = '#90a4ae'; ctx.font = '12px Arial'; ctx.fillText('Czekam na dane z gry…', 10, 20); return; }
-      ctx.globalAlpha = cfg.alpha;
-      const s = sc(), o = toS(0, 0), img = colImg();
-      ctx.imageSmoothingEnabled = false;
-      const bgi = mapImg();
-      if (bgi) { ctx.drawImage(bgi, o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s); if (img) { ctx.globalAlpha = cfg.alpha * .35; ctx.drawImage(img, o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s); } }
-      else if (img) ctx.drawImage(img, o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s);
-      else { ctx.fillStyle = cfg.cols.free; ctx.fillRect(o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s); }
-      ctx.globalAlpha = 1;
-      const R = Math.max(1.5, cfg.dot * Math.min(1.6, .6 + (sc() / 3) / 3)), q = search.value.trim().toLowerCase();
-      const shp = (p, r, sh) => { ctx.beginPath(); if (sh === 'square') ctx.rect(p[0] - r, p[1] - r, r * 2, r * 2); else if (sh === 'diamond') { r *= 1.3; ctx.moveTo(p[0], p[1] - r); ctx.lineTo(p[0] + r, p[1]); ctx.lineTo(p[0], p[1] + r); ctx.lineTo(p[0] - r, p[1]); ctx.closePath(); } else ctx.arc(p[0], p[1], r, 0, 6.283); };
-      const SH = k => cfg.shapes[k] || 'circle';
-      const dot = (x, y, col, r, sh) => { const p = toS(x, y); ctx.fillStyle = col; shp(p, r, sh || 'circle'); ctx.fill(); return p; };
-      const rkKey = n => ({ 3: 'e3', 2: 'e2', 1: 'e1' })[rk(n)] || 'mobs';
-      const label = (p, t, col) => { ctx.font = '10px Arial'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(t, p[0] + R + 2, p[1] + 3); ctx.fillStyle = col || cfg.cols.text; ctx.fillText(t, p[0] + R + 2, p[1] + 3); };
-      if (cfg.gates) data.gates.forEach(g => { dot(g.x, g.y, cfg.cols.gates, R, SH('gates')); });
-      if (cfg.mobs) data.npcs.filter(n => rk(n) === 0).forEach(n => dot(n.x, n.y, cfg.cols.mobs, Math.max(1.5, R * .6), SH('mobs')));
-      if (cfg.elites) data.npcs.filter(n => rk(n) >= 1).forEach(n => { const p = dot(n.x, n.y, colOf(n), R * 1.25, SH(rkKey(n))); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; shp(p, R * 1.25 + 1, SH(rkKey(n))); ctx.stroke(); });
-      if (cfg.players) data.others.forEach(n => { const p = dot(n.x, n.y, cfg.cols.players, R, SH('players')); });
-      if (cfg.marks) (marks[data.mapId] || []).forEach(m => { const p = toS(m.x, m.y); ctx.fillStyle = cfg.cols.marks; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] - 4, p[1] - 10); ctx.lineTo(p[0] + 4, p[1] - 10); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(p[0], p[1] - 12, 4, 0, 6.283); ctx.fill(); if (m.t) label([p[0] + 2, p[1] - 12], m.t, '#fff59d'); });
-      if (q) [...data.npcs, ...data.others].filter(n => (n.nick || '').toLowerCase().includes(q)).forEach(n => { const p = toS(n.x, n.y), t = (performance.now() % 1000) / 1000; ctx.strokeStyle = cfg.cols.search; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], R + 3 + t * 8, 0, 6.283); ctx.globalAlpha = 1 - t; ctx.stroke(); ctx.globalAlpha = 1; label(p, n.nick, cfg.cols.search); });
-      if (data.hero) { const p = dot(data.hero.x, data.hero.y, cfg.cols.hero, R * 1.2, SH('hero')); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; shp(p, R * 1.2 + 1.5, SH('hero')); ctx.stroke(); }
-      hover = null;
-      if (mouse) { let best = 14; const all = [...(cfg.elites ? data.npcs.filter(n => rk(n) >= 1) : []), ...(cfg.mobs ? data.npcs.filter(n => rk(n) === 0) : []), ...(cfg.players ? data.others : []), ...(cfg.gates ? data.gates.map(g => Object.assign({}, g, { nick: g.name ? '→ ' + g.name : 'Przejście', lvl: 0, isGate: true })) : [])]; all.forEach(n => { const p = toS(n.x, n.y), d = Math.hypot(p[0] - mouse[0], p[1] - mouse[1]); if (d < best) { best = d; hover = n; } }); if (hover) { const t = hover.nick + (hover.lvl ? ' (' + hover.lvl + ')' : '') + (hover.wt ? ' · ' + (rkName(hover) || 'wt ' + hover.wt) : '') + ' [' + Math.round(hover.x) + ',' + Math.round(hover.y) + ']'; ctx.font = 'bold 11px Arial'; const tw = ctx.measureText(t).width; ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(mouse[0] + 10, mouse[1] - 8, tw + 8, 16); ctx.fillStyle = '#fff'; ctx.fillText(t, mouse[0] + 14, mouse[1] + 4); } }
-      if (!drag) cv.style.cursor = (mouse && cfg.click !== false && pick(mouse[0], mouse[1])) ? 'pointer' : (mouse && cfg.tile !== false ? 'crosshair' : 'grab');
-      const wp = mouse ? toW(mouse[0], mouse[1]) : null;
-      info.textContent = (msg && performance.now() - msgT < 3000 ? msg + '  ·  ' : '') + (data.name || '') + (data.hero ? '  ·  Ty: ' + Math.round(data.hero.x) + ',' + Math.round(data.hero.y) : '') + (wp ? '  ·  kursor: ' + wp[0] + ',' + wp[1] : '') + (data.dimsOk ? '' : '  ·  (rozmiar mapy szacowany)') + '  ·  przejścia: ' + data.gates.length + (data.col ? '' : '  ·  brak danych ścian');
-    }
-    cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
-    cv.addEventListener('pointerdown', e => { if (e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy, moved: false }; cv.style.cursor = 'grabbing'; try { cv.setPointerCapture(e.pointerId); } catch (er) {  } });
-    cv.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); mouse = [e.clientX - r.left, e.clientY - r.top]; if (drag) { const dx = (e.clientX - drag.x) / sc(), dy = (e.clientY - drag.y) / sc(); if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) drag.moved = true; if (!cfg.lockpan && Math.abs(dx) + Math.abs(dy) > .3 && drag.moved) { if (cfg.fit) { cfg.zoom = sc() / 3; cfg.fit = false; } cfg.follow = false; view.cx = drag.cx - dx; view.cy = drag.cy - dy; } } });
-    let msgT = 0, msg = '';
-    function walkTo(x, y, what) {
-      const E = PW.Engine; x = Math.round(x); y = Math.round(y);
-      let ok = false;
-      try { if (E && E.hero && typeof E.hero.autoGoTo === 'function') { E.hero.autoGoTo({ x, y }); ok = true; } } catch (er) { ok = false; }
-      msg = ok ? 'Idę: ' + (what || x + ',' + y) : 'Gra nie udostępnia ruchu (autoGoTo)'; msgT = performance.now(); dirty = true;
-    }
-    function pick(mx, my) {
-      let best = 13, hit = null; const tryP = (n, kind, name) => { const p = toS(n.x, n.y), d = Math.hypot(p[0] - mx, p[1] - my); if (d < best) { best = d; hit = { x: n.tx != null ? n.tx : n.x, y: n.ty != null ? n.ty : n.y, kind, name }; } };
-      if (cfg.gates) data.gates.forEach(g => tryP(g, 'gate', g.name || 'przejście'));
-      if (cfg.mobs) data.npcs.filter(n => rk(n) === 0).forEach(n => tryP(n, 'npc', n.nick));
-      if (cfg.elites) data.npcs.filter(n => rk(n) >= 1).forEach(n => tryP(n, 'npc', n.nick));
-      return hit;
-    }
-    cv.addEventListener('pointerup', e => { const was = drag; if (was && !was.moved && cfg.click !== false && e.button === 0) { const r = cv.getBoundingClientRect(), h = pick(e.clientX - r.left, e.clientY - r.top); if (h) walkTo(h.x, h.y, h.name); else if (cfg.tile !== false) { const t = toW(e.clientX - r.left, e.clientY - r.top); if (t[0] >= 0 && t[1] >= 0 && t[0] < data.w && t[1] < data.h) { const v = data.col ? data.col[t[1] * data.w + t[0]] : 0; if (typeof v === 'string' ? v !== '0' : v > 0) { msg = 'Tam nie da się wejść'; msgT = performance.now(); dirty = true; } else walkTo(t[0], t[1], 'miejsce ' + t[0] + ',' + t[1]); } } } drag = null; cv.style.cursor = 'grab'; save(); });
-    cv.addEventListener('pointerleave', () => { mouse = null; });
-    cv.addEventListener('contextmenu', e => { e.preventDefault(); const r = cv.getBoundingClientRect(), p = toW(e.clientX - r.left, e.clientY - r.top); const t = prompt('Podpis znacznika (puste = usuń znacznik w tym miejscu):', ''); if (t === null) return; const list = marks[data.mapId] = marks[data.mapId] || []; if (!t.trim()) { const i = list.findIndex(m => Math.abs(m.x - p[0]) < 3 && Math.abs(m.y - p[1]) < 3); if (i >= 0) list.splice(i, 1); } else list.push({ x: p[0], y: p[1], t: t.trim().slice(0, 40) }); saveM(); drawMarks(); });
-    bar.append(search, mkB('⚙', 'Ustawienia minimapy', () => { if (root.openSettings) root.openSettings(); }), mkB('⛶', 'Cała mapa w oknie', () => { cfg.fit = true; save(); setTimeout(() => fitWindow(document.getElementById('gi-mm-win')), 30); }), mkB('⌖', 'Wyśrodkuj na sobie i podążaj', () => { cfg.fit = false; cfg.follow = true; save(); }), mkB('+', 'Przybliż', () => setZoom(1.3)), mkB('−', 'Oddal', () => setZoom(1 / 1.3)));
-    ['keydown', 'keyup', 'keypress'].forEach(ev => search.addEventListener(ev, e => e.stopPropagation()));
-    let tmr = 0, raf = 0;
-    function fitBody(w) {
-      const bd = body.parentElement; if (!bd || !w) return;
-      const cs = getComputedStyle(bd), pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
-      const hh = Math.max(150, Math.floor(w.clientHeight - bd.offsetTop - pad));
-      if (body._h !== hh) { body._h = hh; body.style.height = hh + 'px'; dirty = true; }
-    }
-    function fitWindow(w, force) {
-      if (!(cfg.autowin || force) || !data.w || !w) return;
-      const bd = body.parentElement; if (!bd) return;
-      const chrome = w.clientWidth - body.clientWidth;
-      const nw = Math.round(Math.min(innerWidth - 20, Math.max(260, (body._h - 12) * data.w / data.h + 12 + chrome)));
-      w.style.width = nw + 'px'; const st = readLS(WKEY, {}) || {}; st.w = nw; writeLS(WKEY, st); dirty = true;
-    }
-    const loop = () => { raf = requestAnimationFrame(loop); if (!mmEnabled) return; const w = document.getElementById('gi-mm-win'); if (!w || w.style.display === 'none' || document.hidden) return; fitBody(w); if (!(dirty || anim || mouse || drag || search.value || cv.clientWidth !== cv.width || cv.clientHeight !== cv.height)) return; dirty = false; draw(); };
-    function apply() { clearInterval(tmr); tmr = 0; if (!mmEnabled) return; refresh(); tmr = setInterval(() => { const w = document.getElementById('gi-mm-win'); if (w && w.style.display !== 'none') { try { refresh(); } catch (e) {  } } }, 100); if (!raf) raf = requestAnimationFrame(loop); }
-    const mkC = (key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
-    const mkR = (key, label, min, max, step, fmt) => { const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' }); const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:90px'; const show = () => { val.textContent = fmt(Number(r.value)); }; r.addEventListener('input', () => { cfg[key] = Number(r.value); show(); save(); }); show(); return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val); };
-    const SHAPES = [['circle', '● okrągły'], ['square', '■ kwadratowy'], ['diamond', '◆ romb']];
-    const mkShape = (key, label) => { const sel = isolate(el('select', {})); SHAPES.forEach(([v, t]) => sel.append(el('option', { value: v, textContent: t }))); sel.value = cfg.shapes[key] || 'circle'; sel.addEventListener('change', () => { cfg.shapes[key] = sel.value; save(); }); return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:150px' }), sel); };
-    const mkCol = (key, label) => { const c = isolate(el('input', { type: 'color', value: cfg.cols[key] })); c.dataset.k = key; c.addEventListener('input', () => { cfg.cols[key] = c.value; colKey = ''; save(); cv.style.background = cfg.cols.bg; }); return el('div', { style: 'margin:2px 0' }, c, ' ' + label); };
-    const marksBox = el('div');
-    function drawMarks() { const list = marks[data.mapId] || []; marksBox.replaceChildren(el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Prawy przycisk myszy na minimapie dodaje znacznik z podpisem. Pusty podpis w tym samym miejscu usuwa go. Poniżej znaczniki tej mapy (' + (data.name || '—') + ').'), ...list.map((m, i) => { const x = el('button', { textContent: '×' }); x.addEventListener('click', () => { list.splice(i, 1); saveM(); drawMarks(); }); return el('div', { style: 'margin:2px 0' }, `${m.t} [${m.x},${m.y}] `, x); })); }
-    drawMarks(); setInterval(() => { if (marksBox.isConnected && marksBox._m !== data.mapId) { marksBox._m = data.mapId; drawMarks(); } }, 1500);
-    const dbg = isolate(el('textarea', { rows: 12, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
-    const dbgBtn = el('button', { textContent: 'Zbierz dane o mapie' });
-    const dbgCopy = el('button', { textContent: 'Kopiuj' }); dbgCopy.addEventListener('click', () => { dbg.select(); try { navigator.clipboard.writeText(dbg.value); } catch (e) { document.execCommand('copy'); } });
-    dbgBtn.addEventListener('click', () => { const E = PW.Engine, m = safeG(() => E.map, {}), md = m.d || {};
-      const desc = o => { const r = {}; try { Object.keys(o).slice(0, 120).forEach(k => { let v; try { v = o[k]; } catch (e) { return; } const t = v === null ? 'null' : Array.isArray(v) ? 'array:' + v.length : ArrayBuffer.isView(v) ? 'typed:' + v.length : typeof v === 'string' ? 'string:' + v.length + ':' + v.slice(0, 20) : typeof v === 'object' ? 'obj{' + Object.keys(v).slice(0, 12).join(',') + '}' : typeof v === 'function' ? 'fn' : typeof v + ':' + String(v).slice(0, 30); r[k] = t; }); } catch (e) {  } return r; };
-      const dom = [...document.querySelectorAll('canvas,[class*="map" i],[id*="map" i],[class*="radar" i]')].filter(e => !e.closest('#gi-mm-win') && !e.closest('[id^="gi-"]')).slice(0, 30).map(e => e.tagName + (e.id ? '#' + e.id : '') + (e.className && e.className.baseVal === undefined ? '.' + String(e.className).trim().split(/\s+/).slice(0, 4).join('.') : '') + (e.tagName === 'CANVAS' ? ' ' + e.width + 'x' + e.height : ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height)));
-      const protoOf = o => { try { return o && typeof o === 'object' ? Object.getOwnPropertyNames(Object.getPrototypeOf(o) || {}).slice(0, 40) : null; } catch (e) { return null; } };
-      dbg.value = JSON.stringify({ ruchBohatera: safeG(() => { const h = E.hero, out = new Set(Object.keys(h)); let pr = Object.getPrototypeOf(h); while (pr && pr !== Object.prototype) { Object.getOwnPropertyNames(pr).forEach(k => out.add(k)); pr = Object.getPrototypeOf(pr); } return [...out].filter(k => /go|path|walk|move|stop|auto/i.test(k)); }, null), miniMapController: safeG(() => Object.keys(E.miniMapController).slice(0, 30), null), rxry: safeG(() => [E.hero.rx, E.hero.ry, E.hero.d.x, E.hero.d.y], null), colPola: m.col && typeof m.col === 'object' ? desc(m.col) : typeof m.col, colMetody: protoOf(m.col), colliderPola: m.collider && typeof m.collider === 'object' ? desc(m.collider) : typeof m.collider, colliderMetody: protoOf(m.collider), src: typeof m.src === 'string' ? m.src.slice(0, 200) : (m.src && m.src.constructor && m.src.constructor.name), size: m.size, dFile: md.file, dBg: md.bg, uzytyOdczyt: data.colPath, mapaPola: desc(m), mapaDPola: desc(md), elementyDOM: dom, silnikKlucze: Object.keys(E || {}).filter(k => /map|town|path|loc|world|minimap/i.test(k)),  mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, kandydaciNaSciany: data.cands, uzyty: data.colPath, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3), bramyListaSurowa: safeG(() => { const l = E.map.gateways.getList(); const a = Array.isArray(l) ? l : (l instanceof Map ? Array.from(l.values()) : Object.values(l || {})); return { typ: Array.isArray(l) ? 'array' : l instanceof Map ? 'map' : typeof l, ile: a.length, probki: a.slice(0, 2).map(g => ({ klucze: Object.keys(g || {}).slice(0, 14), d: g && g.d ? JSON.stringify(g.d).slice(0, 220) : JSON.stringify(g).slice(0, 220) })) }; }, null), bramyMetody: safeG(() => Object.keys(E.map.gateways), null), npcTypy: (() => { const r = {}; safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (!d) return; const k = 'type' + d.type + '/wt' + d.wt + '/' + (d.lvl > 0 ? 'lvl' : 'bezlvl'); (r[k] = r[k] || []).length < 3 && r[k].push(d.nick); }); return r; })() }, null, 1); });
-    const WKEY = 'gi_win_mm_v1';
-    function setWinSize(w, h) {
-      const st = readLS(WKEY, {}) || {}; st.w = Math.round(w); st.h = Math.round(h); writeLS(WKEY, st);
-      const b = document.getElementById('gi-mm-win'); if (b) { b.style.width = st.w + 'px'; b.style.height = st.h + 'px'; }
-      szW.querySelector('input').value = st.w; szH.querySelector('input').value = st.h; szW.querySelector('input').dispatchEvent(new Event('input')); szH.querySelector('input').dispatchEvent(new Event('input'));
-    }
-    const mkSz = (label, min, max, key) => {
-      const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' });
-      const r = isolate(el('input', { type: 'range', min, max, step: 10, value: (readLS(WKEY, {}) || {})[key] || (key === 'w' ? 340 : 300) })); r.style.cssText = 'flex:1;min-width:90px';
-      const show = () => { val.textContent = r.value + ' px'; }; show();
-      r.addEventListener('input', show);
-      r.addEventListener('change', () => { const st = readLS(WKEY, {}) || {}; st[key] = Number(r.value); if (!st.w) st.w = 340; if (!st.h) st.h = 300; writeLS(WKEY, st); const b = document.getElementById('gi-mm-win'); if (b) { b.style.width = st.w + 'px'; b.style.height = st.h + 'px'; } });
-      return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val);
-    };
-    const szW = mkSz('Szerokość', 200, 1000, 'w'), szH = mkSz('Wysokość', 150, 800, 'h');
-    const rstSz = el('button', { textContent: 'Przywróć domyślny rozmiar i pozycję' });
-    rstSz.addEventListener('click', () => { const st = readLS(WKEY, {}) || {}; writeLS(WKEY, { open: st.open }); const b = document.getElementById('gi-mm-win'); if (b) { b.style.width = '340px'; b.style.height = ''; b.style.left = Math.max(0, innerWidth - 360) + 'px'; b.style.top = '100px'; } });
-    const rstCol = el('button', { textContent: 'Przywróć domyślne kolory' });
-    rstCol.addEventListener('click', () => { Object.assign(cfg.cols, COL_DEF); colKey = ''; save(); cv.style.background = cfg.cols.bg; if (rstCol.parentElement) rstCol.parentElement.parentElement.querySelectorAll('input[type=color]').forEach((c, i) => { const k = Object.keys(COL_DEF)[i]; }); document.querySelectorAll('#gi-mm-set input[type=color]').forEach(c => { const k = c.dataset.k; if (k && COL_DEF[k]) c.value = COL_DEF[k]; }); });
-    const keyName = k => k ? (k === ' ' ? 'Spacja' : k.length === 1 ? k.toUpperCase() : k) : 'brak';
-    const keyBtn = el('button', { textContent: 'Skrót: ' + keyName(cfg.key), style: 'min-width:140px' });
-    let capturing = false;
-    keyBtn.addEventListener('click', () => { capturing = true; keyBtn.textContent = 'Naciśnij klawisz… (Esc = anuluj)'; });
-    const clrKey = el('button', { textContent: 'Usuń skrót' });
-    clrKey.addEventListener('click', () => { cfg.key = ''; save(); keyBtn.textContent = 'Skrót: brak'; });
-    document.addEventListener('keydown', e => {
-      if (capturing) { e.preventDefault(); e.stopImmediatePropagation(); capturing = false; if (e.key !== 'Escape' && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) { cfg.key = e.key; save(); } keyBtn.textContent = 'Skrót: ' + keyName(cfg.key); return; }
-      if (!cfg.key || !mmEnabled || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
-      const t = e.target, tg = t && t.tagName; if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT' || (t && t.isContentEditable)) return;
-      if (e.key.toLowerCase() === cfg.key.toLowerCase()) { if (root.toggleWin) root.toggleWin(); }
-    }, true);
-    const PKEY = 'gi_mm_btn_v1'; let launcher = null;
-    function syncLauncher() {
-      const want = mmEnabled && cfg.btn;
-      if (!want) { if (launcher) launcher.style.display = 'none'; return; }
-      if (!launcher) {
-        const p0 = readLS(PKEY, { x: 12, y: Math.max(60, innerHeight - 150) });
-        launcher = el('div', { id: 'gi-mm-open', title: 'Minimapa: kliknij, aby otworzyć lub zamknąć. Przeciągnij, aby przesunąć.', textContent: '🗺', style: `position:fixed;left:${p0.x}px;top:${p0.y}px;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2b6c8a,#0b2230);border:2px solid #81d4fa;color:#fff;font-size:18px;line-height:30px;text-align:center;cursor:pointer;z-index:99998;box-shadow:0 0 8px #000a;user-select:none` });
-        let d = null;
-        launcher.addEventListener('pointerdown', e => { if (e.button !== 0) return; d = { x: e.clientX, y: e.clientY, l: launcher.offsetLeft, t: launcher.offsetTop, moved: false }; try { launcher.setPointerCapture(e.pointerId); } catch (er) {  } });
-        launcher.addEventListener('pointermove', e => { if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y; if (!d.moved && Math.hypot(dx, dy) < 5) return; d.moved = true; launcher.style.left = Math.min(innerWidth - 34, Math.max(0, d.l + dx)) + 'px'; launcher.style.top = Math.min(innerHeight - 34, Math.max(0, d.t + dy)) + 'px'; });
-        launcher.addEventListener('pointerup', () => { if (!d) return; const m = d.moved; d = null; if (m) writeLS(PKEY, { x: launcher.offsetLeft, y: launcher.offsetTop }); else if (root.toggleWin) root.toggleWin(); });
-        document.body.append(launcher);
-      }
-      launcher.style.display = '';
-    }
-    setInterval(syncLauncher, 700);
-    const root = el('div');
-    root.body = body;
-    root.settingsBox = setTabs([
-      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('nolvl', 'Pokazuj też NPC i elementy bez poziomu (ozdoby, lampy itp.)'), mkC('click', 'Kliknięcie potwora lub przejścia na minimapie prowadzi do niego'), mkC('lockpan', 'Zablokuj przesuwanie mapy myszką (zapobiega przypadkowemu przesunięciu)'), mkC('tile', 'Kliknięcie w dowolne miejsce mapy prowadzi postać w to miejsce'), mkC('autowin', 'Po zmianie lokacji dopasuj szerokość okna do proporcji mapy (domyślnie wyłączone — okno zachowuje Twój rozmiar)'), (() => { const b = el('button', { textContent: 'Dopasuj okno do proporcji tej mapy (jednorazowo)' }); b.addEventListener('click', () => fitWindow(document.getElementById('gi-mm-win'), true)); return b; })(), mkC('fit', 'Pokazuj całą mapę w oknie (dopasuj do rozmiaru)'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
-      ['Okno', [el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Rozmiar okna minimapy'), el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px' }, ...[['Mała', 260, 230], ['Średnia', 380, 330], ['Duża', 560, 470], ['Bardzo duża', 760, 620]].map(([n, w, h]) => { const b = el('button', { textContent: n }); b.addEventListener('click', () => setWinSize(w, h)); return b; })), szW, szH, el('div', { style: 'margin-top:4px' }, rstSz), el('div', { style: 'color:#90a4ae;font-size:11px;margin:4px 0 8px' }, 'Rozmiar możesz też zmieniać, ciągnąc prawy dolny róg okna.'), el('hr'), el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Klawisz otwierający minimapę'), el('div', { style: 'display:flex;gap:4px;align-items:center;margin-bottom:3px' }, keyBtn, clrKey), el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:6px' }, 'Wybierz klawisz, który nie jest używany w grze. Nie działa podczas pisania na czacie.'), el('hr'), mkC('btn', 'Pokazuj przycisk 🗺 do otwierania i zamykania minimapy'), el('div', { style: 'color:#90a4ae;font-size:11px' }, 'Przycisk możesz przeciągnąć w dowolne miejsce ekranu.')]],
-      ['Kolory', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Punkty na mapie'), mkCol('hero', 'Ty'), mkCol('players', 'Gracze'), mkCol('mobs', 'Zwykłe potwory i NPC'), mkCol('e1', 'Elity (I, II, III)'), mkCol('e2', 'Heros'), mkCol('e3', 'Tytan'), mkCol('gates', 'Przejścia'), mkCol('marks', 'Znaczniki'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0 3px' }, 'Mapa i napisy'), mkCol('wall', 'Ściany'), mkCol('free', 'Teren'), mkCol('bg', 'Tło poza mapą'), mkCol('text', 'Napisy przy punktach'), mkCol('search', 'Wyróżnienie wyszukiwania'), el('div', { style: 'margin-top:6px' }, rstCol)]],
-      ['Znaczniki', [marksBox]],
-      ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli brakuje ścian, przejść albo rozmiar mapy się nie zgadza, kliknij i wklej mi wynik.'), el('div', { style: 'display:flex;gap:4px;margin-bottom:4px' }, dbgBtn, dbgCopy), dbg]]
-    ]);
-    root.apply = apply; root.test = apply; root.stop = apply; apply();
-    return root;
+    rebuild();
+    const root0 = el('div');
+    root0.settingsBox = el('div', {}, holder);
+    root0.apply = apply; root0.stop = apply; root0.test = apply;
+    apply();
+    return root0;
   }
 
   const IF_ON_KEY = 'gi_if_on_v1', IF_CFG_KEY = 'gi_if_cfg_v1';
@@ -4985,12 +4751,8 @@
     const chView = safeView('Zmieniacz czatu', buildChatView);
     const dmView = safeView('Obrażenia w walce', buildDmgView);
     const bgView = safeView('Zmieniacz tła', buildBgView);
+    const scView = safeView('Skalowanie interfejsu', buildScaleView);
     const ifView = safeView('Ramki przedmiotów', buildItemFramesView);
-    const mmView = safeView('Minimapa', buildMinimapView);
-    const mmWin = (() => {
-      try { return makeFloatWindow({ id: 'gi-mm-win', title: 'Minimapa', key: 'gi_win_mm_v1', content: mmView.body || el('div'), width: 340, top: 100, mini: true, headLeft: [] }); }
-      catch (err) { log('błąd okna minimapy', err); return { el: el('div'), toggle() {}, restore() {}, setOpen() {} }; }
-    })();
     const relogView = safeView('Przelogowanie', buildRelogView);
     const relogWin = (() => {
       try {
@@ -5023,11 +4785,8 @@
     const auraSetWin = mkSetWin('gi-aura-set', 'Ustawienia – Aura ekwipunku', 'gi_win_auraset_v1', auraView.settingsBox || el('div'), 340);
     const haSetWin = mkSetWin('gi-ha-set', 'Ustawienia – Aura postaci', 'gi_win_haset_v1', haView.settingsBox || el('div'), 340);
     const chSetWin = mkSetWin('gi-ch-set', 'Ustawienia – Zmieniacz czatu', 'gi_win_chset_v1', chView.settingsBox || el('div'), 340);
-    const mmSetWin0 = null;
-    const mmSetWin = mkSetWin('gi-mm-set', 'Ustawienia – Minimapa', 'gi_win_mmset_v1', mmView.settingsBox || el('div'), 330);
-    mmView.toggleWin = () => { if (!mmEnabled) return; mmWin.toggle(); };
-    mmView.openSettings = () => mmSetWin.toggle();
     const ifSetWin = mkSetWin('gi-if-set', 'Ustawienia – Ramki przedmiotów', 'gi_win_ifset_v1', ifView.settingsBox || el('div'), 330);
+    const scSetWin = mkSetWin('gi-sc-set', 'Ustawienia – Skalowanie interfejsu', 'gi_win_scset_v1', scView.settingsBox || el('div'), 340);
     const bgSetWin = mkSetWin('gi-bg-set', 'Ustawienia – Zmieniacz tła', 'gi_win_bgset_v1', bgView.settingsBox || el('div'), 340);
     const dmSetWin = mkSetWin('gi-dm-set', 'Ustawienia – Obrażenia w walce', 'gi_win_dmset_v1', dmView.settingsBox || el('div'), 340);
     const flameSetWin = mkSetWin('gi-flame-set', 'Ustawienia – Efekt przy unikacie/heroiku', 'gi_win_flameset_v1', flameView.settingsBox || el('div'), 330);
@@ -5062,14 +4821,14 @@
         settings: () => chSetWin.toggle(),
         isOn: () => chEnabled,
         setOn: v => { chEnabled = v; try { localStorage.setItem(CH_ON_KEY, v ? '1' : '0'); } catch (e) {} if (chView.apply) chView.apply(); if (!v) chSetWin.setOpen(false); } },
-      { id: 'minimap', icon: '🗺', title: 'Minimapa', desc: 'Własna minimapa z przybliżaniem i przesuwaniem: ściany, przejścia, gracze, potwory, elity i tytani z podpisami, wyszukiwarka po nazwie, własne znaczniki z podpisem (prawy przycisk myszy) i współrzędne pod kursorem. Tylko pokazuje, nie steruje postacią.', view: el('div'), action: () => { if (mmEnabled) mmWin.toggle(); },
-        settings: () => mmSetWin.toggle(),
-        isOn: () => mmEnabled,
-        setOn: v => { mmEnabled = v; try { localStorage.setItem(MM_ON_KEY, v ? '1' : '0'); } catch (e) {} if (mmView.apply) mmView.apply(); if (v) mmWin.setOpen(true); else { mmWin.setOpen(false); mmSetWin.setOpen(false); } } },
       { id: 'itemfr', icon: '🟦', title: 'Ramki przedmiotów', desc: 'Ramki na ikonach przedmiotów według rzadkości (zwykłe, ulepszone, unikaty, heroiki, legendy), 22 style statyczne i animowane, oznaczenie poziomu ulepszenia (+N) oraz ruchome efekty na założonych przedmiotach. Nie koliduje z innymi dodatkami.', view: el('div'), action: () => { if (ifEnabled) ifSetWin.toggle(); },
         settings: () => ifSetWin.toggle(),
         isOn: () => ifEnabled,
         setOn: v => { ifEnabled = v; try { localStorage.setItem(IF_ON_KEY, v ? '1' : '0'); } catch (e) {} if (ifView.apply) ifView.apply(); if (!v) ifSetWin.setOpen(false); } },
+      { id: 'scale', icon: '🔍', title: 'Skalowanie interfejsu', desc: 'Powiększa lub zmniejsza okna i przyciski dodatków (50–250%), z gotowymi wartościami. Opcjonalnie, eksperymentalnie, także interfejs samej gry.', view: el('div'), action: () => { if (scEnabled) scSetWin.toggle(); },
+        settings: () => scSetWin.toggle(),
+        isOn: () => scEnabled,
+        setOn: v => { scEnabled = v; try { localStorage.setItem(SC_ON_KEY, v ? '1' : '0'); } catch (e) {} if (scView.apply) scView.apply(); if (!v) scSetWin.setOpen(false); } },
       { id: 'bg', icon: '🌄', title: 'Zmieniacz tła', desc: 'Własne tło za grą: 28 gotowych gradientów i wzorów, własny gradient lub kolor oraz efekty w tle (gwiazdy, śnieg, deszcz, żar, świetliki, bąbelki, spadające gwiazdy, zorza, płynący gradient), z przyciemnieniem i winietą.', view: el('div'), action: () => { if (bgEnabled) bgSetWin.toggle(); },
         settings: () => bgSetWin.toggle(),
         isOn: () => bgEnabled,
@@ -5289,18 +5048,17 @@
       if (panel.style.display === 'block' && typeof win.x === 'number') placePanel(win.x, win.y);
     });
 
-    document.body.append(btn, panel, imgSetWin.el, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, chSetWin.el, mmWin.el, mmSetWin.el, ifSetWin.el, bgSetWin.el, dmSetWin.el, flameSetWin.el, gtSetWin.el);
+    document.body.append(btn, panel, imgSetWin.el, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, chSetWin.el, scSetWin.el, ifSetWin.el, bgSetWin.el, dmSetWin.el, flameSetWin.el, gtSetWin.el);
     respWin.restore();
     applyResp();
     dropsWin.restore();
     applyDrops();
     relogWin.restore();
     applyRelog();
-    if (mmEnabled) mmWin.restore();
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.101.11');
+    log('Załadowano v2.103.0');
   }
 
   let tries = 0;
