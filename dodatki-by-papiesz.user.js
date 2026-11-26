@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.101.5
+// @version      2.101.7
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3769,7 +3769,7 @@
   let mmEnabled = (() => { try { return localStorage.getItem(MM_ON_KEY) === '1'; } catch (e) { return false; } })();
   function buildMinimapView() {
     const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
-    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: false, fit: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
+    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: false, nolvl: false, fit: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
     cfg.cols = Object.assign({ hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' }, cfg.cols);
     const COL_DEF = JSON.parse(JSON.stringify(cfg.cols)); Object.assign(COL_DEF, { hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' });
     if (cfg.fitMig !== 1) { cfg.fitMig = 1; cfg.fit = true; cfg.follow = false; writeLS(MM_CFG_KEY, cfg); }
@@ -3839,9 +3839,13 @@
       stat = { id: md.id, col: nd.col, colPath: nd.colPath, cands: nd.cands, w, h: hh, tries: (stat.id === md.id ? stat.tries : 0) + 1, t: Date.now() };
       }
       if (num(w) && num(hh) && w > 4 && hh > 4) { nd.w = w; nd.h = hh; nd.dimsOk = true; }
-      safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y)) nd.npcs.push({ x: d.x, y: d.y, nick: d.nick || d.name || '', lvl: d.lvl || 0, wt: Number(d.wt) || 0 }); });
+      safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y) && (d.lvl > 0 || cfg.nolvl)) nd.npcs.push({ x: d.x, y: d.y, nick: d.nick || d.name || '', lvl: d.lvl || 0, wt: Number(d.wt) || 0, type: d.type }); });
       safeG(() => Object.values(E.others.check() || E.others.list || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y) && d.nick) nd.others.push({ x: d.x, y: d.y, nick: d.nick, lvl: d.lvl || 0 }); });
-      Object.keys(m).filter(k => /gat|gtw|exit|door|portal/i.test(k)).forEach(k => gatherXY(m[k], nd.gates, 0));
+      const gw = safeG(() => m.gateways, null);
+      let gl = safeG(() => gw && typeof gw.getList === 'function' ? gw.getList() : null, null);
+      if (gl && !Array.isArray(gl) && typeof gl === 'object') gl = Object.values(gl);
+      if (Array.isArray(gl)) gl.forEach(g => { const d = g && g.d ? g.d : g; if (d && num(d.x) && num(d.y)) { let nm = d.name || d.nick || ''; if (!nm) nm = safeG(() => { const tn = gw.townnames; const id = d.id != null ? d.id : d.tid; return tn && tn[id] != null ? (tn[id].name || tn[id]) : ''; }, ''); nd.gates.push({ x: d.x, y: d.y, name: typeof nm === 'string' ? nm : '' }); } });
+      if (!nd.gates.length) Object.keys(m).filter(k => /gat|gtw|exit|door|portal/i.test(k)).forEach(k => { if (typeof m[k] !== 'function') gatherXY(m[k], nd.gates, 0); });
       if (!nd.dimsOk) { const all = [nd.hero, ...nd.npcs, ...nd.others, ...nd.gates]; nd.w = Math.max(64, ...all.map(p => p.x + 2)); nd.h = Math.max(64, ...all.map(p => p.y + 2)); }
       if (nd.mapId !== data.mapId) { colKey = ''; view.cx = nd.hero.x; view.cy = nd.hero.y; }
       const sig = JSON.stringify([nd.mapId, nd.w, nd.h, !!nd.col, nd.hero.x, nd.hero.y, nd.npcs.map(n => n.x + ',' + n.y), nd.others.map(n => n.x + ',' + n.y), nd.gates.length]);
@@ -3930,7 +3934,7 @@
       const desc = o => { const r = {}; try { Object.keys(o).slice(0, 120).forEach(k => { let v; try { v = o[k]; } catch (e) { return; } const t = v === null ? 'null' : Array.isArray(v) ? 'array:' + v.length : ArrayBuffer.isView(v) ? 'typed:' + v.length : typeof v === 'string' ? 'string:' + v.length + ':' + v.slice(0, 20) : typeof v === 'object' ? 'obj{' + Object.keys(v).slice(0, 12).join(',') + '}' : typeof v === 'function' ? 'fn' : typeof v + ':' + String(v).slice(0, 30); r[k] = t; }); } catch (e) {  } return r; };
       const dom = [...document.querySelectorAll('canvas,[class*="map" i],[id*="map" i],[class*="radar" i]')].filter(e => !e.closest('#gi-mm-win') && !e.closest('[id^="gi-"]')).slice(0, 30).map(e => e.tagName + (e.id ? '#' + e.id : '') + (e.className && e.className.baseVal === undefined ? '.' + String(e.className).trim().split(/\s+/).slice(0, 4).join('.') : '') + (e.tagName === 'CANVAS' ? ' ' + e.width + 'x' + e.height : ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height)));
       const protoOf = o => { try { return o && typeof o === 'object' ? Object.getOwnPropertyNames(Object.getPrototypeOf(o) || {}).slice(0, 40) : null; } catch (e) { return null; } };
-      dbg.value = JSON.stringify({ colPola: m.col && typeof m.col === 'object' ? desc(m.col) : typeof m.col, colMetody: protoOf(m.col), colliderPola: m.collider && typeof m.collider === 'object' ? desc(m.collider) : typeof m.collider, colliderMetody: protoOf(m.collider), src: typeof m.src === 'string' ? m.src.slice(0, 200) : (m.src && m.src.constructor && m.src.constructor.name), size: m.size, dFile: md.file, dBg: md.bg, uzytyOdczyt: data.colPath, mapaPola: desc(m), mapaDPola: desc(md), elementyDOM: dom, silnikKlucze: Object.keys(E || {}).filter(k => /map|town|path|loc|world|minimap/i.test(k)),  mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, kandydaciNaSciany: data.cands, uzyty: data.colPath, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3) }, null, 1); });
+      dbg.value = JSON.stringify({ colPola: m.col && typeof m.col === 'object' ? desc(m.col) : typeof m.col, colMetody: protoOf(m.col), colliderPola: m.collider && typeof m.collider === 'object' ? desc(m.collider) : typeof m.collider, colliderMetody: protoOf(m.collider), src: typeof m.src === 'string' ? m.src.slice(0, 200) : (m.src && m.src.constructor && m.src.constructor.name), size: m.size, dFile: md.file, dBg: md.bg, uzytyOdczyt: data.colPath, mapaPola: desc(m), mapaDPola: desc(md), elementyDOM: dom, silnikKlucze: Object.keys(E || {}).filter(k => /map|town|path|loc|world|minimap/i.test(k)),  mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, kandydaciNaSciany: data.cands, uzyty: data.colPath, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3), bramyListaSurowa: safeG(() => { const l = E.map.gateways.getList(); const a = Array.isArray(l) ? l : Object.values(l || {}); return a.slice(0, 2).map(g => ({ klucze: Object.keys(g || {}).slice(0, 12), d: g && g.d ? JSON.stringify(g.d).slice(0, 200) : null })); }, null), npcTypy: (() => { const r = {}; safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (!d) return; const k = 'type' + d.type + '/wt' + d.wt + '/' + (d.lvl > 0 ? 'lvl' : 'bezlvl'); (r[k] = r[k] || []).length < 3 && r[k].push(d.nick); }); return r; })() }, null, 1); });
     const WKEY = 'gi_win_mm_v1';
     function setWinSize(w, h) {
       const st = readLS(WKEY, {}) || {}; st.w = Math.round(w); st.h = Math.round(h); writeLS(WKEY, st);
@@ -3981,7 +3985,7 @@
     const root = el('div');
     root.body = body;
     root.settingsBox = setTabs([
-      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('fit', 'Pokazuj całą mapę w oknie (dopasuj do rozmiaru)'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
+      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('nolvl', 'Pokazuj też NPC i elementy bez poziomu (ozdoby, lampy itp.)'), mkC('fit', 'Pokazuj całą mapę w oknie (dopasuj do rozmiaru)'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
       ['Okno', [el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Rozmiar okna minimapy'), el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px' }, ...[['Mała', 260, 230], ['Średnia', 380, 330], ['Duża', 560, 470], ['Bardzo duża', 760, 620]].map(([n, w, h]) => { const b = el('button', { textContent: n }); b.addEventListener('click', () => setWinSize(w, h)); return b; })), szW, szH, el('div', { style: 'margin-top:4px' }, rstSz), el('div', { style: 'color:#90a4ae;font-size:11px;margin:4px 0 8px' }, 'Rozmiar możesz też zmieniać, ciągnąc prawy dolny róg okna.'), el('hr'), el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Klawisz otwierający minimapę'), el('div', { style: 'display:flex;gap:4px;align-items:center;margin-bottom:3px' }, keyBtn, clrKey), el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:6px' }, 'Wybierz klawisz, który nie jest używany w grze. Nie działa podczas pisania na czacie.'), el('hr'), mkC('btn', 'Pokazuj przycisk 🗺 do otwierania i zamykania minimapy'), el('div', { style: 'color:#90a4ae;font-size:11px' }, 'Przycisk możesz przeciągnąć w dowolne miejsce ekranu.')]],
       ['Kolory', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Punkty na mapie'), mkCol('hero', 'Ty'), mkCol('players', 'Gracze'), mkCol('mobs', 'Zwykłe potwory i NPC'), mkCol('e1', 'Elita II'), mkCol('e2', 'Heros'), mkCol('e3', 'Tytan'), mkCol('gates', 'Przejścia'), mkCol('marks', 'Znaczniki'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0 3px' }, 'Mapa i napisy'), mkCol('wall', 'Ściany'), mkCol('free', 'Teren'), mkCol('bg', 'Tło poza mapą'), mkCol('text', 'Napisy przy punktach'), mkCol('search', 'Wyróżnienie wyszukiwania'), el('div', { style: 'margin-top:6px' }, rstCol)]],
       ['Znaczniki', [marksBox]],
@@ -5240,7 +5244,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.101.5');
+    log('Załadowano v2.101.7');
   }
 
   let tries = 0;
