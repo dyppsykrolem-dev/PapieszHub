@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.101.9
+// @version      2.101.10
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3769,9 +3769,10 @@
   let mmEnabled = (() => { try { return localStorage.getItem(MM_ON_KEY) === '1'; } catch (e) { return false; } })();
   function buildMinimapView() {
     const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
-    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: false, click: true, autowin: true, nolvl: false, fit: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
+    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: false, click: true, tile: true, autowin: false, nolvl: false, fit: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
     cfg.cols = Object.assign({ hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' }, cfg.cols);
     const COL_DEF = JSON.parse(JSON.stringify(cfg.cols)); Object.assign(COL_DEF, { hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' });
+    if (cfg.fitMig2 !== 1) { cfg.fitMig2 = 1; cfg.autowin = false; writeLS(MM_CFG_KEY, cfg); }
     if (cfg.fitMig !== 1) { cfg.fitMig = 1; cfg.fit = true; cfg.follow = false; writeLS(MM_CFG_KEY, cfg); }
     const marks = readLS(MM_MARK_KEY, {});
     const save = () => { writeLS(MM_CFG_KEY, cfg); dirty = true; }, saveM = () => writeLS(MM_MARK_KEY, marks);
@@ -3926,8 +3927,8 @@
       if (q) [...data.npcs, ...data.others].filter(n => (n.nick || '').toLowerCase().includes(q)).forEach(n => { const p = toS(n.x, n.y), t = (performance.now() % 1000) / 1000; ctx.strokeStyle = cfg.cols.search; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], R + 3 + t * 8, 0, 6.283); ctx.globalAlpha = 1 - t; ctx.stroke(); ctx.globalAlpha = 1; label(p, n.nick, cfg.cols.search); });
       if (data.hero) { const p = dot(data.hero.x, data.hero.y, cfg.cols.hero, R * 1.2); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], R * 1.2 + 1.5, 0, 6.283); ctx.stroke(); }
       hover = null;
-      if (mouse) { let best = 14; const all = [...(cfg.elites ? data.npcs.filter(n => rk(n) >= 1) : []), ...(cfg.mobs ? data.npcs.filter(n => rk(n) === 0) : []), ...(cfg.players ? data.others : [])]; all.forEach(n => { const p = toS(n.x, n.y), d = Math.hypot(p[0] - mouse[0], p[1] - mouse[1]); if (d < best) { best = d; hover = n; } }); if (hover) { const t = hover.nick + (hover.lvl ? ' (' + hover.lvl + ')' : '') + (hover.wt ? ' · ' + (rkName(hover) || 'wt ' + hover.wt) : '') + ' [' + Math.round(hover.x) + ',' + Math.round(hover.y) + ']'; ctx.font = 'bold 11px Arial'; const tw = ctx.measureText(t).width; ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(mouse[0] + 10, mouse[1] - 8, tw + 8, 16); ctx.fillStyle = '#fff'; ctx.fillText(t, mouse[0] + 14, mouse[1] + 4); } }
-      if (!drag) cv.style.cursor = (mouse && cfg.click !== false && pick(mouse[0], mouse[1])) ? 'pointer' : 'grab';
+      if (mouse) { let best = 14; const all = [...(cfg.elites ? data.npcs.filter(n => rk(n) >= 1) : []), ...(cfg.mobs ? data.npcs.filter(n => rk(n) === 0) : []), ...(cfg.players ? data.others : []), ...(cfg.gates ? data.gates.map(g => Object.assign({}, g, { nick: g.name ? '→ ' + g.name : 'Przejście', lvl: 0, isGate: true })) : [])]; all.forEach(n => { const p = toS(n.x, n.y), d = Math.hypot(p[0] - mouse[0], p[1] - mouse[1]); if (d < best) { best = d; hover = n; } }); if (hover) { const t = hover.nick + (hover.lvl ? ' (' + hover.lvl + ')' : '') + (hover.wt ? ' · ' + (rkName(hover) || 'wt ' + hover.wt) : '') + ' [' + Math.round(hover.x) + ',' + Math.round(hover.y) + ']'; ctx.font = 'bold 11px Arial'; const tw = ctx.measureText(t).width; ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(mouse[0] + 10, mouse[1] - 8, tw + 8, 16); ctx.fillStyle = '#fff'; ctx.fillText(t, mouse[0] + 14, mouse[1] + 4); } }
+      if (!drag) cv.style.cursor = (mouse && cfg.click !== false && pick(mouse[0], mouse[1])) ? 'pointer' : (mouse && cfg.tile !== false ? 'crosshair' : 'grab');
       const wp = mouse ? toW(mouse[0], mouse[1]) : null;
       info.textContent = (msg && performance.now() - msgT < 3000 ? msg + '  ·  ' : '') + (data.name || '') + (data.hero ? '  ·  Ty: ' + Math.round(data.hero.x) + ',' + Math.round(data.hero.y) : '') + (wp ? '  ·  kursor: ' + wp[0] + ',' + wp[1] : '') + (data.dimsOk ? '' : '  ·  (rozmiar mapy szacowany)') + '  ·  przejścia: ' + data.gates.length + (data.col ? '' : '  ·  brak danych ścian');
     }
@@ -3948,7 +3949,7 @@
       if (cfg.elites) data.npcs.filter(n => rk(n) >= 1).forEach(n => tryP(n, 'npc', n.nick));
       return hit;
     }
-    cv.addEventListener('pointerup', e => { const was = drag; if (was && !was.moved && cfg.click !== false && e.button === 0) { const r = cv.getBoundingClientRect(), h = pick(e.clientX - r.left, e.clientY - r.top); if (h) walkTo(h.x, h.y, h.name); } drag = null; cv.style.cursor = 'grab'; save(); });
+    cv.addEventListener('pointerup', e => { const was = drag; if (was && !was.moved && cfg.click !== false && e.button === 0) { const r = cv.getBoundingClientRect(), h = pick(e.clientX - r.left, e.clientY - r.top); if (h) walkTo(h.x, h.y, h.name); else if (cfg.tile !== false) { const t = toW(e.clientX - r.left, e.clientY - r.top); if (t[0] >= 0 && t[1] >= 0 && t[0] < data.w && t[1] < data.h) { const v = data.col ? data.col[t[1] * data.w + t[0]] : 0; if (typeof v === 'string' ? v !== '0' : v > 0) { msg = 'Tam nie da się wejść'; msgT = performance.now(); dirty = true; } else walkTo(t[0], t[1], 'miejsce ' + t[0] + ',' + t[1]); } } } drag = null; cv.style.cursor = 'grab'; save(); });
     cv.addEventListener('pointerleave', () => { mouse = null; });
     cv.addEventListener('contextmenu', e => { e.preventDefault(); const r = cv.getBoundingClientRect(), p = toW(e.clientX - r.left, e.clientY - r.top); const t = prompt('Podpis znacznika (puste = usuń znacznik w tym miejscu):', ''); if (t === null) return; const list = marks[data.mapId] = marks[data.mapId] || []; if (!t.trim()) { const i = list.findIndex(m => Math.abs(m.x - p[0]) < 3 && Math.abs(m.y - p[1]) < 3); if (i >= 0) list.splice(i, 1); } else list.push({ x: p[0], y: p[1], t: t.trim().slice(0, 40) }); saveM(); drawMarks(); });
     bar.append(search, mkB('⚙', 'Ustawienia minimapy', () => { if (root.openSettings) root.openSettings(); }), mkB('⛶', 'Cała mapa w oknie', () => { cfg.fit = true; save(); setTimeout(() => fitWindow(document.getElementById('gi-mm-win')), 30); }), mkB('⌖', 'Wyśrodkuj na sobie i podążaj', () => { cfg.fit = false; cfg.follow = true; save(); }), mkB('+', 'Przybliż', () => setZoom(1.3)), mkB('−', 'Oddal', () => setZoom(1 / 1.3)));
@@ -3960,8 +3961,8 @@
       const hh = Math.max(150, Math.floor(w.clientHeight - bd.offsetTop - pad));
       if (body._h !== hh) { body._h = hh; body.style.height = hh + 'px'; dirty = true; }
     }
-    function fitWindow(w) {
-      if (!cfg.autowin || !cfg.fit || !data.w || !w) return;
+    function fitWindow(w, force) {
+      if (!(cfg.autowin || force) || !data.w || !w) return;
       const bd = body.parentElement; if (!bd) return;
       const chrome = w.clientWidth - body.clientWidth;
       const nw = Math.round(Math.min(innerWidth - 20, Math.max(260, (body._h - 12) * data.w / data.h + 12 + chrome)));
@@ -4033,7 +4034,7 @@
     const root = el('div');
     root.body = body;
     root.settingsBox = setTabs([
-      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('nolvl', 'Pokazuj też NPC i elementy bez poziomu (ozdoby, lampy itp.)'), mkC('click', 'Kliknięcie potwora lub przejścia na minimapie prowadzi do niego'), mkC('autowin', 'Dopasuj szerokość okna do proporcji mapy'), mkC('fit', 'Pokazuj całą mapę w oknie (dopasuj do rozmiaru)'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
+      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('nolvl', 'Pokazuj też NPC i elementy bez poziomu (ozdoby, lampy itp.)'), mkC('click', 'Kliknięcie potwora lub przejścia na minimapie prowadzi do niego'), mkC('tile', 'Kliknięcie w dowolne miejsce mapy prowadzi postać w to miejsce'), mkC('autowin', 'Po zmianie lokacji dopasuj szerokość okna do proporcji mapy (domyślnie wyłączone — okno zachowuje Twój rozmiar)'), (() => { const b = el('button', { textContent: 'Dopasuj okno do proporcji tej mapy (jednorazowo)' }); b.addEventListener('click', () => fitWindow(document.getElementById('gi-mm-win'), true)); return b; })(), mkC('fit', 'Pokazuj całą mapę w oknie (dopasuj do rozmiaru)'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
       ['Okno', [el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Rozmiar okna minimapy'), el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px' }, ...[['Mała', 260, 230], ['Średnia', 380, 330], ['Duża', 560, 470], ['Bardzo duża', 760, 620]].map(([n, w, h]) => { const b = el('button', { textContent: n }); b.addEventListener('click', () => setWinSize(w, h)); return b; })), szW, szH, el('div', { style: 'margin-top:4px' }, rstSz), el('div', { style: 'color:#90a4ae;font-size:11px;margin:4px 0 8px' }, 'Rozmiar możesz też zmieniać, ciągnąc prawy dolny róg okna.'), el('hr'), el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Klawisz otwierający minimapę'), el('div', { style: 'display:flex;gap:4px;align-items:center;margin-bottom:3px' }, keyBtn, clrKey), el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:6px' }, 'Wybierz klawisz, który nie jest używany w grze. Nie działa podczas pisania na czacie.'), el('hr'), mkC('btn', 'Pokazuj przycisk 🗺 do otwierania i zamykania minimapy'), el('div', { style: 'color:#90a4ae;font-size:11px' }, 'Przycisk możesz przeciągnąć w dowolne miejsce ekranu.')]],
       ['Kolory', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Punkty na mapie'), mkCol('hero', 'Ty'), mkCol('players', 'Gracze'), mkCol('mobs', 'Zwykłe potwory i NPC'), mkCol('e1', 'Elity (I, II, III)'), mkCol('e2', 'Heros'), mkCol('e3', 'Tytan'), mkCol('gates', 'Przejścia'), mkCol('marks', 'Znaczniki'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0 3px' }, 'Mapa i napisy'), mkCol('wall', 'Ściany'), mkCol('free', 'Teren'), mkCol('bg', 'Tło poza mapą'), mkCol('text', 'Napisy przy punktach'), mkCol('search', 'Wyróżnienie wyszukiwania'), el('div', { style: 'margin-top:6px' }, rstCol)]],
       ['Znaczniki', [marksBox]],
@@ -5292,7 +5293,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.101.9');
+    log('Załadowano v2.101.10');
   }
 
   let tries = 0;
