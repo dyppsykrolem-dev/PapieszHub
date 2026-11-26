@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.100.1
+// @version      2.101.1
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3765,6 +3765,158 @@
     return root0;
   }
 
+  const MM_ON_KEY = 'gi_mm_on_v1', MM_CFG_KEY = 'gi_mm_cfg_v1', MM_MARK_KEY = 'gi_mm_marks_v1';
+  let mmEnabled = (() => { try { return localStorage.getItem(MM_ON_KEY) === '1'; } catch (e) { return false; } })();
+  function buildMinimapView() {
+    const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
+    const cfg = Object.assign({ players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: true, btn: true, cols: {} }, readLS(MM_CFG_KEY, {}));
+    cfg.cols = Object.assign({ hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' }, cfg.cols);
+    const COL_DEF = JSON.parse(JSON.stringify(cfg.cols)); Object.assign(COL_DEF, { hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' });
+    const marks = readLS(MM_MARK_KEY, {});
+    const save = () => writeLS(MM_CFG_KEY, cfg), saveM = () => writeLS(MM_MARK_KEY, marks);
+    const safeG = (f, d) => { try { const v = f(); return v == null ? d : v; } catch (e) { return d; } };
+    const num = v => typeof v === 'number' && isFinite(v);
+    const cv = document.createElement('canvas'); cv.style.cssText = 'display:block;width:100%;height:100%;background:#0b0b10;cursor:grab;touch-action:none';
+    cv.style.background = cfg.cols.bg;
+    const ctx = cv.getContext('2d');
+    const info = el('div', { style: 'position:absolute;left:4px;bottom:3px;font:10px Arial;color:#cfd8dc;text-shadow:0 0 3px #000;pointer-events:none' });
+    const bar = el('div', { style: 'position:absolute;right:4px;top:4px;display:flex;gap:3px' });
+    const mkB = (t, ti, fn) => { const b = el('button', { textContent: t, title: ti, style: 'padding:1px 7px;font-weight:bold;cursor:pointer;background:#0b2230cc;color:#fff;border:1px solid #2b6c8a;border-radius:4px' }); b.addEventListener('click', e => { e.stopPropagation(); fn(); }); return b; };
+    const search = isolate(el('input', { type: 'text', placeholder: 'szukaj…', style: 'width:84px;font-size:11px;padding:1px 4px;background:#0b2230cc;color:#fff;border:1px solid #2b6c8a;border-radius:4px' }));
+    const body = el('div', { style: 'position:relative;width:100%;height:100%;min-height:200px' }, cv, info, bar);
+    const view = { cx: 0, cy: 0 };
+    let data = { w: 0, h: 0, col: null, mapId: null, name: '', hero: null, npcs: [], others: [], gates: [], dimsOk: false };
+    let colCv = null, colKey = '', hover = null, mouse = null, drag = null, dirty = true;
+    const gatherXY = (src, out, depth) => {
+      if (!src || depth > 2) return;
+      const arr = Array.isArray(src) ? src : (typeof src === 'object' ? Object.values(src) : []);
+      arr.forEach(o => { const d = o && o.d ? o.d : o; if (d && num(d.x) && num(d.y)) out.push({ x: d.x, y: d.y, name: d.name || d.nick || d.mapname || '' }); else if (d && typeof d === 'object' && depth < 2 && !(d instanceof Node)) gatherXY(d, out, depth + 1); });
+    };
+    function refresh() {
+      const E = PW.Engine; if (!E) return;
+      const m = safeG(() => E.map, null), md = m && m.d, h = safeG(() => E.hero.d, null);
+      if (!md || !h || !num(h.x)) return;
+      const key0 = md.id + '|' + md.name;
+      const nd = { w: 0, h: 0, col: null, mapId: md.id, name: md.name || '', hero: { x: h.x, y: h.y, nick: h.nick }, npcs: [], others: [], gates: [], dimsOk: false };
+      let w = md.x || m.x || m.width || md.w, hh = md.y || m.y || m.height || md.h;
+      const cands = [m.col, md.col, m.collision, md.collision, m.mapCol, m.d && m.d.mapcol];
+      for (const c of cands) { if (c == null) continue; const L = c.length; if (!L) continue; if (num(w) && num(hh) && L === w * hh) { nd.col = c; break; } if (num(hh) && hh > 0 && L % hh === 0 && !num(w)) { w = L / hh; nd.col = c; break; } if (num(w) && w > 0 && L % w === 0 && !num(hh)) { hh = L / w; nd.col = c; break; } }
+      if (num(w) && num(hh) && w > 4 && hh > 4) { nd.w = w; nd.h = hh; nd.dimsOk = true; }
+      safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y)) nd.npcs.push({ x: d.x, y: d.y, nick: d.nick || d.name || '', lvl: d.lvl || 0, wt: Number(d.wt) || 0 }); });
+      safeG(() => Object.values(E.others.check() || E.others.list || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y) && d.nick) nd.others.push({ x: d.x, y: d.y, nick: d.nick, lvl: d.lvl || 0 }); });
+      Object.keys(m).filter(k => /gat|gtw|exit|door|portal/i.test(k)).forEach(k => gatherXY(m[k], nd.gates, 0));
+      if (!nd.dimsOk) { const all = [nd.hero, ...nd.npcs, ...nd.others, ...nd.gates]; nd.w = Math.max(64, ...all.map(p => p.x + 2)); nd.h = Math.max(64, ...all.map(p => p.y + 2)); }
+      if (nd.mapId !== data.mapId) { colKey = ''; view.cx = nd.hero.x; view.cy = nd.hero.y; }
+      data = nd; dirty = true;
+    }
+    function colImg() {
+      const k = data.mapId + '|' + data.w + 'x' + data.h + '|' + cfg.cols.wall + cfg.cols.free;
+      if (k === colKey) return colCv; colKey = k; colCv = null;
+      if (!data.col) return null;
+      const c = document.createElement('canvas'); c.width = data.w; c.height = data.h; const g = c.getContext('2d'), im = g.createImageData(data.w, data.h);
+      const hex = s => { const n = parseInt(s.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }, W_ = hex(cfg.cols.wall), F_ = hex(cfg.cols.free);
+      for (let i = 0; i < data.w * data.h; i++) { const v = data.col[i], blocked = typeof v === 'string' ? v !== '0' : v > 0, q = blocked ? W_ : F_; im.data[i * 4] = q[0]; im.data[i * 4 + 1] = q[1]; im.data[i * 4 + 2] = q[2]; im.data[i * 4 + 3] = 255; }
+      g.putImageData(im, 0, 0); colCv = c; return c;
+    }
+    const sc = () => Math.max(1, 3 * cfg.zoom);
+    const toS = (x, y) => [cv.width / 2 + (x + .5 - view.cx) * sc(), cv.height / 2 + (y + .5 - view.cy) * sc()];
+    const toW = (px, py) => [Math.floor((px - cv.width / 2) / sc() + view.cx), Math.floor((py - cv.height / 2) / sc() + view.cy)];
+    const colOf = n => n.wt >= 3 ? cfg.cols.e3 : n.wt === 2 ? cfg.cols.e2 : n.wt === 1 ? cfg.cols.e1 : cfg.cols.mobs;
+    function draw() {
+      const W_ = cv.clientWidth, H_ = cv.clientHeight; if (!W_ || !H_) return;
+      if (cv.width !== W_ || cv.height !== H_) { cv.width = W_; cv.height = H_; }
+      if (cfg.follow && data.hero) { view.cx = data.hero.x; view.cy = data.hero.y; }
+      ctx.globalAlpha = 1; ctx.fillStyle = cfg.cols.bg; ctx.fillRect(0, 0, cv.width, cv.height);
+      if (!data.mapId) { ctx.fillStyle = '#90a4ae'; ctx.font = '12px Arial'; ctx.fillText('Czekam na dane z gry…', 10, 20); return; }
+      ctx.globalAlpha = cfg.alpha;
+      const s = sc(), o = toS(0, 0), img = colImg();
+      ctx.imageSmoothingEnabled = false;
+      if (img) ctx.drawImage(img, o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s);
+      else { ctx.fillStyle = cfg.cols.free; ctx.fillRect(o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s); }
+      ctx.globalAlpha = 1;
+      const R = Math.max(1.5, cfg.dot * Math.min(1.6, .6 + cfg.zoom / 3)), q = search.value.trim().toLowerCase();
+      const dot = (x, y, col, r) => { const p = toS(x, y); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 6.283); ctx.fill(); return p; };
+      const label = (p, t, col) => { ctx.font = '10px Arial'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(t, p[0] + R + 2, p[1] + 3); ctx.fillStyle = col || cfg.cols.text; ctx.fillText(t, p[0] + R + 2, p[1] + 3); };
+      if (cfg.gates) data.gates.forEach(g => { const p = toS(g.x, g.y); ctx.fillStyle = cfg.cols.gates; ctx.fillRect(p[0] - R, p[1] - R, R * 2, R * 2); if (cfg.labels && g.name && cfg.zoom >= 2) label(p, g.name, '#bbdefb'); });
+      if (cfg.mobs) data.npcs.filter(n => n.wt === 0).forEach(n => dot(n.x, n.y, cfg.cols.mobs, Math.max(1.5, R * .6)));
+      if (cfg.elites) data.npcs.filter(n => n.wt >= 1).forEach(n => { const p = dot(n.x, n.y, colOf(n), R * 1.25); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p[0], p[1], R * 1.25 + 1, 0, 6.283); ctx.stroke(); if (cfg.labels) label(p, n.nick + (n.lvl ? ' (' + n.lvl + ')' : ''), cfg.cols.text); });
+      if (cfg.players) data.others.forEach(n => { const p = dot(n.x, n.y, cfg.cols.players, R); if (cfg.labels && cfg.zoom >= 2.5) label(p, n.nick, '#b3e5fc'); });
+      if (cfg.marks) (marks[data.mapId] || []).forEach(m => { const p = toS(m.x, m.y); ctx.fillStyle = cfg.cols.marks; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] - 4, p[1] - 10); ctx.lineTo(p[0] + 4, p[1] - 10); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(p[0], p[1] - 12, 4, 0, 6.283); ctx.fill(); if (m.t) label([p[0] + 2, p[1] - 12], m.t, '#fff59d'); });
+      if (q) [...data.npcs, ...data.others].filter(n => (n.nick || '').toLowerCase().includes(q)).forEach(n => { const p = toS(n.x, n.y), t = (performance.now() % 1000) / 1000; ctx.strokeStyle = cfg.cols.search; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], R + 3 + t * 8, 0, 6.283); ctx.globalAlpha = 1 - t; ctx.stroke(); ctx.globalAlpha = 1; label(p, n.nick, cfg.cols.search); });
+      if (data.hero) { const p = dot(data.hero.x, data.hero.y, cfg.cols.hero, R * 1.2); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], R * 1.2 + 1.5, 0, 6.283); ctx.stroke(); }
+      hover = null;
+      if (mouse) { let best = 14; const all = [...(cfg.elites ? data.npcs.filter(n => n.wt >= 1) : []), ...(cfg.mobs ? data.npcs.filter(n => n.wt === 0) : []), ...(cfg.players ? data.others : [])]; all.forEach(n => { const p = toS(n.x, n.y), d = Math.hypot(p[0] - mouse[0], p[1] - mouse[1]); if (d < best) { best = d; hover = n; } }); if (hover) { const t = hover.nick + (hover.lvl ? ' (' + hover.lvl + ')' : '') + ' [' + hover.x + ',' + hover.y + ']'; ctx.font = 'bold 11px Arial'; const tw = ctx.measureText(t).width; ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(mouse[0] + 10, mouse[1] - 8, tw + 8, 16); ctx.fillStyle = '#fff'; ctx.fillText(t, mouse[0] + 14, mouse[1] + 4); } }
+      const wp = mouse ? toW(mouse[0], mouse[1]) : null;
+      info.textContent = (data.name || '') + (data.hero ? '  ·  Ty: ' + data.hero.x + ',' + data.hero.y : '') + (wp ? '  ·  kursor: ' + wp[0] + ',' + wp[1] : '') + (data.dimsOk ? '' : '  ·  (rozmiar mapy szacowany)') + (data.col ? '' : '  ·  brak danych ścian');
+    }
+    cv.addEventListener('wheel', e => { e.preventDefault(); cfg.zoom = Math.min(10, Math.max(.5, cfg.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); save(); }, { passive: false });
+    cv.addEventListener('pointerdown', e => { if (e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy }; cv.style.cursor = 'grabbing'; try { cv.setPointerCapture(e.pointerId); } catch (er) {  } });
+    cv.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); mouse = [e.clientX - r.left, e.clientY - r.top]; if (drag) { const dx = (e.clientX - drag.x) / sc(), dy = (e.clientY - drag.y) / sc(); if (Math.abs(dx) + Math.abs(dy) > .3) { cfg.follow = false; view.cx = drag.cx - dx; view.cy = drag.cy - dy; } } });
+    cv.addEventListener('pointerup', () => { drag = null; cv.style.cursor = 'grab'; save(); });
+    cv.addEventListener('pointerleave', () => { mouse = null; });
+    cv.addEventListener('contextmenu', e => { e.preventDefault(); const r = cv.getBoundingClientRect(), p = toW(e.clientX - r.left, e.clientY - r.top); const t = prompt('Podpis znacznika (puste = usuń znacznik w tym miejscu):', ''); if (t === null) return; const list = marks[data.mapId] = marks[data.mapId] || []; if (!t.trim()) { const i = list.findIndex(m => Math.abs(m.x - p[0]) < 3 && Math.abs(m.y - p[1]) < 3); if (i >= 0) list.splice(i, 1); } else list.push({ x: p[0], y: p[1], t: t.trim().slice(0, 40) }); saveM(); drawMarks(); });
+    bar.append(search, mkB('⚙', 'Ustawienia minimapy', () => { if (root.openSettings) root.openSettings(); }), mkB('⌖', 'Wyśrodkuj na sobie i podążaj', () => { cfg.follow = true; save(); }), mkB('+', 'Przybliż', () => { cfg.zoom = Math.min(10, cfg.zoom * 1.3); save(); }), mkB('−', 'Oddal', () => { cfg.zoom = Math.max(.5, cfg.zoom / 1.3); save(); }));
+    ['keydown', 'keyup', 'keypress'].forEach(ev => search.addEventListener(ev, e => e.stopPropagation()));
+    let tmr = 0, raf = 0;
+    const loop = () => { raf = requestAnimationFrame(loop); if (!mmEnabled) return; const w = document.getElementById('gi-mm-win'); if (!w || w.style.display === 'none' || document.hidden) return; draw(); };
+    function apply() { clearInterval(tmr); tmr = 0; if (!mmEnabled) return; refresh(); tmr = setInterval(() => { const w = document.getElementById('gi-mm-win'); if (w && w.style.display !== 'none') { try { refresh(); } catch (e) {  } } }, 250); if (!raf) raf = requestAnimationFrame(loop); }
+    const mkC = (key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
+    const mkR = (key, label, min, max, step, fmt) => { const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' }); const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:90px'; const show = () => { val.textContent = fmt(Number(r.value)); }; r.addEventListener('input', () => { cfg[key] = Number(r.value); show(); save(); }); show(); return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val); };
+    const mkCol = (key, label) => { const c = isolate(el('input', { type: 'color', value: cfg.cols[key] })); c.dataset.k = key; c.addEventListener('input', () => { cfg.cols[key] = c.value; colKey = ''; save(); cv.style.background = cfg.cols.bg; }); return el('div', { style: 'margin:2px 0' }, c, ' ' + label); };
+    const marksBox = el('div');
+    function drawMarks() { const list = marks[data.mapId] || []; marksBox.replaceChildren(el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Prawy przycisk myszy na minimapie dodaje znacznik z podpisem. Pusty podpis w tym samym miejscu usuwa go. Poniżej znaczniki tej mapy (' + (data.name || '—') + ').'), ...list.map((m, i) => { const x = el('button', { textContent: '×' }); x.addEventListener('click', () => { list.splice(i, 1); saveM(); drawMarks(); }); return el('div', { style: 'margin:2px 0' }, `${m.t} [${m.x},${m.y}] `, x); })); }
+    drawMarks(); setInterval(() => { if (marksBox.isConnected && marksBox._m !== data.mapId) { marksBox._m = data.mapId; drawMarks(); } }, 1500);
+    const dbg = isolate(el('textarea', { rows: 9, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
+    const dbgBtn = el('button', { textContent: 'Zbierz dane o mapie' });
+    dbgBtn.addEventListener('click', () => { const E = PW.Engine, m = safeG(() => E.map, {}), md = m.d || {}; dbg.value = JSON.stringify({ mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3) }, null, 1); });
+    const WKEY = 'gi_win_mm_v1';
+    function setWinSize(w, h) {
+      const st = readLS(WKEY, {}) || {}; st.w = Math.round(w); st.h = Math.round(h); writeLS(WKEY, st);
+      const b = document.getElementById('gi-mm-win'); if (b) { b.style.width = st.w + 'px'; b.style.height = st.h + 'px'; }
+      szW.querySelector('input').value = st.w; szH.querySelector('input').value = st.h; szW.querySelector('input').dispatchEvent(new Event('input')); szH.querySelector('input').dispatchEvent(new Event('input'));
+    }
+    const mkSz = (label, min, max, key) => {
+      const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' });
+      const r = isolate(el('input', { type: 'range', min, max, step: 10, value: (readLS(WKEY, {}) || {})[key] || (key === 'w' ? 340 : 300) })); r.style.cssText = 'flex:1;min-width:90px';
+      const show = () => { val.textContent = r.value + ' px'; }; show();
+      r.addEventListener('input', show);
+      r.addEventListener('change', () => { const st = readLS(WKEY, {}) || {}; st[key] = Number(r.value); if (!st.w) st.w = 340; if (!st.h) st.h = 300; writeLS(WKEY, st); const b = document.getElementById('gi-mm-win'); if (b) { b.style.width = st.w + 'px'; b.style.height = st.h + 'px'; } });
+      return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val);
+    };
+    const szW = mkSz('Szerokość', 200, 1000, 'w'), szH = mkSz('Wysokość', 150, 800, 'h');
+    const rstSz = el('button', { textContent: 'Przywróć domyślny rozmiar i pozycję' });
+    rstSz.addEventListener('click', () => { const st = readLS(WKEY, {}) || {}; writeLS(WKEY, { open: st.open }); const b = document.getElementById('gi-mm-win'); if (b) { b.style.width = '340px'; b.style.height = ''; b.style.left = Math.max(0, innerWidth - 360) + 'px'; b.style.top = '100px'; } });
+    const rstCol = el('button', { textContent: 'Przywróć domyślne kolory' });
+    rstCol.addEventListener('click', () => { Object.assign(cfg.cols, COL_DEF); colKey = ''; save(); cv.style.background = cfg.cols.bg; if (rstCol.parentElement) rstCol.parentElement.parentElement.querySelectorAll('input[type=color]').forEach((c, i) => { const k = Object.keys(COL_DEF)[i]; }); document.querySelectorAll('#gi-mm-set input[type=color]').forEach(c => { const k = c.dataset.k; if (k && COL_DEF[k]) c.value = COL_DEF[k]; }); });
+    const PKEY = 'gi_mm_btn_v1'; let launcher = null;
+    function syncLauncher() {
+      const want = mmEnabled && cfg.btn;
+      if (!want) { if (launcher) launcher.style.display = 'none'; return; }
+      if (!launcher) {
+        const p0 = readLS(PKEY, { x: 12, y: Math.max(60, innerHeight - 150) });
+        launcher = el('div', { id: 'gi-mm-open', title: 'Minimapa: kliknij, aby otworzyć lub zamknąć. Przeciągnij, aby przesunąć.', textContent: '🗺', style: `position:fixed;left:${p0.x}px;top:${p0.y}px;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2b6c8a,#0b2230);border:2px solid #81d4fa;color:#fff;font-size:18px;line-height:30px;text-align:center;cursor:pointer;z-index:99998;box-shadow:0 0 8px #000a;user-select:none` });
+        let d = null;
+        launcher.addEventListener('pointerdown', e => { if (e.button !== 0) return; d = { x: e.clientX, y: e.clientY, l: launcher.offsetLeft, t: launcher.offsetTop, moved: false }; try { launcher.setPointerCapture(e.pointerId); } catch (er) {  } });
+        launcher.addEventListener('pointermove', e => { if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y; if (!d.moved && Math.hypot(dx, dy) < 5) return; d.moved = true; launcher.style.left = Math.min(innerWidth - 34, Math.max(0, d.l + dx)) + 'px'; launcher.style.top = Math.min(innerHeight - 34, Math.max(0, d.t + dy)) + 'px'; });
+        launcher.addEventListener('pointerup', () => { if (!d) return; const m = d.moved; d = null; if (m) writeLS(PKEY, { x: launcher.offsetLeft, y: launcher.offsetTop }); else if (root.toggleWin) root.toggleWin(); });
+        document.body.append(launcher);
+      }
+      launcher.style.display = '';
+    }
+    setInterval(syncLauncher, 700);
+    const root = el('div');
+    root.body = body;
+    root.settingsBox = setTabs([
+      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('labels', 'Podpisy przy punktach (przy większym przybliżeniu)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
+      ['Okno', [el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Rozmiar okna minimapy'), el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px' }, ...[['Mała', 260, 230], ['Średnia', 380, 330], ['Duża', 560, 470], ['Bardzo duża', 760, 620]].map(([n, w, h]) => { const b = el('button', { textContent: n }); b.addEventListener('click', () => setWinSize(w, h)); return b; })), szW, szH, el('div', { style: 'margin-top:4px' }, rstSz), el('div', { style: 'color:#90a4ae;font-size:11px;margin:4px 0 8px' }, 'Rozmiar możesz też zmieniać, ciągnąc prawy dolny róg okna.'), el('hr'), mkC('btn', 'Pokazuj przycisk 🗺 do otwierania i zamykania minimapy'), el('div', { style: 'color:#90a4ae;font-size:11px' }, 'Przycisk możesz przeciągnąć w dowolne miejsce ekranu.')]],
+      ['Kolory', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Punkty na mapie'), mkCol('hero', 'Ty'), mkCol('players', 'Gracze'), mkCol('mobs', 'Zwykłe potwory i NPC'), mkCol('e1', 'Elita II'), mkCol('e2', 'Heros'), mkCol('e3', 'Tytan'), mkCol('gates', 'Przejścia'), mkCol('marks', 'Znaczniki'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0 3px' }, 'Mapa i napisy'), mkCol('wall', 'Ściany'), mkCol('free', 'Teren'), mkCol('bg', 'Tło poza mapą'), mkCol('text', 'Napisy przy punktach'), mkCol('search', 'Wyróżnienie wyszukiwania'), el('div', { style: 'margin-top:6px' }, rstCol)]],
+      ['Znaczniki', [marksBox]],
+      ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli brakuje ścian, przejść albo rozmiar mapy się nie zgadza, kliknij i wklej mi wynik.'), dbgBtn, dbg]]
+    ]);
+    root.apply = apply; root.test = apply; root.stop = apply; apply();
+    return root;
+  }
+
   const IF_ON_KEY = 'gi_if_on_v1', IF_CFG_KEY = 'gi_if_cfg_v1';
   let ifEnabled = (() => { try { return localStorage.getItem(IF_ON_KEY) === '1'; } catch (e) { return false; } })();
   const IF_RAR = [['normal', 'Zwykłe', '#9e9e9e'], ['upgraded', 'Ulepszone', '#26c6da'], ['uni', 'Unikaty', '#ffd54f'], ['her', 'Heroiki', '#4fc3f7'], ['leg', 'Legendy', '#ff7a1a']];
@@ -4700,6 +4852,11 @@
     const dmView = safeView('Obrażenia w walce', buildDmgView);
     const bgView = safeView('Zmieniacz tła', buildBgView);
     const ifView = safeView('Ramki przedmiotów', buildItemFramesView);
+    const mmView = safeView('Minimapa', buildMinimapView);
+    const mmWin = (() => {
+      try { return makeFloatWindow({ id: 'gi-mm-win', title: 'Minimapa', key: 'gi_win_mm_v1', content: mmView.body || el('div'), width: 340, top: 100, mini: true, headLeft: [] }); }
+      catch (err) { log('błąd okna minimapy', err); return { el: el('div'), toggle() {}, restore() {}, setOpen() {} }; }
+    })();
     const relogView = safeView('Przelogowanie', buildRelogView);
     const relogWin = (() => {
       try {
@@ -4732,6 +4889,10 @@
     const auraSetWin = mkSetWin('gi-aura-set', 'Ustawienia – Aura ekwipunku', 'gi_win_auraset_v1', auraView.settingsBox || el('div'), 340);
     const haSetWin = mkSetWin('gi-ha-set', 'Ustawienia – Aura postaci', 'gi_win_haset_v1', haView.settingsBox || el('div'), 340);
     const chSetWin = mkSetWin('gi-ch-set', 'Ustawienia – Zmieniacz czatu', 'gi_win_chset_v1', chView.settingsBox || el('div'), 340);
+    const mmSetWin0 = null;
+    const mmSetWin = mkSetWin('gi-mm-set', 'Ustawienia – Minimapa', 'gi_win_mmset_v1', mmView.settingsBox || el('div'), 330);
+    mmView.toggleWin = () => { if (!mmEnabled) return; mmWin.toggle(); };
+    mmView.openSettings = () => mmSetWin.toggle();
     const ifSetWin = mkSetWin('gi-if-set', 'Ustawienia – Ramki przedmiotów', 'gi_win_ifset_v1', ifView.settingsBox || el('div'), 330);
     const bgSetWin = mkSetWin('gi-bg-set', 'Ustawienia – Zmieniacz tła', 'gi_win_bgset_v1', bgView.settingsBox || el('div'), 340);
     const dmSetWin = mkSetWin('gi-dm-set', 'Ustawienia – Obrażenia w walce', 'gi_win_dmset_v1', dmView.settingsBox || el('div'), 340);
@@ -4767,6 +4928,10 @@
         settings: () => chSetWin.toggle(),
         isOn: () => chEnabled,
         setOn: v => { chEnabled = v; try { localStorage.setItem(CH_ON_KEY, v ? '1' : '0'); } catch (e) {} if (chView.apply) chView.apply(); if (!v) chSetWin.setOpen(false); } },
+      { id: 'minimap', icon: '🗺', title: 'Minimapa', desc: 'Własna minimapa z przybliżaniem i przesuwaniem: ściany, przejścia, gracze, potwory, elity i tytani z podpisami, wyszukiwarka po nazwie, własne znaczniki z podpisem (prawy przycisk myszy) i współrzędne pod kursorem. Tylko pokazuje, nie steruje postacią.', view: el('div'), action: () => { if (mmEnabled) mmWin.toggle(); },
+        settings: () => mmSetWin.toggle(),
+        isOn: () => mmEnabled,
+        setOn: v => { mmEnabled = v; try { localStorage.setItem(MM_ON_KEY, v ? '1' : '0'); } catch (e) {} if (mmView.apply) mmView.apply(); if (v) mmWin.setOpen(true); else { mmWin.setOpen(false); mmSetWin.setOpen(false); } } },
       { id: 'itemfr', icon: '🟦', title: 'Ramki przedmiotów', desc: 'Ramki na ikonach przedmiotów według rzadkości (zwykłe, ulepszone, unikaty, heroiki, legendy), 22 style statyczne i animowane, oznaczenie poziomu ulepszenia (+N) oraz ruchome efekty na założonych przedmiotach. Nie koliduje z innymi dodatkami.', view: el('div'), action: () => { if (ifEnabled) ifSetWin.toggle(); },
         settings: () => ifSetWin.toggle(),
         isOn: () => ifEnabled,
@@ -4990,17 +5155,18 @@
       if (panel.style.display === 'block' && typeof win.x === 'number') placePanel(win.x, win.y);
     });
 
-    document.body.append(btn, panel, imgSetWin.el, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, chSetWin.el, ifSetWin.el, bgSetWin.el, dmSetWin.el, flameSetWin.el, gtSetWin.el);
+    document.body.append(btn, panel, imgSetWin.el, respWin.el, dropsWin.el, relogWin.el, respSetWin.el, dropsSetWin.el, relogSetWin.el, auraSetWin.el, haSetWin.el, chSetWin.el, mmWin.el, mmSetWin.el, ifSetWin.el, bgSetWin.el, dmSetWin.el, flameSetWin.el, gtSetWin.el);
     respWin.restore();
     applyResp();
     dropsWin.restore();
     applyDrops();
     relogWin.restore();
     applyRelog();
+    if (mmEnabled) mmWin.restore();
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.100.1');
+    log('Załadowano v2.101.1');
   }
 
   let tries = 0;
