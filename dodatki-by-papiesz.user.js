@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.101.4
+// @version      2.101.5
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3769,11 +3769,12 @@
   let mmEnabled = (() => { try { return localStorage.getItem(MM_ON_KEY) === '1'; } catch (e) { return false; } })();
   function buildMinimapView() {
     const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
-    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
+    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: false, fit: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
     cfg.cols = Object.assign({ hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' }, cfg.cols);
     const COL_DEF = JSON.parse(JSON.stringify(cfg.cols)); Object.assign(COL_DEF, { hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' });
+    if (cfg.fitMig !== 1) { cfg.fitMig = 1; cfg.fit = true; cfg.follow = false; writeLS(MM_CFG_KEY, cfg); }
     const marks = readLS(MM_MARK_KEY, {});
-    const save = () => writeLS(MM_CFG_KEY, cfg), saveM = () => writeLS(MM_MARK_KEY, marks);
+    const save = () => { writeLS(MM_CFG_KEY, cfg); dirty = true; }, saveM = () => writeLS(MM_MARK_KEY, marks);
     const safeG = (f, d) => { try { const v = f(); return v == null ? d : v; } catch (e) { return d; } };
     const num = v => typeof v === 'number' && isFinite(v);
     const cv = document.createElement('canvas'); cv.style.cssText = 'display:block;width:100%;height:100%;background:#0b0b10;cursor:grab;touch-action:none';
@@ -3786,8 +3787,9 @@
     const body = el('div', { style: 'position:relative;width:100%;height:100%;min-height:200px' }, cv, info, bar);
     const view = { cx: 0, cy: 0 };
     let data = { w: 0, h: 0, col: null, mapId: null, name: '', hero: null, npcs: [], others: [], gates: [], dimsOk: false };
+    let stat = { id: 0, tries: 0, t: 0 };
     let colCache = { id: 0, w: 0, h: 0, arr: null, path: '', tries: 0 };
-    let colCv = null, colKey = '', hover = null, mouse = null, drag = null, dirty = true;
+    let lastSig = '', colCv = null, colKey = '', hover = null, mouse = null, drag = null, dirty = true;
     const gatherXY = (src, out, depth) => {
       if (!src || depth > 2) return;
       const arr = Array.isArray(src) ? src : (typeof src === 'object' ? Object.values(src) : []);
@@ -3800,6 +3802,9 @@
       const key0 = md.id + '|' + md.name;
       const nd = { w: 0, h: 0, col: null, mapId: md.id, name: md.name || '', hero: { x: h.x, y: h.y, nick: h.nick }, npcs: [], others: [], gates: [], dimsOk: false };
       let w = md.x || m.x || m.width || md.w, hh = md.y || m.y || m.height || md.h;
+      const useCache = stat.id === md.id && (stat.col || stat.tries >= 3 || Date.now() - stat.t < 2500);
+      if (useCache) { nd.col = stat.col; nd.colPath = stat.colPath; nd.cands = stat.cands; if (stat.w) { w = stat.w; hh = stat.h; } }
+      else {
       const isArr = c => c != null && typeof c === 'object' && (Array.isArray(c) || ArrayBuffer.isView(c)) && !(c instanceof Node);
       const lenOf = c => (typeof c === 'string' || isArr(c)) ? c.length : 0;
       const cands = []; const seen = new Set();
@@ -3831,13 +3836,17 @@
         }
       }
       nd.cands = cands.map(c => c.path + ':' + typeof c.v + ':' + c.n).slice(0, 12);
+      stat = { id: md.id, col: nd.col, colPath: nd.colPath, cands: nd.cands, w, h: hh, tries: (stat.id === md.id ? stat.tries : 0) + 1, t: Date.now() };
+      }
       if (num(w) && num(hh) && w > 4 && hh > 4) { nd.w = w; nd.h = hh; nd.dimsOk = true; }
       safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y)) nd.npcs.push({ x: d.x, y: d.y, nick: d.nick || d.name || '', lvl: d.lvl || 0, wt: Number(d.wt) || 0 }); });
       safeG(() => Object.values(E.others.check() || E.others.list || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y) && d.nick) nd.others.push({ x: d.x, y: d.y, nick: d.nick, lvl: d.lvl || 0 }); });
       Object.keys(m).filter(k => /gat|gtw|exit|door|portal/i.test(k)).forEach(k => gatherXY(m[k], nd.gates, 0));
       if (!nd.dimsOk) { const all = [nd.hero, ...nd.npcs, ...nd.others, ...nd.gates]; nd.w = Math.max(64, ...all.map(p => p.x + 2)); nd.h = Math.max(64, ...all.map(p => p.y + 2)); }
       if (nd.mapId !== data.mapId) { colKey = ''; view.cx = nd.hero.x; view.cy = nd.hero.y; }
-      data = nd; dirty = true;
+      const sig = JSON.stringify([nd.mapId, nd.w, nd.h, !!nd.col, nd.hero.x, nd.hero.y, nd.npcs.map(n => n.x + ',' + n.y), nd.others.map(n => n.x + ',' + n.y), nd.gates.length]);
+      if (sig !== lastSig) { lastSig = sig; dirty = true; }
+      data = nd;
     }
     function colImg() {
       const k = data.mapId + '|' + data.w + 'x' + data.h + '|' + cfg.cols.wall + cfg.cols.free;
@@ -3862,14 +3871,16 @@
       }
       return ok(imgState.im) ? imgState.im : null;
     }
-    const sc = () => Math.max(1, 3 * cfg.zoom);
+    const sc = () => (cfg.fit && data.w && data.h && cv.width > 20 && cv.height > 20) ? Math.max(1, Math.min((cv.width - 12) / data.w, (cv.height - 12) / data.h)) : Math.max(1, 3 * cfg.zoom);
+    const setZoom = f => { if (cfg.fit) { cfg.zoom = sc() / 3; cfg.fit = false; } cfg.zoom = Math.min(10, Math.max(.3, cfg.zoom * f)); save(); };
     const toS = (x, y) => [cv.width / 2 + (x + .5 - view.cx) * sc(), cv.height / 2 + (y + .5 - view.cy) * sc()];
     const toW = (px, py) => [Math.floor((px - cv.width / 2) / sc() + view.cx), Math.floor((py - cv.height / 2) / sc() + view.cy)];
     const colOf = n => n.wt >= 3 ? cfg.cols.e3 : n.wt === 2 ? cfg.cols.e2 : n.wt === 1 ? cfg.cols.e1 : cfg.cols.mobs;
     function draw() {
       const W_ = cv.clientWidth, H_ = cv.clientHeight; if (!W_ || !H_) return;
       if (cv.width !== W_ || cv.height !== H_) { cv.width = W_; cv.height = H_; }
-      if (cfg.follow && data.hero) { view.cx = data.hero.x; view.cy = data.hero.y; }
+      if (cfg.fit && data.w) { view.cx = data.w / 2 - .5; view.cy = data.h / 2 - .5; }
+      else if (cfg.follow && data.hero) { view.cx = data.hero.x; view.cy = data.hero.y; }
       ctx.globalAlpha = 1; ctx.fillStyle = cfg.cols.bg; ctx.fillRect(0, 0, cv.width, cv.height);
       if (!data.mapId) { ctx.fillStyle = '#90a4ae'; ctx.font = '12px Arial'; ctx.fillText('Czekam na dane z gry…', 10, 20); return; }
       ctx.globalAlpha = cfg.alpha;
@@ -3880,7 +3891,7 @@
       else if (img) ctx.drawImage(img, o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s);
       else { ctx.fillStyle = cfg.cols.free; ctx.fillRect(o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s); }
       ctx.globalAlpha = 1;
-      const R = Math.max(1.5, cfg.dot * Math.min(1.6, .6 + cfg.zoom / 3)), q = search.value.trim().toLowerCase();
+      const R = Math.max(1.5, cfg.dot * Math.min(1.6, .6 + (sc() / 3) / 3)), q = search.value.trim().toLowerCase();
       const dot = (x, y, col, r) => { const p = toS(x, y); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 6.283); ctx.fill(); return p; };
       const label = (p, t, col) => { ctx.font = '10px Arial'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(t, p[0] + R + 2, p[1] + 3); ctx.fillStyle = col || cfg.cols.text; ctx.fillText(t, p[0] + R + 2, p[1] + 3); };
       if (cfg.gates) data.gates.forEach(g => { const p = toS(g.x, g.y); ctx.fillStyle = cfg.cols.gates; ctx.fillRect(p[0] - R, p[1] - R, R * 2, R * 2); });
@@ -3895,16 +3906,16 @@
       const wp = mouse ? toW(mouse[0], mouse[1]) : null;
       info.textContent = (data.name || '') + (data.hero ? '  ·  Ty: ' + data.hero.x + ',' + data.hero.y : '') + (wp ? '  ·  kursor: ' + wp[0] + ',' + wp[1] : '') + (data.dimsOk ? '' : '  ·  (rozmiar mapy szacowany)') + (data.col ? '' : '  ·  brak danych ścian');
     }
-    cv.addEventListener('wheel', e => { e.preventDefault(); cfg.zoom = Math.min(10, Math.max(.5, cfg.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); save(); }, { passive: false });
+    cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
     cv.addEventListener('pointerdown', e => { if (e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy }; cv.style.cursor = 'grabbing'; try { cv.setPointerCapture(e.pointerId); } catch (er) {  } });
-    cv.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); mouse = [e.clientX - r.left, e.clientY - r.top]; if (drag) { const dx = (e.clientX - drag.x) / sc(), dy = (e.clientY - drag.y) / sc(); if (Math.abs(dx) + Math.abs(dy) > .3) { cfg.follow = false; view.cx = drag.cx - dx; view.cy = drag.cy - dy; } } });
+    cv.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect(); mouse = [e.clientX - r.left, e.clientY - r.top]; if (drag) { const dx = (e.clientX - drag.x) / sc(), dy = (e.clientY - drag.y) / sc(); if (Math.abs(dx) + Math.abs(dy) > .3) { if (cfg.fit) { cfg.zoom = sc() / 3; cfg.fit = false; } cfg.follow = false; view.cx = drag.cx - dx; view.cy = drag.cy - dy; } } });
     cv.addEventListener('pointerup', () => { drag = null; cv.style.cursor = 'grab'; save(); });
     cv.addEventListener('pointerleave', () => { mouse = null; });
     cv.addEventListener('contextmenu', e => { e.preventDefault(); const r = cv.getBoundingClientRect(), p = toW(e.clientX - r.left, e.clientY - r.top); const t = prompt('Podpis znacznika (puste = usuń znacznik w tym miejscu):', ''); if (t === null) return; const list = marks[data.mapId] = marks[data.mapId] || []; if (!t.trim()) { const i = list.findIndex(m => Math.abs(m.x - p[0]) < 3 && Math.abs(m.y - p[1]) < 3); if (i >= 0) list.splice(i, 1); } else list.push({ x: p[0], y: p[1], t: t.trim().slice(0, 40) }); saveM(); drawMarks(); });
-    bar.append(search, mkB('⚙', 'Ustawienia minimapy', () => { if (root.openSettings) root.openSettings(); }), mkB('⌖', 'Wyśrodkuj na sobie i podążaj', () => { cfg.follow = true; save(); }), mkB('+', 'Przybliż', () => { cfg.zoom = Math.min(10, cfg.zoom * 1.3); save(); }), mkB('−', 'Oddal', () => { cfg.zoom = Math.max(.5, cfg.zoom / 1.3); save(); }));
+    bar.append(search, mkB('⚙', 'Ustawienia minimapy', () => { if (root.openSettings) root.openSettings(); }), mkB('⛶', 'Cała mapa w oknie', () => { cfg.fit = true; save(); }), mkB('⌖', 'Wyśrodkuj na sobie i podążaj', () => { cfg.fit = false; cfg.follow = true; save(); }), mkB('+', 'Przybliż', () => setZoom(1.3)), mkB('−', 'Oddal', () => setZoom(1 / 1.3)));
     ['keydown', 'keyup', 'keypress'].forEach(ev => search.addEventListener(ev, e => e.stopPropagation()));
     let tmr = 0, raf = 0;
-    const loop = () => { raf = requestAnimationFrame(loop); if (!mmEnabled) return; const w = document.getElementById('gi-mm-win'); if (!w || w.style.display === 'none' || document.hidden) return; draw(); };
+    const loop = () => { raf = requestAnimationFrame(loop); if (!mmEnabled) return; const w = document.getElementById('gi-mm-win'); if (!w || w.style.display === 'none' || document.hidden) return; if (!(dirty || mouse || drag || search.value || cv.clientWidth !== cv.width || cv.clientHeight !== cv.height)) return; dirty = false; draw(); };
     function apply() { clearInterval(tmr); tmr = 0; if (!mmEnabled) return; refresh(); tmr = setInterval(() => { const w = document.getElementById('gi-mm-win'); if (w && w.style.display !== 'none') { try { refresh(); } catch (e) {  } } }, 250); if (!raf) raf = requestAnimationFrame(loop); }
     const mkC = (key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
     const mkR = (key, label, min, max, step, fmt) => { const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' }); const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:90px'; const show = () => { val.textContent = fmt(Number(r.value)); }; r.addEventListener('input', () => { cfg[key] = Number(r.value); show(); save(); }); show(); return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val); };
@@ -3970,7 +3981,7 @@
     const root = el('div');
     root.body = body;
     root.settingsBox = setTabs([
-      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
+      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('fit', 'Pokazuj całą mapę w oknie (dopasuj do rozmiaru)'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
       ['Okno', [el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Rozmiar okna minimapy'), el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px' }, ...[['Mała', 260, 230], ['Średnia', 380, 330], ['Duża', 560, 470], ['Bardzo duża', 760, 620]].map(([n, w, h]) => { const b = el('button', { textContent: n }); b.addEventListener('click', () => setWinSize(w, h)); return b; })), szW, szH, el('div', { style: 'margin-top:4px' }, rstSz), el('div', { style: 'color:#90a4ae;font-size:11px;margin:4px 0 8px' }, 'Rozmiar możesz też zmieniać, ciągnąc prawy dolny róg okna.'), el('hr'), el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Klawisz otwierający minimapę'), el('div', { style: 'display:flex;gap:4px;align-items:center;margin-bottom:3px' }, keyBtn, clrKey), el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:6px' }, 'Wybierz klawisz, który nie jest używany w grze. Nie działa podczas pisania na czacie.'), el('hr'), mkC('btn', 'Pokazuj przycisk 🗺 do otwierania i zamykania minimapy'), el('div', { style: 'color:#90a4ae;font-size:11px' }, 'Przycisk możesz przeciągnąć w dowolne miejsce ekranu.')]],
       ['Kolory', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Punkty na mapie'), mkCol('hero', 'Ty'), mkCol('players', 'Gracze'), mkCol('mobs', 'Zwykłe potwory i NPC'), mkCol('e1', 'Elita II'), mkCol('e2', 'Heros'), mkCol('e3', 'Tytan'), mkCol('gates', 'Przejścia'), mkCol('marks', 'Znaczniki'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0 3px' }, 'Mapa i napisy'), mkCol('wall', 'Ściany'), mkCol('free', 'Teren'), mkCol('bg', 'Tło poza mapą'), mkCol('text', 'Napisy przy punktach'), mkCol('search', 'Wyróżnienie wyszukiwania'), el('div', { style: 'margin-top:6px' }, rstCol)]],
       ['Znaczniki', [marksBox]],
@@ -5229,7 +5240,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.101.4');
+    log('Załadowano v2.101.5');
   }
 
   let tries = 0;
