@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.101.2
+// @version      2.101.4
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3769,7 +3769,7 @@
   let mmEnabled = (() => { try { return localStorage.getItem(MM_ON_KEY) === '1'; } catch (e) { return false; } })();
   function buildMinimapView() {
     const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
-    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: true, btn: true, cols: {} }, readLS(MM_CFG_KEY, {}));
+    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
     cfg.cols = Object.assign({ hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' }, cfg.cols);
     const COL_DEF = JSON.parse(JSON.stringify(cfg.cols)); Object.assign(COL_DEF, { hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' });
     const marks = readLS(MM_MARK_KEY, {});
@@ -3786,6 +3786,7 @@
     const body = el('div', { style: 'position:relative;width:100%;height:100%;min-height:200px' }, cv, info, bar);
     const view = { cx: 0, cy: 0 };
     let data = { w: 0, h: 0, col: null, mapId: null, name: '', hero: null, npcs: [], others: [], gates: [], dimsOk: false };
+    let colCache = { id: 0, w: 0, h: 0, arr: null, path: '', tries: 0 };
     let colCv = null, colKey = '', hover = null, mouse = null, drag = null, dirty = true;
     const gatherXY = (src, out, depth) => {
       if (!src || depth > 2) return;
@@ -3810,6 +3811,25 @@
       cands.sort((a, b) => pref(a) - pref(b));
       for (const c of cands) { const L = c.n; if (num(w) && num(hh) && L === w * hh) { nd.col = c.v; nd.colPath = c.path; break; } }
       if (!nd.col) for (const c of cands) { const L = c.n; let f = null; for (const a of nums) { if (L % a === 0 && nums.includes(L / a)) { f = [a, L / a]; break; } } if (f) { w = f[0]; hh = f[1]; if (num(md.x) && num(md.y) && md.x * md.y === L) { w = md.x; hh = md.y; } nd.col = c.v; nd.colPath = c.path; break; } }
+      if (!nd.col && num(w) && num(hh) && w > 4 && hh > 4) {
+        if (colCache.id === md.id && colCache.w === w && colCache.h === hh && colCache.arr) { nd.col = colCache.arr; nd.colPath = colCache.path; }
+        else if (colCache.id !== md.id || colCache.w !== w || colCache.tries < 3) {
+          if (colCache.id !== md.id) colCache = { id: md.id, w, h: hh, arr: null, path: '', tries: 0 };
+          colCache.tries++;
+          const owners = [['col', m.col], ['collider', m.collider], ['col', md.col]];
+          outer: for (const [on, ob] of owners) {
+            if (!ob || (typeof ob !== 'object' && typeof ob !== 'function')) continue;
+            let names = []; try { names = Object.getOwnPropertyNames(Object.getPrototypeOf(ob) || {}).concat(Object.keys(ob)); } catch (e) {  }
+            names = [...new Set(names)].filter(k => { try { return typeof ob[k] === 'function' && k !== 'constructor' && !/^(set|add|remove|delete|clear|destroy|init|draw|update|on[A-Z])/i.test(k); } catch (e) { return false; } });
+            names.sort((a, b) => (/check|get|block|coll|wall|pass|is/i.test(a) ? 0 : 1) - (/check|get|block|coll|wall|pass|is/i.test(b) ? 0 : 1));
+            for (const fn of names.slice(0, 14)) {
+              let ok = false, seenV = new Set(); const arr = new Uint8Array(w * hh);
+              try { for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) { const r = ob[fn](x, y); const v = typeof r === 'boolean' ? (r ? 1 : 0) : (typeof r === 'number' ? (r > 0 ? 1 : 0) : -1); if (v < 0) throw 0; arr[y * w + x] = v; seenV.add(v); } ok = seenV.size > 1; } catch (e) { ok = false; }
+              if (ok) { colCache.arr = arr; colCache.path = on + '.' + fn + '(x,y)'; nd.col = arr; nd.colPath = colCache.path; break outer; }
+            }
+          }
+        }
+      }
       nd.cands = cands.map(c => c.path + ':' + typeof c.v + ':' + c.n).slice(0, 12);
       if (num(w) && num(hh) && w > 4 && hh > 4) { nd.w = w; nd.h = hh; nd.dimsOk = true; }
       safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y)) nd.npcs.push({ x: d.x, y: d.y, nick: d.nick || d.name || '', lvl: d.lvl || 0, wt: Number(d.wt) || 0 }); });
@@ -3828,6 +3848,20 @@
       for (let i = 0; i < data.w * data.h; i++) { const v = data.col[i], blocked = typeof v === 'string' ? v !== '0' : v > 0, q = blocked ? W_ : F_; im.data[i * 4] = q[0]; im.data[i * 4 + 1] = q[1]; im.data[i * 4 + 2] = q[2]; im.data[i * 4 + 3] = 255; }
       g.putImageData(im, 0, 0); colCv = c; return c;
     }
+    let imgState = { id: 0, im: null };
+    function mapImg() {
+      if (cfg.img === false) return null;
+      const E = PW.Engine, m = safeG(() => E.map, null); if (!m || !m.d) return null;
+      if (imgState.id !== m.d.id) { imgState = { id: m.d.id, im: null, t: 0 }; }
+      const s0 = m.src; let im = imgState.im;
+      const ok = i => i && ((i.naturalWidth > 0) || (i.width > 0 && i.getContext));
+      if (!im) {
+        if (s0 && typeof s0 === 'object' && (s0 instanceof HTMLImageElement || s0 instanceof HTMLCanvasElement)) im = s0;
+        else if (typeof s0 === 'string' && s0 && !imgState.t) { imgState.t = 1; const i = new Image(); i.onload = () => { imgState.im = i; }; i.src = s0; }
+        imgState.im = im || imgState.im;
+      }
+      return ok(imgState.im) ? imgState.im : null;
+    }
     const sc = () => Math.max(1, 3 * cfg.zoom);
     const toS = (x, y) => [cv.width / 2 + (x + .5 - view.cx) * sc(), cv.height / 2 + (y + .5 - view.cy) * sc()];
     const toW = (px, py) => [Math.floor((px - cv.width / 2) / sc() + view.cx), Math.floor((py - cv.height / 2) / sc() + view.cy)];
@@ -3841,7 +3875,9 @@
       ctx.globalAlpha = cfg.alpha;
       const s = sc(), o = toS(0, 0), img = colImg();
       ctx.imageSmoothingEnabled = false;
-      if (img) ctx.drawImage(img, o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s);
+      const bgi = mapImg();
+      if (bgi) { ctx.drawImage(bgi, o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s); if (img) { ctx.globalAlpha = cfg.alpha * .35; ctx.drawImage(img, o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s); } }
+      else if (img) ctx.drawImage(img, o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s);
       else { ctx.fillStyle = cfg.cols.free; ctx.fillRect(o[0] - .5 * s, o[1] - .5 * s, data.w * s, data.h * s); }
       ctx.globalAlpha = 1;
       const R = Math.max(1.5, cfg.dot * Math.min(1.6, .6 + cfg.zoom / 3)), q = search.value.trim().toLowerCase();
@@ -3876,9 +3912,14 @@
     const marksBox = el('div');
     function drawMarks() { const list = marks[data.mapId] || []; marksBox.replaceChildren(el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Prawy przycisk myszy na minimapie dodaje znacznik z podpisem. Pusty podpis w tym samym miejscu usuwa go. Poniżej znaczniki tej mapy (' + (data.name || '—') + ').'), ...list.map((m, i) => { const x = el('button', { textContent: '×' }); x.addEventListener('click', () => { list.splice(i, 1); saveM(); drawMarks(); }); return el('div', { style: 'margin:2px 0' }, `${m.t} [${m.x},${m.y}] `, x); })); }
     drawMarks(); setInterval(() => { if (marksBox.isConnected && marksBox._m !== data.mapId) { marksBox._m = data.mapId; drawMarks(); } }, 1500);
-    const dbg = isolate(el('textarea', { rows: 9, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
+    const dbg = isolate(el('textarea', { rows: 12, readOnly: true })); dbg.style.cssText = 'width:100%;box-sizing:border-box;font-size:10px';
     const dbgBtn = el('button', { textContent: 'Zbierz dane o mapie' });
-    dbgBtn.addEventListener('click', () => { const E = PW.Engine, m = safeG(() => E.map, {}), md = m.d || {}; dbg.value = JSON.stringify({ mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, kandydaciNaSciany: data.cands, uzyty: data.colPath, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3) }, null, 1); });
+    const dbgCopy = el('button', { textContent: 'Kopiuj' }); dbgCopy.addEventListener('click', () => { dbg.select(); try { navigator.clipboard.writeText(dbg.value); } catch (e) { document.execCommand('copy'); } });
+    dbgBtn.addEventListener('click', () => { const E = PW.Engine, m = safeG(() => E.map, {}), md = m.d || {};
+      const desc = o => { const r = {}; try { Object.keys(o).slice(0, 120).forEach(k => { let v; try { v = o[k]; } catch (e) { return; } const t = v === null ? 'null' : Array.isArray(v) ? 'array:' + v.length : ArrayBuffer.isView(v) ? 'typed:' + v.length : typeof v === 'string' ? 'string:' + v.length + ':' + v.slice(0, 20) : typeof v === 'object' ? 'obj{' + Object.keys(v).slice(0, 12).join(',') + '}' : typeof v === 'function' ? 'fn' : typeof v + ':' + String(v).slice(0, 30); r[k] = t; }); } catch (e) {  } return r; };
+      const dom = [...document.querySelectorAll('canvas,[class*="map" i],[id*="map" i],[class*="radar" i]')].filter(e => !e.closest('#gi-mm-win') && !e.closest('[id^="gi-"]')).slice(0, 30).map(e => e.tagName + (e.id ? '#' + e.id : '') + (e.className && e.className.baseVal === undefined ? '.' + String(e.className).trim().split(/\s+/).slice(0, 4).join('.') : '') + (e.tagName === 'CANVAS' ? ' ' + e.width + 'x' + e.height : ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height)));
+      const protoOf = o => { try { return o && typeof o === 'object' ? Object.getOwnPropertyNames(Object.getPrototypeOf(o) || {}).slice(0, 40) : null; } catch (e) { return null; } };
+      dbg.value = JSON.stringify({ colPola: m.col && typeof m.col === 'object' ? desc(m.col) : typeof m.col, colMetody: protoOf(m.col), colliderPola: m.collider && typeof m.collider === 'object' ? desc(m.collider) : typeof m.collider, colliderMetody: protoOf(m.collider), src: typeof m.src === 'string' ? m.src.slice(0, 200) : (m.src && m.src.constructor && m.src.constructor.name), size: m.size, dFile: md.file, dBg: md.bg, uzytyOdczyt: data.colPath, mapaPola: desc(m), mapaDPola: desc(md), elementyDOM: dom, silnikKlucze: Object.keys(E || {}).filter(k => /map|town|path|loc|world|minimap/i.test(k)),  mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, kandydaciNaSciany: data.cands, uzyty: data.colPath, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3) }, null, 1); });
     const WKEY = 'gi_win_mm_v1';
     function setWinSize(w, h) {
       const st = readLS(WKEY, {}) || {}; st.w = Math.round(w); st.h = Math.round(h); writeLS(WKEY, st);
@@ -3929,11 +3970,11 @@
     const root = el('div');
     root.body = body;
     root.settingsBox = setTabs([
-      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
+      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
       ['Okno', [el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Rozmiar okna minimapy'), el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px' }, ...[['Mała', 260, 230], ['Średnia', 380, 330], ['Duża', 560, 470], ['Bardzo duża', 760, 620]].map(([n, w, h]) => { const b = el('button', { textContent: n }); b.addEventListener('click', () => setWinSize(w, h)); return b; })), szW, szH, el('div', { style: 'margin-top:4px' }, rstSz), el('div', { style: 'color:#90a4ae;font-size:11px;margin:4px 0 8px' }, 'Rozmiar możesz też zmieniać, ciągnąc prawy dolny róg okna.'), el('hr'), el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Klawisz otwierający minimapę'), el('div', { style: 'display:flex;gap:4px;align-items:center;margin-bottom:3px' }, keyBtn, clrKey), el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:6px' }, 'Wybierz klawisz, który nie jest używany w grze. Nie działa podczas pisania na czacie.'), el('hr'), mkC('btn', 'Pokazuj przycisk 🗺 do otwierania i zamykania minimapy'), el('div', { style: 'color:#90a4ae;font-size:11px' }, 'Przycisk możesz przeciągnąć w dowolne miejsce ekranu.')]],
       ['Kolory', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Punkty na mapie'), mkCol('hero', 'Ty'), mkCol('players', 'Gracze'), mkCol('mobs', 'Zwykłe potwory i NPC'), mkCol('e1', 'Elita II'), mkCol('e2', 'Heros'), mkCol('e3', 'Tytan'), mkCol('gates', 'Przejścia'), mkCol('marks', 'Znaczniki'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0 3px' }, 'Mapa i napisy'), mkCol('wall', 'Ściany'), mkCol('free', 'Teren'), mkCol('bg', 'Tło poza mapą'), mkCol('text', 'Napisy przy punktach'), mkCol('search', 'Wyróżnienie wyszukiwania'), el('div', { style: 'margin-top:6px' }, rstCol)]],
       ['Znaczniki', [marksBox]],
-      ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli brakuje ścian, przejść albo rozmiar mapy się nie zgadza, kliknij i wklej mi wynik.'), dbgBtn, dbg]]
+      ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli brakuje ścian, przejść albo rozmiar mapy się nie zgadza, kliknij i wklej mi wynik.'), el('div', { style: 'display:flex;gap:4px;margin-bottom:4px' }, dbgBtn, dbgCopy), dbg]]
     ]);
     root.apply = apply; root.test = apply; root.stop = apply; apply();
     return root;
@@ -5188,7 +5229,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.101.2');
+    log('Załadowano v2.101.4');
   }
 
   let tries = 0;
