@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.103.0
+// @version      2.104.0
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3779,12 +3779,29 @@
     const cfg = Object.assign({ addons: 100, game: 100, gameOn: false }, readLS(SC_CFG_KEY, {}));
     const save = () => writeLS(SC_CFG_KEY, cfg);
     const style = document.createElement('style'); style.id = 'gi-scale-css'; document.head.append(style);
+    let handle = null;
+    function syncHandle() {
+      const want = scEnabled && cfg.gameOn && cfg.handle !== false;
+      if (!want) { if (handle) handle.style.display = 'none'; return; }
+      if (!handle) {
+        handle = el('div', { id: 'gi-sc-handle', title: 'Przeciągnij: w dół/w prawo = większy interfejs gry, w górę/w lewo = mniejszy. Dwuklik = 100%.', textContent: '⤡', style: 'position:fixed;right:110px;bottom:110px;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2b6c8a,#0b2230);border:2px solid #81d4fa;color:#fff;font:bold 18px/30px Arial;text-align:center;cursor:nwse-resize;z-index:99998;box-shadow:0 0 8px #000a;user-select:none;touch-action:none' });
+        let d = null;
+        handle.addEventListener('pointerdown', e => { if (e.button !== 0) return; d = { x: e.clientX, y: e.clientY, k: cfg.game }; try { handle.setPointerCapture(e.pointerId); } catch (er) {  } e.preventDefault(); });
+        handle.addEventListener('pointermove', e => { if (!d) return; const m = ((e.clientX - d.x) + (e.clientY - d.y)) / 2; cfg.game = Math.round(Math.min(150, Math.max(70, d.k * Math.exp(m / 400)))); apply(); });
+        handle.addEventListener('pointerup', () => { if (!d) return; d = null; save(); if (gameLbl) gameLbl.update(); });
+        handle.addEventListener('dblclick', () => { cfg.game = 100; save(); apply(); if (gameLbl) gameLbl.update(); });
+        document.body.append(handle);
+      }
+      handle.style.display = ''; handle.title = 'Interfejs gry: ' + cfg.game + '%. Przeciągnij: w dół/w prawo = większy, w górę/w lewo = mniejszy. Dwuklik = 100%.';
+    }
+    let gameLbl = null;
     function apply() {
-      if (!scEnabled) { style.textContent = ''; return; }
+      if (!scEnabled) { style.textContent = ''; syncHandle(); return; }
       const a = Math.max(.5, Math.min(2.5, cfg.addons / 100)), g = Math.max(.7, Math.min(1.6, cfg.game / 100));
       let css = '';
       if (Math.abs(a - 1) > .001) css += `html .gi-float{transform:scale(${a});transform-origin:0 0;max-height:calc(92vh / ${a}) !important;max-width:calc(98vw / ${a}) !important}\nhtml #gi-panel{transform:scale(${a});transform-origin:0 100%;max-height:calc((100vh - 60px) / ${a}) !important;max-width:calc(98vw / ${a}) !important}\nhtml #gi-btn{transform:scale(${Math.min(a, 1.6)});transform-origin:0 100%}\n`;
-      if (cfg.gameOn && Math.abs(g - 1) > .001) css += `html .interface-layer.layer{zoom:${g}}\n`;
+      if (cfg.gameOn && Math.abs(g - 1) > .001) css += `html .interface-layer.layer{transform:scale(${g}) !important;transform-origin:0 0 !important;width:calc(100% / ${g}) !important;height:calc(100% / ${g}) !important;right:auto !important;bottom:auto !important}\n`;
+      syncHandle();
       style.textContent = css;
     }
     const mkR = (key, label, min, max, step) => {
@@ -3797,6 +3814,7 @@
     const presets = (key) => el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 6px' }, ...[80, 100, 120, 150, 175, 200].filter(v => key !== 'game' || v <= 150).map(v => { const b = el('button', { textContent: v + '%' }); b.addEventListener('click', () => { cfg[key] = v; save(); apply(); rebuild(); }); return b; }));
     const holder = el('div');
     function rebuild() {
+      const hOn = isolate(el('input', { type: 'checkbox', checked: cfg.handle !== false })); hOn.addEventListener('change', () => { cfg.handle = hOn.checked; save(); apply(); });
       const gOn = isolate(el('input', { type: 'checkbox', checked: !!cfg.gameOn })); gOn.addEventListener('change', () => { cfg.gameOn = gOn.checked; save(); apply(); });
       holder.replaceChildren(
         el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Okna i przyciski dodatków'),
@@ -3804,12 +3822,13 @@
         el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:8px' }, 'Powiększa lub zmniejsza wszystkie okna dodatków i panel z przyciskiem 🅿. Okna powiększają się od lewego górnego rogu.'),
         el('hr'),
         el('label', { style: 'display:block;cursor:pointer;margin:4px 0' }, gOn, ' Skaluj też interfejs gry (eksperymentalne)'),
+        el('label', { style: 'display:block;cursor:pointer;margin:4px 0' }, hOn, ' Pokaż uchwyt ⤡ do skalowania przeciąganiem (prawy dolny róg ekranu)'),
         mkR('game', 'Interfejs gry', 70, 150, 5), presets('game'),
-        el('div', { style: 'color:#ffcc80;font-size:11px' }, 'Uwaga: ta opcja zmienia rozmiar okien samej gry. Przy niektórych oknach przeciąganie lub dymki mogą być przesunięte. Jeśli coś będzie działać dziwnie, odznacz opcję albo wróć do 100%.'),
+        el('div', { style: 'color:#ffcc80;font-size:11px' }, 'Uwaga: ta opcja zmienia rozmiar okien samej gry (metodą przekształcenia, a nie „zoom”). Przy niektórych oknach przeciąganie lub dymki mogą być lekko przesunięte, a kliknięcie w mapę może trafiać obok — jeśli tak będzie, daj znać. Jeśli coś będzie działać dziwnie, odznacz opcję albo wróć do 100%.'),
         el('div', { style: 'margin-top:8px' }, (() => { const b = el('button', { textContent: 'Przywróć 100%' }); b.addEventListener('click', () => { cfg.addons = 100; cfg.game = 100; cfg.gameOn = false; save(); apply(); rebuild(); }); return b; })())
       );
     }
-    rebuild();
+    rebuild(); gameLbl = { update: rebuild };
     const root0 = el('div');
     root0.settingsBox = el('div', {}, holder);
     root0.apply = apply; root0.stop = apply; root0.test = apply;
@@ -5058,7 +5077,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.103.0');
+    log('Załadowano v2.104.0');
   }
 
   let tries = 0;
