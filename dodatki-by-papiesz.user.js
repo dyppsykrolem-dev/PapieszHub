@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dodatki by Papiesz
 // @namespace    margonem-zmieniacz-grafik
-// @version      2.101.7
+// @version      2.101.8
 // @description  Dodatki by Papiesz – zbiór dodatków do nowego interfejsu Margonem: Zmieniacz grafik przedmiotów i Minutnik respawnów (E2, Heros, Tytan).
 // @homepageURL  https://github.com/dyppsykrolem-dev/PapieszHub
 // @updateURL    https://raw.githubusercontent.com/dyppsykrolem-dev/PapieszHub/main/dodatki-by-papiesz.user.js
@@ -3769,7 +3769,7 @@
   let mmEnabled = (() => { try { return localStorage.getItem(MM_ON_KEY) === '1'; } catch (e) { return false; } })();
   function buildMinimapView() {
     const PW = (typeof unsafeWindow !== 'undefined') ? unsafeWindow : window;
-    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: false, nolvl: false, fit: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
+    const cfg = Object.assign({ key: '', players: true, mobs: true, elites: true, gates: true, marks: true, labels: true, dot: 4, alpha: 0.92, zoom: 2.5, follow: false, autowin: true, nolvl: false, fit: true, btn: true, img: true, cols: {} }, readLS(MM_CFG_KEY, {}));
     cfg.cols = Object.assign({ hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' }, cfg.cols);
     const COL_DEF = JSON.parse(JSON.stringify(cfg.cols)); Object.assign(COL_DEF, { hero: '#69f0ae', players: '#4fc3f7', mobs: '#90a4ae', e1: '#ffb300', e2: '#ff5252', e3: '#e040fb', gates: '#448aff', marks: '#ffeb3b', wall: '#14141c', free: '#2f3a4a', bg: '#0b0b10', search: '#ffeb3b', text: '#ffffff' });
     if (cfg.fitMig !== 1) { cfg.fitMig = 1; cfg.fit = true; cfg.follow = false; writeLS(MM_CFG_KEY, cfg); }
@@ -3843,11 +3843,21 @@
       safeG(() => Object.values(E.others.check() || E.others.list || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (d && num(d.x) && num(d.y) && d.nick) nd.others.push({ x: d.x, y: d.y, nick: d.nick, lvl: d.lvl || 0 }); });
       const gw = safeG(() => m.gateways, null);
       let gl = safeG(() => gw && typeof gw.getList === 'function' ? gw.getList() : null, null);
-      if (gl && !Array.isArray(gl) && typeof gl === 'object') gl = Object.values(gl);
-      if (Array.isArray(gl)) gl.forEach(g => { const d = g && g.d ? g.d : g; if (d && num(d.x) && num(d.y)) { let nm = d.name || d.nick || ''; if (!nm) nm = safeG(() => { const tn = gw.townnames; const id = d.id != null ? d.id : d.tid; return tn && tn[id] != null ? (tn[id].name || tn[id]) : ''; }, ''); nd.gates.push({ x: d.x, y: d.y, name: typeof nm === 'string' ? nm : '' }); } });
+      if (gl instanceof Map || gl instanceof Set) gl = Array.from(gl.values());
+      else if (gl && !Array.isArray(gl) && typeof gl === 'object') gl = Object.values(gl);
+      if (Array.isArray(gl)) gl.forEach(g => {
+        if (!g) return; const d = g.d && typeof g.d === 'object' ? g.d : g;
+        let x = d.x, y = d.y;
+        if (!num(x) && Array.isArray(g) && num(g[0])) { x = g[0]; y = g[1]; }
+        if (!num(x) && d.pos && num(d.pos.x)) { x = d.pos.x; y = d.pos.y; }
+        if (!num(x) && num(g.x)) { x = g.x; y = g.y; }
+        if (!num(x) || !num(y)) return;
+        let nm = d.name || d.nick || g.name || ''; if (!nm) nm = safeG(() => { const tn = gw.townnames; const id = d.id != null ? d.id : (d.tid != null ? d.tid : g.id); const v = tn && tn[id]; return v == null ? '' : (v.name || v); }, '');
+        nd.gates.push({ x, y, name: typeof nm === 'string' ? nm : '' });
+      });
       if (!nd.gates.length) Object.keys(m).filter(k => /gat|gtw|exit|door|portal/i.test(k)).forEach(k => { if (typeof m[k] !== 'function') gatherXY(m[k], nd.gates, 0); });
       if (!nd.dimsOk) { const all = [nd.hero, ...nd.npcs, ...nd.others, ...nd.gates]; nd.w = Math.max(64, ...all.map(p => p.x + 2)); nd.h = Math.max(64, ...all.map(p => p.y + 2)); }
-      if (nd.mapId !== data.mapId) { colKey = ''; view.cx = nd.hero.x; view.cy = nd.hero.y; }
+      if (nd.mapId !== data.mapId) { colKey = ''; view.cx = nd.hero.x; view.cy = nd.hero.y; setTimeout(() => fitWindow(document.getElementById('gi-mm-win')), 60); }
       const sig = JSON.stringify([nd.mapId, nd.w, nd.h, !!nd.col, nd.hero.x, nd.hero.y, nd.npcs.map(n => n.x + ',' + n.y), nd.others.map(n => n.x + ',' + n.y), nd.gates.length]);
       if (sig !== lastSig) { lastSig = sig; dirty = true; }
       data = nd;
@@ -3879,7 +3889,9 @@
     const setZoom = f => { if (cfg.fit) { cfg.zoom = sc() / 3; cfg.fit = false; } cfg.zoom = Math.min(10, Math.max(.3, cfg.zoom * f)); save(); };
     const toS = (x, y) => [cv.width / 2 + (x + .5 - view.cx) * sc(), cv.height / 2 + (y + .5 - view.cy) * sc()];
     const toW = (px, py) => [Math.floor((px - cv.width / 2) / sc() + view.cx), Math.floor((py - cv.height / 2) / sc() + view.cy)];
-    const colOf = n => n.wt >= 3 ? cfg.cols.e3 : n.wt === 2 ? cfg.cols.e2 : n.wt === 1 ? cfg.cols.e1 : cfg.cols.mobs;
+    const rk = n => n.wt > 99 ? 3 : n.wt > 79 ? 2 : n.wt > 9 ? 1 : 0;
+    const rkName = n => n.wt > 99 ? 'Tytan' : n.wt > 79 ? 'Heros' : n.wt > 29 ? 'Elita III' : n.wt > 19 ? 'Elita II' : n.wt > 9 ? 'Elita' : '';
+    const colOf = n => ({ 3: cfg.cols.e3, 2: cfg.cols.e2, 1: cfg.cols.e1 })[rk(n)] || cfg.cols.mobs;
     function draw() {
       const W_ = cv.clientWidth, H_ = cv.clientHeight; if (!W_ || !H_) return;
       if (cv.width !== W_ || cv.height !== H_) { cv.width = W_; cv.height = H_; }
@@ -3899,16 +3911,16 @@
       const dot = (x, y, col, r) => { const p = toS(x, y); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 6.283); ctx.fill(); return p; };
       const label = (p, t, col) => { ctx.font = '10px Arial'; ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(t, p[0] + R + 2, p[1] + 3); ctx.fillStyle = col || cfg.cols.text; ctx.fillText(t, p[0] + R + 2, p[1] + 3); };
       if (cfg.gates) data.gates.forEach(g => { const p = toS(g.x, g.y); ctx.fillStyle = cfg.cols.gates; ctx.fillRect(p[0] - R, p[1] - R, R * 2, R * 2); });
-      if (cfg.mobs) data.npcs.filter(n => n.wt === 0).forEach(n => dot(n.x, n.y, cfg.cols.mobs, Math.max(1.5, R * .6)));
-      if (cfg.elites) data.npcs.filter(n => n.wt >= 1).forEach(n => { const p = dot(n.x, n.y, colOf(n), R * 1.25); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p[0], p[1], R * 1.25 + 1, 0, 6.283); ctx.stroke(); });
+      if (cfg.mobs) data.npcs.filter(n => rk(n) === 0).forEach(n => dot(n.x, n.y, cfg.cols.mobs, Math.max(1.5, R * .6)));
+      if (cfg.elites) data.npcs.filter(n => rk(n) >= 1).forEach(n => { const p = dot(n.x, n.y, colOf(n), R * 1.25); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p[0], p[1], R * 1.25 + 1, 0, 6.283); ctx.stroke(); });
       if (cfg.players) data.others.forEach(n => { const p = dot(n.x, n.y, cfg.cols.players, R); });
       if (cfg.marks) (marks[data.mapId] || []).forEach(m => { const p = toS(m.x, m.y); ctx.fillStyle = cfg.cols.marks; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] - 4, p[1] - 10); ctx.lineTo(p[0] + 4, p[1] - 10); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(p[0], p[1] - 12, 4, 0, 6.283); ctx.fill(); if (m.t) label([p[0] + 2, p[1] - 12], m.t, '#fff59d'); });
       if (q) [...data.npcs, ...data.others].filter(n => (n.nick || '').toLowerCase().includes(q)).forEach(n => { const p = toS(n.x, n.y), t = (performance.now() % 1000) / 1000; ctx.strokeStyle = cfg.cols.search; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], R + 3 + t * 8, 0, 6.283); ctx.globalAlpha = 1 - t; ctx.stroke(); ctx.globalAlpha = 1; label(p, n.nick, cfg.cols.search); });
       if (data.hero) { const p = dot(data.hero.x, data.hero.y, cfg.cols.hero, R * 1.2); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p[0], p[1], R * 1.2 + 1.5, 0, 6.283); ctx.stroke(); }
       hover = null;
-      if (mouse) { let best = 14; const all = [...(cfg.elites ? data.npcs.filter(n => n.wt >= 1) : []), ...(cfg.mobs ? data.npcs.filter(n => n.wt === 0) : []), ...(cfg.players ? data.others : [])]; all.forEach(n => { const p = toS(n.x, n.y), d = Math.hypot(p[0] - mouse[0], p[1] - mouse[1]); if (d < best) { best = d; hover = n; } }); if (hover) { const t = hover.nick + (hover.lvl ? ' (' + hover.lvl + ')' : '') + ' [' + hover.x + ',' + hover.y + ']'; ctx.font = 'bold 11px Arial'; const tw = ctx.measureText(t).width; ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(mouse[0] + 10, mouse[1] - 8, tw + 8, 16); ctx.fillStyle = '#fff'; ctx.fillText(t, mouse[0] + 14, mouse[1] + 4); } }
+      if (mouse) { let best = 14; const all = [...(cfg.elites ? data.npcs.filter(n => rk(n) >= 1) : []), ...(cfg.mobs ? data.npcs.filter(n => rk(n) === 0) : []), ...(cfg.players ? data.others : [])]; all.forEach(n => { const p = toS(n.x, n.y), d = Math.hypot(p[0] - mouse[0], p[1] - mouse[1]); if (d < best) { best = d; hover = n; } }); if (hover) { const t = hover.nick + (hover.lvl ? ' (' + hover.lvl + ')' : '') + (hover.wt ? ' · ' + (rkName(hover) || 'wt ' + hover.wt) : '') + ' [' + hover.x + ',' + hover.y + ']'; ctx.font = 'bold 11px Arial'; const tw = ctx.measureText(t).width; ctx.fillStyle = 'rgba(0,0,0,.8)'; ctx.fillRect(mouse[0] + 10, mouse[1] - 8, tw + 8, 16); ctx.fillStyle = '#fff'; ctx.fillText(t, mouse[0] + 14, mouse[1] + 4); } }
       const wp = mouse ? toW(mouse[0], mouse[1]) : null;
-      info.textContent = (data.name || '') + (data.hero ? '  ·  Ty: ' + data.hero.x + ',' + data.hero.y : '') + (wp ? '  ·  kursor: ' + wp[0] + ',' + wp[1] : '') + (data.dimsOk ? '' : '  ·  (rozmiar mapy szacowany)') + (data.col ? '' : '  ·  brak danych ścian');
+      info.textContent = (data.name || '') + (data.hero ? '  ·  Ty: ' + data.hero.x + ',' + data.hero.y : '') + (wp ? '  ·  kursor: ' + wp[0] + ',' + wp[1] : '') + (data.dimsOk ? '' : '  ·  (rozmiar mapy szacowany)') + '  ·  przejścia: ' + data.gates.length + (data.col ? '' : '  ·  brak danych ścian');
     }
     cv.addEventListener('wheel', e => { e.preventDefault(); setZoom(e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
     cv.addEventListener('pointerdown', e => { if (e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, cx: view.cx, cy: view.cy }; cv.style.cursor = 'grabbing'; try { cv.setPointerCapture(e.pointerId); } catch (er) {  } });
@@ -3916,10 +3928,23 @@
     cv.addEventListener('pointerup', () => { drag = null; cv.style.cursor = 'grab'; save(); });
     cv.addEventListener('pointerleave', () => { mouse = null; });
     cv.addEventListener('contextmenu', e => { e.preventDefault(); const r = cv.getBoundingClientRect(), p = toW(e.clientX - r.left, e.clientY - r.top); const t = prompt('Podpis znacznika (puste = usuń znacznik w tym miejscu):', ''); if (t === null) return; const list = marks[data.mapId] = marks[data.mapId] || []; if (!t.trim()) { const i = list.findIndex(m => Math.abs(m.x - p[0]) < 3 && Math.abs(m.y - p[1]) < 3); if (i >= 0) list.splice(i, 1); } else list.push({ x: p[0], y: p[1], t: t.trim().slice(0, 40) }); saveM(); drawMarks(); });
-    bar.append(search, mkB('⚙', 'Ustawienia minimapy', () => { if (root.openSettings) root.openSettings(); }), mkB('⛶', 'Cała mapa w oknie', () => { cfg.fit = true; save(); }), mkB('⌖', 'Wyśrodkuj na sobie i podążaj', () => { cfg.fit = false; cfg.follow = true; save(); }), mkB('+', 'Przybliż', () => setZoom(1.3)), mkB('−', 'Oddal', () => setZoom(1 / 1.3)));
+    bar.append(search, mkB('⚙', 'Ustawienia minimapy', () => { if (root.openSettings) root.openSettings(); }), mkB('⛶', 'Cała mapa w oknie', () => { cfg.fit = true; save(); setTimeout(() => fitWindow(document.getElementById('gi-mm-win')), 30); }), mkB('⌖', 'Wyśrodkuj na sobie i podążaj', () => { cfg.fit = false; cfg.follow = true; save(); }), mkB('+', 'Przybliż', () => setZoom(1.3)), mkB('−', 'Oddal', () => setZoom(1 / 1.3)));
     ['keydown', 'keyup', 'keypress'].forEach(ev => search.addEventListener(ev, e => e.stopPropagation()));
     let tmr = 0, raf = 0;
-    const loop = () => { raf = requestAnimationFrame(loop); if (!mmEnabled) return; const w = document.getElementById('gi-mm-win'); if (!w || w.style.display === 'none' || document.hidden) return; if (!(dirty || mouse || drag || search.value || cv.clientWidth !== cv.width || cv.clientHeight !== cv.height)) return; dirty = false; draw(); };
+    function fitBody(w) {
+      const bd = body.parentElement; if (!bd || !w) return;
+      const cs = getComputedStyle(bd), pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      const hh = Math.max(150, Math.floor(w.clientHeight - bd.offsetTop - pad));
+      if (body._h !== hh) { body._h = hh; body.style.height = hh + 'px'; dirty = true; }
+    }
+    function fitWindow(w) {
+      if (!cfg.autowin || !cfg.fit || !data.w || !w) return;
+      const bd = body.parentElement; if (!bd) return;
+      const chrome = w.clientWidth - body.clientWidth;
+      const nw = Math.round(Math.min(innerWidth - 20, Math.max(260, (body._h - 12) * data.w / data.h + 12 + chrome)));
+      w.style.width = nw + 'px'; const st = readLS(WKEY, {}) || {}; st.w = nw; writeLS(WKEY, st); dirty = true;
+    }
+    const loop = () => { raf = requestAnimationFrame(loop); if (!mmEnabled) return; const w = document.getElementById('gi-mm-win'); if (!w || w.style.display === 'none' || document.hidden) return; fitBody(w); if (!(dirty || mouse || drag || search.value || cv.clientWidth !== cv.width || cv.clientHeight !== cv.height)) return; dirty = false; draw(); };
     function apply() { clearInterval(tmr); tmr = 0; if (!mmEnabled) return; refresh(); tmr = setInterval(() => { const w = document.getElementById('gi-mm-win'); if (w && w.style.display !== 'none') { try { refresh(); } catch (e) {  } } }, 250); if (!raf) raf = requestAnimationFrame(loop); }
     const mkC = (key, label) => { const c = isolate(el('input', { type: 'checkbox', checked: !!cfg[key] })); c.addEventListener('change', () => { cfg[key] = c.checked; save(); }); return el('label', { style: 'display:block;cursor:pointer;margin:2px 0' }, c, ' ' + label); };
     const mkR = (key, label, min, max, step, fmt) => { const val = el('span', { style: 'display:inline-block;min-width:44px;text-align:right;color:#aaa' }); const r = isolate(el('input', { type: 'range', min, max, step, value: cfg[key] })); r.style.cssText = 'flex:1;min-width:90px'; const show = () => { val.textContent = fmt(Number(r.value)); }; r.addEventListener('input', () => { cfg[key] = Number(r.value); show(); save(); }); show(); return el('div', { style: 'display:flex;align-items:center;gap:6px;margin:3px 0' }, el('span', { textContent: label, style: 'min-width:92px' }), r, val); };
@@ -3934,7 +3959,7 @@
       const desc = o => { const r = {}; try { Object.keys(o).slice(0, 120).forEach(k => { let v; try { v = o[k]; } catch (e) { return; } const t = v === null ? 'null' : Array.isArray(v) ? 'array:' + v.length : ArrayBuffer.isView(v) ? 'typed:' + v.length : typeof v === 'string' ? 'string:' + v.length + ':' + v.slice(0, 20) : typeof v === 'object' ? 'obj{' + Object.keys(v).slice(0, 12).join(',') + '}' : typeof v === 'function' ? 'fn' : typeof v + ':' + String(v).slice(0, 30); r[k] = t; }); } catch (e) {  } return r; };
       const dom = [...document.querySelectorAll('canvas,[class*="map" i],[id*="map" i],[class*="radar" i]')].filter(e => !e.closest('#gi-mm-win') && !e.closest('[id^="gi-"]')).slice(0, 30).map(e => e.tagName + (e.id ? '#' + e.id : '') + (e.className && e.className.baseVal === undefined ? '.' + String(e.className).trim().split(/\s+/).slice(0, 4).join('.') : '') + (e.tagName === 'CANVAS' ? ' ' + e.width + 'x' + e.height : ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height)));
       const protoOf = o => { try { return o && typeof o === 'object' ? Object.getOwnPropertyNames(Object.getPrototypeOf(o) || {}).slice(0, 40) : null; } catch (e) { return null; } };
-      dbg.value = JSON.stringify({ colPola: m.col && typeof m.col === 'object' ? desc(m.col) : typeof m.col, colMetody: protoOf(m.col), colliderPola: m.collider && typeof m.collider === 'object' ? desc(m.collider) : typeof m.collider, colliderMetody: protoOf(m.collider), src: typeof m.src === 'string' ? m.src.slice(0, 200) : (m.src && m.src.constructor && m.src.constructor.name), size: m.size, dFile: md.file, dBg: md.bg, uzytyOdczyt: data.colPath, mapaPola: desc(m), mapaDPola: desc(md), elementyDOM: dom, silnikKlucze: Object.keys(E || {}).filter(k => /map|town|path|loc|world|minimap/i.test(k)),  mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, kandydaciNaSciany: data.cands, uzyty: data.colPath, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3), bramyListaSurowa: safeG(() => { const l = E.map.gateways.getList(); const a = Array.isArray(l) ? l : Object.values(l || {}); return a.slice(0, 2).map(g => ({ klucze: Object.keys(g || {}).slice(0, 12), d: g && g.d ? JSON.stringify(g.d).slice(0, 200) : null })); }, null), npcTypy: (() => { const r = {}; safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (!d) return; const k = 'type' + d.type + '/wt' + d.wt + '/' + (d.lvl > 0 ? 'lvl' : 'bezlvl'); (r[k] = r[k] || []).length < 3 && r[k].push(d.nick); }); return r; })() }, null, 1); });
+      dbg.value = JSON.stringify({ colPola: m.col && typeof m.col === 'object' ? desc(m.col) : typeof m.col, colMetody: protoOf(m.col), colliderPola: m.collider && typeof m.collider === 'object' ? desc(m.collider) : typeof m.collider, colliderMetody: protoOf(m.collider), src: typeof m.src === 'string' ? m.src.slice(0, 200) : (m.src && m.src.constructor && m.src.constructor.name), size: m.size, dFile: md.file, dBg: md.bg, uzytyOdczyt: data.colPath, mapaPola: desc(m), mapaDPola: desc(md), elementyDOM: dom, silnikKlucze: Object.keys(E || {}).filter(k => /map|town|path|loc|world|minimap/i.test(k)),  mapa: { id: md.id, nazwa: md.name, x: md.x, y: md.y, kluczeD: Object.keys(md).slice(0, 40), kluczeMap: Object.keys(m).slice(0, 60) }, kandydaciNaSciany: data.cands, uzyty: data.colPath, col: ['col', 'collision'].map(k => [k, m[k] == null ? null : (typeof m[k]) + ':' + m[k].length]).concat([['d.col', md.col == null ? null : typeof md.col + ':' + md.col.length]]), wymiaryOk: data.dimsOk, ile: { npc: data.npcs.length, gracze: data.others.length, bramy: data.gates.length }, bramyPrzykład: data.gates.slice(0, 3), npcPrzykład: data.npcs.slice(0, 3), bramyListaSurowa: safeG(() => { const l = E.map.gateways.getList(); const a = Array.isArray(l) ? l : (l instanceof Map ? Array.from(l.values()) : Object.values(l || {})); return { typ: Array.isArray(l) ? 'array' : l instanceof Map ? 'map' : typeof l, ile: a.length, probki: a.slice(0, 2).map(g => ({ klucze: Object.keys(g || {}).slice(0, 14), d: g && g.d ? JSON.stringify(g.d).slice(0, 220) : JSON.stringify(g).slice(0, 220) })) }; }, null), bramyMetody: safeG(() => Object.keys(E.map.gateways), null), npcTypy: (() => { const r = {}; safeG(() => Object.values(E.npcs.check() || {}), []).forEach(n => { const d = n && n.d ? n.d : n; if (!d) return; const k = 'type' + d.type + '/wt' + d.wt + '/' + (d.lvl > 0 ? 'lvl' : 'bezlvl'); (r[k] = r[k] || []).length < 3 && r[k].push(d.nick); }); return r; })() }, null, 1); });
     const WKEY = 'gi_win_mm_v1';
     function setWinSize(w, h) {
       const st = readLS(WKEY, {}) || {}; st.w = Math.round(w); st.h = Math.round(h); writeLS(WKEY, st);
@@ -3985,9 +4010,9 @@
     const root = el('div');
     root.body = body;
     root.settingsBox = setTabs([
-      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani (z podpisami)'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('nolvl', 'Pokazuj też NPC i elementy bez poziomu (ozdoby, lampy itp.)'), mkC('fit', 'Pokazuj całą mapę w oknie (dopasuj do rozmiaru)'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
+      ['Widok', [mkC('players', 'Gracze'), mkC('mobs', 'Zwykłe potwory i NPC'), mkC('elites', 'Elity, herosi i tytani'), mkC('gates', 'Przejścia między mapami'), mkC('marks', 'Moje znaczniki'), mkC('nolvl', 'Pokazuj też NPC i elementy bez poziomu (ozdoby, lampy itp.)'), mkC('autowin', 'Dopasuj szerokość okna do proporcji mapy'), mkC('fit', 'Pokazuj całą mapę w oknie (dopasuj do rozmiaru)'), mkC('img', 'Obraz lokacji w tle (jeśli gra go udostępnia)'), mkR('dot', 'Wielkość punktów', 2, 9, 1, v => v + ' px'), mkR('alpha', 'Widoczność mapy', .3, 1, .02, v => Math.round(v * 100) + '%')]],
       ['Okno', [el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Rozmiar okna minimapy'), el('div', { style: 'display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px' }, ...[['Mała', 260, 230], ['Średnia', 380, 330], ['Duża', 560, 470], ['Bardzo duża', 760, 620]].map(([n, w, h]) => { const b = el('button', { textContent: n }); b.addEventListener('click', () => setWinSize(w, h)); return b; })), szW, szH, el('div', { style: 'margin-top:4px' }, rstSz), el('div', { style: 'color:#90a4ae;font-size:11px;margin:4px 0 8px' }, 'Rozmiar możesz też zmieniać, ciągnąc prawy dolny róg okna.'), el('hr'), el('div', { style: 'font-weight:bold;margin-bottom:3px' }, 'Klawisz otwierający minimapę'), el('div', { style: 'display:flex;gap:4px;align-items:center;margin-bottom:3px' }, keyBtn, clrKey), el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:6px' }, 'Wybierz klawisz, który nie jest używany w grze. Nie działa podczas pisania na czacie.'), el('hr'), mkC('btn', 'Pokazuj przycisk 🗺 do otwierania i zamykania minimapy'), el('div', { style: 'color:#90a4ae;font-size:11px' }, 'Przycisk możesz przeciągnąć w dowolne miejsce ekranu.')]],
-      ['Kolory', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Punkty na mapie'), mkCol('hero', 'Ty'), mkCol('players', 'Gracze'), mkCol('mobs', 'Zwykłe potwory i NPC'), mkCol('e1', 'Elita II'), mkCol('e2', 'Heros'), mkCol('e3', 'Tytan'), mkCol('gates', 'Przejścia'), mkCol('marks', 'Znaczniki'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0 3px' }, 'Mapa i napisy'), mkCol('wall', 'Ściany'), mkCol('free', 'Teren'), mkCol('bg', 'Tło poza mapą'), mkCol('text', 'Napisy przy punktach'), mkCol('search', 'Wyróżnienie wyszukiwania'), el('div', { style: 'margin-top:6px' }, rstCol)]],
+      ['Kolory', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:3px' }, 'Punkty na mapie'), mkCol('hero', 'Ty'), mkCol('players', 'Gracze'), mkCol('mobs', 'Zwykłe potwory i NPC'), mkCol('e1', 'Elity (I, II, III)'), mkCol('e2', 'Heros'), mkCol('e3', 'Tytan'), mkCol('gates', 'Przejścia'), mkCol('marks', 'Znaczniki'), el('div', { style: 'color:#90a4ae;font-size:11px;margin:6px 0 3px' }, 'Mapa i napisy'), mkCol('wall', 'Ściany'), mkCol('free', 'Teren'), mkCol('bg', 'Tło poza mapą'), mkCol('text', 'Napisy przy punktach'), mkCol('search', 'Wyróżnienie wyszukiwania'), el('div', { style: 'margin-top:6px' }, rstCol)]],
       ['Znaczniki', [marksBox]],
       ['Diagnostyka', [el('div', { style: 'color:#90a4ae;font-size:11px;margin-bottom:4px' }, 'Jeśli brakuje ścian, przejść albo rozmiar mapy się nie zgadza, kliknij i wklej mi wynik.'), el('div', { style: 'display:flex;gap:4px;margin-bottom:4px' }, dbgBtn, dbgCopy), dbg]]
     ]);
@@ -5244,7 +5269,7 @@
     renderRules();
     setInterval(sweep, 600);
     sweep();
-    log('Załadowano v2.101.7');
+    log('Załadowano v2.101.8');
   }
 
   let tries = 0;
